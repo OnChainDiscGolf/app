@@ -617,18 +617,8 @@ export const Profile: React.FC = () => {
                     <p className="text-xs uppercase tracking-wider text-slate-500 font-bold">Rounds Played</p>
                 </div>
                 <div className="bg-slate-800 p-4 rounded-xl text-center border border-slate-700">
-                    <p className="text-3xl font-bold text-brand-primary">{userStats.averageScore > 0 ? userStats.averageScore : '-'}</p>
-                    <p className="text-xs uppercase tracking-wider text-slate-500 font-bold">Avg Score</p>
-                </div>
-                <div className="bg-slate-800 p-4 rounded-xl text-center border border-slate-700">
-                    <p className="text-3xl font-bold text-emerald-400">{userStats.bestScore > 0 ? userStats.bestScore : '-'}</p>
-                    <p className="text-xs uppercase tracking-wider text-slate-500 font-bold">Best Round</p>
-                </div>
-                <div className="bg-slate-800 p-4 rounded-xl text-center border border-slate-700">
-                    <p className="text-xl font-bold text-slate-300 truncate px-1">
-                        {userProfile.lud16 ? 'Active' : 'Setup'}
-                    </p>
-                    <p className="text-xs uppercase tracking-wider text-slate-500 font-bold">Payouts</p>
+                    <p className="text-3xl font-bold text-brand-primary">{userStats.totalSatsWon || 0}</p>
+                    <p className="text-xs uppercase tracking-wider text-slate-500 font-bold">Total Sats Won</p>
                 </div>
             </div>
 

@@ -32,7 +32,7 @@ export interface RoundSettings {
   isFinalized: boolean;
   holeCount: number;
   players: string[]; // List of pubkeys
-  
+
   // Customization Config
   startingHole: number;
   trackPenalties: boolean;
@@ -74,6 +74,7 @@ export interface UserStats {
   totalWins: number;
   averageScore: number;
   bestScore: number;
+  totalSatsWon: number;
 }
 
 export interface AppState {
@@ -108,24 +109,24 @@ export const NOSTR_KIND_SCORE = 30002; // Replaceable event for a Player's Score
 export const NOSTR_KIND_APP_DATA = 30078; // Application-specific Data
 
 export interface KeyPair {
-  sk?: Uint8Array; 
+  sk?: Uint8Array;
   pk: string;
   method: 'local' | 'nip46';
 }
 
 // NIP-07 / NIP-46 Types
 export interface WindowNostr {
-    getPublicKey: () => Promise<string>;
-    signEvent: (event: any) => Promise<any>;
-    nip04?: {
-        encrypt: (pubkey: string, plaintext: string) => Promise<string>;
-        decrypt: (pubkey: string, ciphertext: string) => Promise<string>;
-    };
+  getPublicKey: () => Promise<string>;
+  signEvent: (event: any) => Promise<any>;
+  nip04?: {
+    encrypt: (pubkey: string, plaintext: string) => Promise<string>;
+    decrypt: (pubkey: string, ciphertext: string) => Promise<string>;
+  };
 }
 
 declare global {
-    interface Window {
-        nostr?: WindowNostr;
-        Buffer: any;
-    }
+  interface Window {
+    nostr?: WindowNostr;
+    Buffer: any;
+  }
 }

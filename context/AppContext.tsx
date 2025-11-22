@@ -110,7 +110,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     totalRounds: 0,
     totalWins: 0,
     averageScore: 0,
-    bestScore: 0
+    bestScore: 0,
+    totalSatsWon: 0
   });
 
   const subRef = useRef<any>(null);
@@ -450,11 +451,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } catch (e) { }
         });
 
+        // Calculate Total Sats Won from Transactions
+        const wonTxs = transactions.filter(t => t.type === 'payout' || t.type === 'ace_pot');
+        const totalWon = wonTxs.reduce((sum, t) => sum + t.amountSats, 0);
+
         setUserStats({
           totalRounds: history.length,
           totalWins: 0,
           averageScore: Math.round(totalScoreSum / history.length),
-          bestScore: best === 999 ? 0 : best
+          bestScore: best === 999 ? 0 : best,
+          totalSatsWon: totalWon
         });
       }
     } catch (e) {
