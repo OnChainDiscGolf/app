@@ -9,6 +9,7 @@ import { COURSE_PRESETS } from '../constants';
 import { getPool, getRelays, listEvents, lookupUser } from '../services/nostrService';
 import { NOSTR_KIND_ROUND, DisplayProfile } from '../types';
 import { nip19 } from 'nostr-tools';
+import jsQR from 'jsqr';
 
 // Helper Component for Success Animation (Reusable)
 const SuccessOverlay: React.FC<{ message: string, onClose: () => void }> = ({ message, onClose }) => {
@@ -127,7 +128,7 @@ export const Home: React.FC = () => {
         let animationFrameId: number;
         let isMounted = true;
 
-        const tick = async (jsQR: any) => {
+        const tick = async () => {
             if (!isMounted) return;
 
             if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && canvasRef.current) {
@@ -174,15 +175,13 @@ export const Home: React.FC = () => {
                     }
                 }
             }
-            animationFrameId = requestAnimationFrame(() => tick(jsQR));
+            animationFrameId = requestAnimationFrame(() => tick());
         };
 
         const startCamera = async () => {
             setIsCameraLoading(true);
             try {
-                const jsQRModule = await import('https://esm.sh/jsqr@1.4.2');
-                const jsQR = jsQRModule.default || jsQRModule;
-
+                // jsQR is imported statically
                 const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
 
                 if (!isMounted) {
@@ -200,7 +199,7 @@ export const Home: React.FC = () => {
                     } catch (e) { }
 
                     setIsCameraLoading(false);
-                    requestAnimationFrame(() => tick(jsQR));
+                    requestAnimationFrame(() => tick());
                 }
             } catch (err) {
                 console.error("Camera error", err);

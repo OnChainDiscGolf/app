@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "experimentalDecorators": true,
+    "esModuleInterop": true,
     "useDefineForClassFields": false,
     "module": "ESNext",
     "lib": [
@@ -21,6 +22,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@noble/hashes/utils": [
+        "./node_modules/@noble/hashes/utils.js"
       ]
     },
     "allowImportingTsExtensions": true,
