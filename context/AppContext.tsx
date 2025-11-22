@@ -190,6 +190,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [nwcString]);
 
+  // Auto-refresh balance when wallet mode changes
+  useEffect(() => {
+    refreshWalletBalance();
+  }, [walletMode, nwcString]);
+
   // Persist Wallet Mode
   useEffect(() => {
     localStorage.setItem('cdg_wallet_mode', walletMode);
@@ -944,8 +949,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setWalletModeAction = (mode: 'cashu' | 'nwc') => {
     setWalletMode(mode);
-    // Trigger balance refresh immediately
-    setTimeout(() => refreshWalletBalance(), 100);
   };
 
   const setNwcConnection = (uri: string) => {
