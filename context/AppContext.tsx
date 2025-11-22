@@ -1,8 +1,10 @@
 
+
+import { getDecodedToken } from '@cashu/cashu-ts';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, Player, RoundSettings, WalletTransaction, UserProfile, UserStats, NOSTR_KIND_SCORE, Mint, DisplayProfile, Proof } from '../types';
 import { DEFAULT_HOLE_COUNT } from '../constants';
-import { publishProfile, publishRound, publishScore, subscribeToRound, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch } from '../services/nostrService';
+import { publishProfile, publishRound, publishScore, subscribeToRound, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages } from '../services/nostrService';
 import { WalletService } from '../services/walletService';
 import { bytesToHex } from '@noble/hashes/utils';
 
@@ -16,23 +18,23 @@ interface AppContextType extends AppState {
   updateScore: (hole: number, score: number, playerId?: string) => void;
   setPlayerPaid: (playerId: string) => void;
   finalizeRound: () => void;
-  depositFunds: (amount: number) => Promise<{request: string, quote: string}>; // Returns {request, quote}
+  depositFunds: (amount: number) => Promise<{ request: string, quote: string }>; // Returns {request, quote}
   checkDepositStatus: (quote: string) => Promise<boolean>;
   confirmDeposit: (quote: string, amount: number) => Promise<boolean>;
   joinRoundAndPay: (roundId: string, roundData?: any) => Promise<boolean>;
   resetRound: () => void;
   refreshStats: () => void;
   currentUserPubkey: string;
-  
+
   // Mint/Wallet Actions
   addMint: (url: string, nickname: string) => void;
   removeMint: (url: string) => void;
   setActiveMint: (url: string) => void;
   sendFunds: (amount: number, invoice: string) => Promise<boolean>;
   receiveEcash: (token: string) => Promise<boolean>;
-  getLightningQuote: (invoice: string) => Promise<{amount: number, fee: number}>;
+  getLightningQuote: (invoice: string) => Promise<{ amount: number, fee: number }>;
   refreshWalletBalance: () => Promise<void>;
-  
+
   // Player Management
   addRecentPlayer: (player: DisplayProfile) => void;
 
@@ -42,12 +44,13 @@ interface AppContextType extends AppState {
   createAccount: () => Promise<void>;
   performLogout: () => void;
   isProfileLoading: boolean;
+  createToken: (amount: number) => Promise<string>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  
+
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
@@ -57,10 +60,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Wallet & Local State
   const [proofs, setProofs] = useState<Proof[]>(() => {
-      const saved = localStorage.getItem('cdg_proofs');
-      return saved ? JSON.parse(saved) : [];
+    const saved = localStorage.getItem('cdg_proofs');
+    return saved ? JSON.parse(saved) : [];
   });
-  
+
   const [walletBalance, setWalletBalance] = useState<number>(0);
 
   const [transactions, setTransactions] = useState<WalletTransaction[]>(() => {
@@ -71,16 +74,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [mints, setMints] = useState<Mint[]>(() => {
     const saved = localStorage.getItem('cdg_mints');
     if (saved) {
-        try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        } catch (e) {
-            console.warn("Corrupt mints data in localStorage, resetting.", e);
-        }
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.warn("Corrupt mints data in localStorage, resetting.", e);
+      }
     }
     return [
-        { url: 'https://mint.minibits.cash/Bitcoin', nickname: 'Minibits', isActive: true },
-        { url: 'https://testnut.cashu.space', nickname: 'TestNut', isActive: false }
+      { url: 'https://mint.minibits.cash/Bitcoin', nickname: 'Minibits', isActive: true }
     ];
   });
 
@@ -92,174 +94,174 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [contacts, setContacts] = useState<DisplayProfile[]>([]);
 
   // Nostr Data
-  const [userProfile, setUserProfile] = useState<UserProfile>({ 
-      name: 'Disc Golfer', 
-      about: '', 
-      picture: '', 
-      lud16: '',
-      nip05: ''
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+    name: 'Disc Golfer',
+    about: '',
+    picture: '',
+    lud16: '',
+    nip05: ''
   });
   const [activeRound, setActiveRound] = useState<RoundSettings | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentHole, setCurrentHole] = useState<number>(1);
-  
+
   // Stats
   const [userStats, setUserStats] = useState<UserStats>({
-      totalRounds: 0,
-      totalWins: 0,
-      averageScore: 0,
-      bestScore: 0
+    totalRounds: 0,
+    totalWins: 0,
+    averageScore: 0,
+    bestScore: 0
   });
 
   const subRef = useRef<any>(null);
   const walletServiceRef = useRef<WalletService | null>(null);
-  
+
   // --- Effects ---
 
   // Helper to force immediate sync (bypass debounce)
   const syncWallet = useCallback(async (currentProofs: Proof[], currentMints: Mint[], currentTransactions: WalletTransaction[]) => {
-      if (isAuthenticated && !isGuest) {
-          console.log("Syncing wallet to Nostr...");
-          try {
-            await publishWalletBackup(currentProofs, currentMints, currentTransactions);
-          } catch (e) {
-            console.error("Wallet Sync Failed:", e);
-          }
+    if (isAuthenticated && !isGuest) {
+      console.log("Syncing wallet to Nostr...");
+      try {
+        await publishWalletBackup(currentProofs, currentMints, currentTransactions);
+      } catch (e) {
+        console.error("Wallet Sync Failed:", e);
       }
+    }
   }, [isAuthenticated, isGuest]);
 
   // Persistence & Auto-Calculation
   useEffect(() => {
-      setWalletBalance(WalletService.calculateBalance(proofs));
-      localStorage.setItem('cdg_proofs', JSON.stringify(proofs));
+    setWalletBalance(WalletService.calculateBalance(proofs));
+    localStorage.setItem('cdg_proofs', JSON.stringify(proofs));
   }, [proofs, mints]);
-  
+
   useEffect(() => localStorage.setItem('cdg_txs', JSON.stringify(transactions)), [transactions]);
   useEffect(() => localStorage.setItem('cdg_mints', JSON.stringify(mints)), [mints]);
   useEffect(() => localStorage.setItem('cdg_recent_players', JSON.stringify(recentPlayers)), [recentPlayers]);
 
   // Sync Recent Players to Nostr when changed (Debounced)
   useEffect(() => {
-      if (isAuthenticated && !isGuest && !isProfileLoading && recentPlayers.length > 0) {
-          const timer = setTimeout(() => {
-             publishRecentPlayers(recentPlayers).catch(console.warn);
-          }, 2000); // Debounce 2s to prevent spam
-          return () => clearTimeout(timer);
-      }
+    if (isAuthenticated && !isGuest && !isProfileLoading && recentPlayers.length > 0) {
+      const timer = setTimeout(() => {
+        publishRecentPlayers(recentPlayers).catch(console.warn);
+      }, 2000); // Debounce 2s to prevent spam
+      return () => clearTimeout(timer);
+    }
   }, [recentPlayers, isAuthenticated, isGuest, isProfileLoading]);
 
   // Init Wallet Service
   useEffect(() => {
-      const activeMint = mints.find(m => m.isActive) || mints[0];
-      if (activeMint) {
-          walletServiceRef.current = new WalletService(activeMint.url);
-          walletServiceRef.current.connect().catch(console.error);
-      }
+    const activeMint = mints.find(m => m.isActive) || mints[0];
+    if (activeMint) {
+      walletServiceRef.current = new WalletService(activeMint.url);
+      walletServiceRef.current.connect().catch(console.error);
+    }
   }, [mints]);
 
   // Init Auth
   useEffect(() => {
     const initSession = async () => {
-        let session = getSession();
-        let guestMode = localStorage.getItem('is_guest_mode') === 'true';
+      let session = getSession();
+      let guestMode = localStorage.getItem('is_guest_mode') === 'true';
 
-        // Auto-create Guest Account if no session exists
-        if (!session) {
-            const newIdentity = generateNewProfile();
-            session = { method: 'local', pk: newIdentity.pk, sk: newIdentity.sk };
-            guestMode = true;
-            localStorage.setItem('is_guest_mode', 'true');
+      // Auto-create Guest Account if no session exists
+      if (!session) {
+        const newIdentity = generateNewProfile();
+        session = { method: 'local', pk: newIdentity.pk, sk: newIdentity.sk };
+        guestMode = true;
+        localStorage.setItem('is_guest_mode', 'true');
+      }
+
+      if (session) {
+        setCurrentUserPubkey(session.pk);
+        setAuthMethod(session.method);
+        setIsAuthenticated(true);
+        setIsGuest(guestMode);
+
+        if (guestMode) {
+          setUserProfile({ name: 'Guest Golfer', about: 'Unclaimed account', picture: '', lud16: '', nip05: '' });
         }
-
-        if (session) {
-            setCurrentUserPubkey(session.pk);
-            setAuthMethod(session.method);
-            setIsAuthenticated(true);
-            setIsGuest(guestMode);
-
-            if (guestMode) {
-                setUserProfile({ name: 'Guest Golfer', about: 'Unclaimed account', picture: '', lud16: '', nip05: '' });
-            }
-        }
+      }
     };
     initSession();
 
     return () => {
-        if (subRef.current) subRef.current.close();
+      if (subRef.current) subRef.current.close();
     };
   }, []); // Only run once on mount
 
   // Fetch profile & Restore Wallet/Data when identity changes (e.g. login)
   useEffect(() => {
     if (currentUserPubkey && !isGuest) {
-        setIsProfileLoading(true);
-        
-        // 1. Fetch Profile
-        fetchProfile(currentUserPubkey).then(profile => {
-            if (profile) {
-                console.log("Profile loaded:", profile);
-                setUserProfile(profile);
-            } else {
-                setUserProfile(prev => ({ ...prev, name: 'Nostr User', picture: '', lud16: '', nip05: '' }));
+      setIsProfileLoading(true);
+
+      // 1. Fetch Profile
+      fetchProfile(currentUserPubkey).then(profile => {
+        if (profile) {
+          console.log("Profile loaded:", profile);
+          setUserProfile(profile);
+        } else {
+          setUserProfile(prev => ({ ...prev, name: 'Nostr User', picture: '', lud16: '', nip05: '' }));
+        }
+      }).catch(e => {
+        console.error("Error fetching profile in effect:", e);
+      }).finally(() => {
+        setIsProfileLoading(false);
+        refreshStats();
+      });
+
+      // 2. Fetch Contacts (Friend List)
+      fetchContactList(currentUserPubkey).then(async (contactPubkeys) => {
+        if (contactPubkeys.length > 0) {
+          console.log(`Found ${contactPubkeys.length} contacts.Fetching profiles...`);
+          const profiles = await fetchProfilesBatch(contactPubkeys);
+          setContacts(profiles.sort((a, b) => a.name.localeCompare(b.name)));
+        }
+      }).catch(e => console.warn("Contacts fetch failed", e));
+
+      // 3. Restore Wallet Proofs (Merge Strategy)
+      fetchWalletBackup(currentUserPubkey).then(backup => {
+        if (backup) {
+          console.log("Found remote backup, merging...");
+
+          // Merge existing (guest) proofs with remote proofs
+          setProofs(currentLocalProofs => {
+            const merged = WalletService.deduplicateProofs(currentLocalProofs, backup.proofs);
+            return merged;
+          });
+
+          // Merge Transactions
+          setTransactions(currentTxs => {
+            const existingIds = new Set(currentTxs.map(t => t.id));
+            const newTxs = backup.transactions.filter(t => !existingIds.has(t.id));
+            return [...newTxs, ...currentTxs].sort((a, b) => b.timestamp - a.timestamp);
+          });
+
+          if (backup.mints.length > 0) setMints(backup.mints);
+        } else {
+          console.log("No wallet backup found. Creating initial backup if funds exist.");
+          // If user has local funds (from guest mode) but no remote backup, back them up now
+          setProofs(current => {
+            if (current.length > 0) {
+              console.log("Skipping auto-backup on first load to avoid overwriting history.");
             }
-        }).catch(e => {
-            console.error("Error fetching profile in effect:", e);
-        }).finally(() => {
-            setIsProfileLoading(false);
-            refreshStats();
-        });
+            return current;
+          });
+        }
+      }).catch(e => console.error("Wallet restore failed:", e));
 
-        // 2. Fetch Contacts (Friend List)
-        fetchContactList(currentUserPubkey).then(async (contactPubkeys) => {
-             if (contactPubkeys.length > 0) {
-                 console.log(`Found ${contactPubkeys.length} contacts. Fetching profiles...`);
-                 const profiles = await fetchProfilesBatch(contactPubkeys);
-                 setContacts(profiles.sort((a, b) => a.name.localeCompare(b.name)));
-             }
-        }).catch(e => console.warn("Contacts fetch failed", e));
-
-        // 3. Restore Wallet Proofs (Merge Strategy)
-        fetchWalletBackup(currentUserPubkey).then(backup => {
-            if (backup) {
-                console.log("Found remote backup, merging...");
-                
-                // Merge existing (guest) proofs with remote proofs
-                setProofs(currentLocalProofs => {
-                    const merged = WalletService.deduplicateProofs(currentLocalProofs, backup.proofs);
-                    return merged;
-                });
-
-                // Merge Transactions
-                setTransactions(currentTxs => {
-                    const existingIds = new Set(currentTxs.map(t => t.id));
-                    const newTxs = backup.transactions.filter(t => !existingIds.has(t.id));
-                    return [...newTxs, ...currentTxs].sort((a, b) => b.timestamp - a.timestamp);
-                });
-
-                if (backup.mints.length > 0) setMints(backup.mints);
-            } else {
-                console.log("No wallet backup found. Creating initial backup if funds exist.");
-                // If user has local funds (from guest mode) but no remote backup, back them up now
-                setProofs(current => {
-                    if (current.length > 0) {
-                         console.log("Skipping auto-backup on first load to avoid overwriting history.");
-                    }
-                    return current;
-                });
-            }
-        }).catch(e => console.error("Wallet restore failed:", e));
-
-        // 4. Restore Recent Players
-        fetchRecentPlayers(currentUserPubkey).then(remotePlayers => {
-             if (remotePlayers && remotePlayers.length > 0) {
-                 console.log("Restoring recent players...");
-                 setRecentPlayers(prev => {
-                     const existingPubkeys = new Set(prev.map(p => p.pubkey));
-                     const uniqueRemote = remotePlayers.filter(p => !existingPubkeys.has(p.pubkey));
-                     return [...uniqueRemote, ...prev].slice(0, 50); // keep 50
-                 });
-             }
-        }).catch(e => console.warn("Recent players restore failed:", e));
+      // 4. Restore Recent Players
+      fetchRecentPlayers(currentUserPubkey).then(remotePlayers => {
+        if (remotePlayers && remotePlayers.length > 0) {
+          console.log("Restoring recent players...");
+          setRecentPlayers(prev => {
+            const existingPubkeys = new Set(prev.map(p => p.pubkey));
+            const uniqueRemote = remotePlayers.filter(p => !existingPubkeys.has(p.pubkey));
+            return [...uniqueRemote, ...prev].slice(0, 50); // keep 50
+          });
+        }
+      }).catch(e => console.warn("Recent players restore failed:", e));
     }
   }, [currentUserPubkey, isGuest]);
 
@@ -268,7 +270,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (activeRound && !activeRound.isFinalized) {
       // Set initial hole if provided
       if (activeRound.startingHole) {
-          setCurrentHole(activeRound.startingHole);
+        setCurrentHole(activeRound.startingHole);
       }
 
       // Subscribe to scores for this round
@@ -278,102 +280,139 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         subRef.current = subscribeToRound(activeRound.id, async (event) => {
           const playerPubkey = event.pubkey;
           const content = JSON.parse(event.content);
-          
+
           // If we don't know this player, fetch their profile
           setPlayers(prev => {
             const exists = prev.find(p => p.id === playerPubkey);
-            
+
             if (exists) {
               // Update existing player score
-              return prev.map(p => p.id === playerPubkey ? { 
-                  ...p, 
-                  scores: content.scores, 
-                  totalScore: content.totalScore 
+              return prev.map(p => p.id === playerPubkey ? {
+                ...p,
+                scores: content.scores,
+                totalScore: content.totalScore
               } : p);
             } else {
-               // New player found (async fetch profile but add placeholder first)
-               fetchProfile(playerPubkey).then(prof => {
-                  setPlayers(curr => curr.map(p => p.id === playerPubkey ? { ...p, name: prof?.name || 'Unknown', lightningAddress: prof?.lud16, photoUrl: prof?.picture } : p));
-               }).catch(() => {});
+              // New player found (async fetch profile but add placeholder first)
+              fetchProfile(playerPubkey).then(prof => {
+                setPlayers(curr => curr.map(p => p.id === playerPubkey ? { ...p, name: prof?.name || 'Unknown', lightningAddress: prof?.lud16, photoUrl: prof?.picture } : p));
+              }).catch(() => { });
 
-               return [...prev, {
-                  id: playerPubkey,
-                  name: 'Loading...',
-                  handicap: 0,
-                  paid: true, // Assumed paid if participating on Nostr
-                  scores: content.scores,
-                  totalScore: content.totalScore,
-                  isCurrentUser: playerPubkey === currentUserPubkey
-               }];
+              return [...prev, {
+                id: playerPubkey,
+                name: 'Loading...',
+                handicap: 0,
+                paid: true, // Assumed paid if participating on Nostr
+                scores: content.scores,
+                totalScore: content.totalScore,
+                isCurrentUser: playerPubkey === currentUserPubkey
+              }];
             }
           });
         });
-      } catch(e) {
+      } catch (e) {
         console.warn("Offline mode: Could not subscribe to round.");
       }
     }
 
     return () => {
-        if (subRef.current) subRef.current.close();
+      if (subRef.current) subRef.current.close();
     };
   }, [activeRound?.id, currentUserPubkey]);
 
+  // Listen for Direct Messages (Auto-Redeem eCash)
+  useEffect(() => {
+    if (isAuthenticated && !isGuest) {
+      const sub = subscribeToDirectMessages(async (event, decrypted) => {
+        // Check for eCash token
+        if (decrypted.includes('cashuA')) {
+          console.log("Received potential eCash in DM from", event.pubkey);
+          const tokens = decrypted.match(/cashuA[A-Za-z0-9_=-]+/g);
+
+          if (tokens) {
+            for (const token of tokens) {
+              try {
+                const success = await receiveEcash(token);
+                if (success) {
+                  console.log("Auto-redeemed token from DM!");
+                  // If this is a player in the active round, mark them as paid
+                  if (activeRound && !activeRound.isFinalized) {
+                    setPlayers(prev => prev.map(p => {
+                      if (p.id === event.pubkey) {
+                        return { ...p, paid: true };
+                      }
+                      return p;
+                    }));
+                  }
+                }
+              } catch (e) {
+                console.warn("Failed to auto-redeem token", e);
+              }
+            }
+          }
+        }
+      });
+
+      return () => sub.close();
+    }
+  }, [isAuthenticated, isGuest, activeRound?.id]);
+
 
   // --- Actions ---
-  
+
   const loginNsec = async (nsec: string) => {
-      const { pk } = loginWithNsec(nsec);
-      setUserProfile({ name: 'Loading...', about: '', picture: '', lud16: '', nip05: '' });
-      setCurrentUserPubkey(pk);
-      setAuthMethod('local');
-      setIsAuthenticated(true);
-      setIsGuest(false);
-      localStorage.removeItem('is_guest_mode');
+    const { pk } = loginWithNsec(nsec);
+    setUserProfile({ name: 'Loading...', about: '', picture: '', lud16: '', nip05: '' });
+    setCurrentUserPubkey(pk);
+    setAuthMethod('local');
+    setIsAuthenticated(true);
+    setIsGuest(false);
+    localStorage.removeItem('is_guest_mode');
   };
 
   const loginNip46 = async (bunkerUrl: string) => {
-      const { pk } = await loginWithNip46(bunkerUrl);
-      setUserProfile({ name: 'Loading...', about: '', picture: '', lud16: '', nip05: '' });
-      setCurrentUserPubkey(pk);
-      setAuthMethod('nip46');
-      setIsAuthenticated(true);
-      setIsGuest(false);
-      localStorage.removeItem('is_guest_mode');
+    const { pk } = await loginWithNip46(bunkerUrl);
+    setUserProfile({ name: 'Loading...', about: '', picture: '', lud16: '', nip05: '' });
+    setCurrentUserPubkey(pk);
+    setAuthMethod('nip46');
+    setIsAuthenticated(true);
+    setIsGuest(false);
+    localStorage.removeItem('is_guest_mode');
   };
 
   const createAccount = async () => {
-      const { pk } = generateNewProfile();
-      setCurrentUserPubkey(pk);
-      setAuthMethod('local');
-      setIsAuthenticated(true);
-      setIsGuest(false);
-      localStorage.removeItem('is_guest_mode');
-      setUserProfile({ name: 'Disc Golfer', about: '', picture: '', lud16: '', nip05: '' });
+    const { pk } = generateNewProfile();
+    setCurrentUserPubkey(pk);
+    setAuthMethod('local');
+    setIsAuthenticated(true);
+    setIsGuest(false);
+    localStorage.removeItem('is_guest_mode');
+    setUserProfile({ name: 'Disc Golfer', about: '', picture: '', lud16: '', nip05: '' });
   };
 
   const performLogout = () => {
-      // 1. Clear authenticated user data from storage
-      nostrLogout();
-      
-      // 2. Clear sensitive app state from memory
-      setProofs([]); 
-      setTransactions([]);
-      setRecentPlayers([]);
-      setContacts([]);
-      setActiveRound(null);
-      
-      // 3. Generate a new Guest Identity immediately
-      const newIdentity = generateNewProfile();
-      
-      // 4. Update State to Guest Mode
-      setCurrentUserPubkey(newIdentity.pk);
-      setAuthMethod('local');
-      setIsAuthenticated(true); // Guest is technically authenticated with ephemeral keys
-      setIsGuest(true);
-      localStorage.setItem('is_guest_mode', 'true');
-      
-      // 5. Reset Profile UI
-      setUserProfile({ name: 'Guest Golfer', about: 'Unclaimed account', picture: '', lud16: '', nip05: '' });
+    // 1. Clear authenticated user data from storage
+    nostrLogout();
+
+    // 2. Clear sensitive app state from memory
+    setProofs([]);
+    setTransactions([]);
+    setRecentPlayers([]);
+    setContacts([]);
+    setActiveRound(null);
+
+    // 3. Generate a new Guest Identity immediately
+    const newIdentity = generateNewProfile();
+
+    // 4. Update State to Guest Mode
+    setCurrentUserPubkey(newIdentity.pk);
+    setAuthMethod('local');
+    setIsAuthenticated(true); // Guest is technically authenticated with ephemeral keys
+    setIsGuest(true);
+    localStorage.setItem('is_guest_mode', 'true');
+
+    // 5. Reset Profile UI
+    setUserProfile({ name: 'Guest Golfer', about: 'Unclaimed account', picture: '', lud16: '', nip05: '' });
   };
 
   const addRecentPlayer = (player: DisplayProfile) => {
@@ -396,31 +435,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const refreshStats = async () => {
-     if (!currentUserPubkey) return;
-     try {
-       const history = await fetchUserHistory(currentUserPubkey);
-       if (history && history.length > 0) {
-           let totalScoreSum = 0;
-           let best = 999;
-           history.forEach(evt => {
-               try {
-                   const c = JSON.parse(evt.content);
-                   const score = c.totalScore || 0;
-                   totalScoreSum += score;
-                   if (score < best && score > 0) best = score;
-               } catch(e) {}
-           });
-           
-           setUserStats({
-               totalRounds: history.length,
-               totalWins: 0, 
-               averageScore: Math.round(totalScoreSum / history.length),
-               bestScore: best === 999 ? 0 : best
-           });
-       }
-     } catch (e) {
-       console.warn("Could not fetch user stats:", e);
-     }
+    if (!currentUserPubkey) return;
+    try {
+      const history = await fetchUserHistory(currentUserPubkey);
+      if (history && history.length > 0) {
+        let totalScoreSum = 0;
+        let best = 999;
+        history.forEach(evt => {
+          try {
+            const c = JSON.parse(evt.content);
+            const score = c.totalScore || 0;
+            totalScoreSum += score;
+            if (score < best && score > 0) best = score;
+          } catch (e) { }
+        });
+
+        setUserStats({
+          totalRounds: history.length,
+          totalWins: 0,
+          averageScore: Math.round(totalScoreSum / history.length),
+          bestScore: best === 999 ? 0 : best
+        });
+      }
+    } catch (e) {
+      console.warn("Could not fetch user stats:", e);
+    }
   };
 
   const updateUserProfile = async (profile: UserProfile) => {
@@ -448,104 +487,118 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       trackPenalties: settings.trackPenalties || false,
       hideOverallScore: settings.hideOverallScore || false
     };
-    
+
     setActiveRound(newRound);
-    
+
     // Add self as player (Host presumed paid)
     const initialPlayers: Player[] = [{
-        id: currentUserPubkey,
-        name: userProfile.name,
-        handicap: 0,
-        paid: true,
-        scores: {},
-        totalScore: 0,
-        isCurrentUser: true,
-        lightningAddress: userProfile.lud16,
-        photoUrl: userProfile.picture
+      id: currentUserPubkey,
+      name: userProfile.name,
+      handicap: 0,
+      paid: true,
+      scores: {},
+      totalScore: 0,
+      isCurrentUser: true,
+      lightningAddress: userProfile.lud16,
+      photoUrl: userProfile.picture
     }];
 
     // Add other invited players
     selectedPlayers.forEach(p => {
-        addRecentPlayer(p);
-        initialPlayers.push({
-            id: p.pubkey,
-            name: p.name,
-            handicap: 0,
-            paid: !!p.paid, // Use passed paid status
-            scores: {},
-            totalScore: 0,
-            isCurrentUser: false,
-            lightningAddress: p.nip05,
-            photoUrl: p.image
-        });
+      addRecentPlayer(p);
+      initialPlayers.push({
+        id: p.pubkey,
+        name: p.name,
+        handicap: 0,
+        paid: !!p.paid, // Use passed paid status
+        scores: {},
+        totalScore: 0,
+        isCurrentUser: false,
+        lightningAddress: p.nip05,
+        photoUrl: p.image
+      });
     });
 
     setPlayers(initialPlayers);
 
     try {
       await publishRound(newRound);
-    } catch(e) {
+    } catch (e) {
       console.warn("Failed to publish round:", e);
     }
   };
 
   const joinRoundAndPay = async (roundId: string, roundData?: any): Promise<boolean> => {
     const fee = (roundData?.entryFeeSats || 0) + (roundData?.acePotFeeSats || 0);
+    const hostPubkey = roundData?.pubkey;
+
     if (walletBalance < fee) return false;
-    
-    addTransaction('payment', fee, `Entry Fee: ${roundData?.name || 'Round'}`);
-    
+
+    // 1. Create Token
+    let token = '';
+    if (fee > 0 && hostPubkey) {
+      try {
+        token = await createToken(fee);
+        // 2. Send Token to Host via DM
+        await sendDirectMessage(hostPubkey, `Payment for round ${roundData?.name || 'Disc Golf'}: ${token}`);
+        addTransaction('send', fee, `Entry Fee: ${roundData?.name || 'Round'}`);
+      } catch (e) {
+        console.error("Failed to pay entry fee", e);
+        return false;
+      }
+    }
+
     const joinedRound: RoundSettings = {
-        id: roundId,
-        name: roundData?.name || 'Joined Round',
-        courseName: roundData?.courseName || 'Unknown Course',
-        entryFeeSats: roundData?.entryFeeSats || 0,
-        acePotFeeSats: roundData?.acePotFeeSats || 0,
-        date: roundData?.date || new Date().toISOString(),
-        isFinalized: false,
-        holeCount: roundData?.holeCount || 18,
-        players: [],
-        pubkey: roundData?.pubkey || '',
-        eventId: roundData?.id,
-        startingHole: 1,
-        trackPenalties: false,
-        hideOverallScore: false
+      id: roundId,
+      name: roundData?.name || 'Joined Round',
+      courseName: roundData?.courseName || 'Unknown Course',
+      entryFeeSats: roundData?.entryFeeSats || 0,
+      acePotFeeSats: roundData?.acePotFeeSats || 0,
+      date: roundData?.date || new Date().toISOString(),
+      isFinalized: false,
+      holeCount: roundData?.holeCount || 18,
+      players: [],
+      pubkey: roundData?.pubkey || '',
+      eventId: roundData?.id,
+      startingHole: 1,
+      trackPenalties: false,
+      hideOverallScore: false
     };
 
     setActiveRound(joinedRound);
-    
+
     setPlayers([{
-        id: currentUserPubkey,
-        name: userProfile.name,
-        handicap: 0,
-        paid: true,
-        scores: {},
-        totalScore: 0,
-        isCurrentUser: true,
-        lightningAddress: userProfile.lud16,
-        photoUrl: userProfile.picture
+      id: currentUserPubkey,
+      name: userProfile.name,
+      handicap: 0,
+      paid: true,
+      scores: {},
+      totalScore: 0,
+      isCurrentUser: true,
+      lightningAddress: userProfile.lud16,
+      photoUrl: userProfile.picture
     }]);
 
     try {
       await publishScore(roundId, {}, 0);
-    } catch(e) {
+    } catch (e) {
       console.warn("Failed to join round on network:", e);
     }
-    
+
     return true;
   };
 
   const updateScore = useCallback((hole: number, score: number, playerId?: string) => {
     const targetId = playerId || currentUserPubkey;
-    
+
     setPlayers(prev => prev.map(p => {
       if (p.id !== targetId) return p;
-      
+
       const newScores = { ...p.scores, [hole]: score };
       const total = (Object.values(newScores) as number[]).reduce((sum, s) => sum + s, 0);
-      
+
       if (p.isCurrentUser && activeRound) {
-          publishScore(activeRound.id, newScores, total).catch(e => console.warn("Score sync failed", e));
+        publishScore(activeRound.id, newScores, total).catch(e => console.warn("Score sync failed", e));
       }
 
       return { ...p, scores: newScores, totalScore: total };
@@ -554,29 +607,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Set player paid status manually
   const setPlayerPaid = useCallback((playerId: string) => {
-      setPlayers(prev => prev.map(p => 
-          p.id === playerId ? { ...p, paid: true } : p
-      ));
+    setPlayers(prev => prev.map(p =>
+      p.id === playerId ? { ...p, paid: true } : p
+    ));
   }, []);
 
   const finalizeRound = async () => {
     if (!activeRound) return;
-    
+
     const sortedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
     const winner = sortedPlayers[0];
-    const potSize = activeRound.entryFeeSats * players.length;
-    
-    if (winner.isCurrentUser) {
-      const prize = Math.floor(potSize * 0.8);
-      addTransaction('payout', prize, `1st Place: ${activeRound.name}`);
-    }
-    
-    if (activeRound.pubkey === currentUserPubkey) {
+    const potSize = activeRound.entryFeeSats * players.length; // Simplified pot
+    const prize = Math.floor(potSize * 0.8); // 80% payout example
+
+    if (prize > 0) {
+      if (winner.isCurrentUser) {
+        // I won, I keep the pot (which I already hold as host)
+        addTransaction('payout', prize, `Won Round: ${activeRound.name}`);
+      } else {
+        // Someone else won, pay them
         try {
-          await publishRound({ ...activeRound, isFinalized: true });
+          const token = await createToken(prize);
+          await sendDirectMessage(winner.id, `You won ${activeRound.name}! Here is your prize: ${token}`);
+          addTransaction('payout', prize, `Payout to ${winner.name}`);
         } catch (e) {
-          console.warn("Failed to finalize round on network:", e);
+          console.error("Failed to pay winner", e);
+          alert("Failed to pay winner. Please pay manually.");
         }
+      }
+    }
+
+    if (activeRound.pubkey === currentUserPubkey) {
+      try {
+        await publishRound({ ...activeRound, isFinalized: true });
+      } catch (e) {
+        console.warn("Failed to finalize round on network:", e);
+      }
     }
 
     setActiveRound(prev => prev ? { ...prev, isFinalized: true } : null);
@@ -586,63 +652,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- Wallet Actions ---
 
   const refreshWalletBalance = async () => {
-      if (!walletServiceRef.current || proofs.length === 0) return;
-      try {
-          console.log("Verifying wallet proofs...");
-          const validProofs = await walletServiceRef.current.verifyProofs(proofs);
-          
-          if (validProofs.length !== proofs.length) {
-              console.log(`Found spent proofs. Updating balance. (${proofs.length} -> ${validProofs.length})`);
-              setProofs(validProofs);
-              syncWallet(validProofs, mints, transactions); // Sync the corrected state
-          } else {
-              console.log("All proofs valid.");
-          }
-      } catch(e) { 
-          console.error("Wallet refresh failed:", e); 
+    if (!walletServiceRef.current || proofs.length === 0) return;
+    try {
+      console.log("Verifying wallet proofs...");
+      const validProofs = await walletServiceRef.current.verifyProofs(proofs);
+
+      if (validProofs.length !== proofs.length) {
+        console.log(`Found spent proofs.Updating balance. (${proofs.length} -> ${validProofs.length})`);
+        setProofs(validProofs);
+        syncWallet(validProofs, mints, transactions); // Sync the corrected state
+      } else {
+        console.log("All proofs valid.");
       }
+    } catch (e) {
+      console.error("Wallet refresh failed:", e);
+    }
   };
 
-  const depositFunds = async (amount: number): Promise<{request: string, quote: string}> => {
-      if (!walletServiceRef.current) throw new Error("Wallet not connected");
-      return await walletServiceRef.current.requestDeposit(amount);
+  const depositFunds = async (amount: number): Promise<{ request: string, quote: string }> => {
+    if (!walletServiceRef.current) throw new Error("Wallet not connected");
+    return await walletServiceRef.current.requestDeposit(amount);
   };
 
   const checkDepositStatus = async (quote: string): Promise<boolean> => {
-      if (!walletServiceRef.current) return false;
-      return await walletServiceRef.current.checkDepositQuoteStatus(quote);
+    if (!walletServiceRef.current) return false;
+    return await walletServiceRef.current.checkDepositQuoteStatus(quote);
   };
 
   const confirmDeposit = async (quote: string, amount: number): Promise<boolean> => {
-      if (!walletServiceRef.current) return false;
-      try {
-          const newProofs = await walletServiceRef.current.completeDeposit(quote, amount);
-          const updatedProofs = [...proofs, ...newProofs];
-          setProofs(updatedProofs);
-          
-          const newTx: WalletTransaction = {
-              id: Date.now().toString(),
-              type: 'deposit',
-              amountSats: amount,
-              description: 'Mint Deposit',
-              timestamp: Date.now()
-          };
-          
-          setTransactions(prev => {
-              const updatedTxs = [newTx, ...prev];
-              syncWallet(updatedProofs, mints, updatedTxs);
-              return updatedTxs;
-          });
-          return true;
-      } catch (e) {
-          console.error(e);
-          return false;
-      }
+    if (!walletServiceRef.current) return false;
+    try {
+      const newProofs = await walletServiceRef.current.completeDeposit(quote, amount);
+      const updatedProofs = [...proofs, ...newProofs];
+      setProofs(updatedProofs);
+
+      const newTx: WalletTransaction = {
+        id: Date.now().toString(),
+        type: 'deposit',
+        amountSats: amount,
+        description: 'Mint Deposit',
+        timestamp: Date.now()
+      };
+
+      setTransactions(prev => {
+        const updatedTxs = [newTx, ...prev];
+        syncWallet(updatedProofs, mints, updatedTxs);
+        return updatedTxs;
+      });
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
   };
 
-  const getLightningQuote = async (invoice: string): Promise<{amount: number, fee: number}> => {
-      if (!walletServiceRef.current) throw new Error("Wallet not connected");
-      return await walletServiceRef.current.getLightningQuote(invoice);
+  const getLightningQuote = async (invoice: string): Promise<{ amount: number, fee: number }> => {
+    if (!walletServiceRef.current) throw new Error("Wallet not connected");
+    return await walletServiceRef.current.getLightningQuote(invoice);
   };
 
   const sendFunds = async (amount: number, invoice: string): Promise<boolean> => {
@@ -653,91 +719,120 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const proofsToSpend = proofs;
 
     try {
-        const { remaining } = await walletServiceRef.current.payInvoice(invoice, proofsToSpend);
-        setProofs(remaining);
-        
-        const newTx: WalletTransaction = {
+      const { remaining } = await walletServiceRef.current.payInvoice(invoice, proofsToSpend);
+      setProofs(remaining);
+
+      const newTx: WalletTransaction = {
+        id: Date.now().toString(),
+        type: 'send',
+        amountSats: amount,
+        description: 'Paid Invoice',
+        timestamp: Date.now()
+      };
+
+      setTransactions(prev => {
+        const updated = [newTx, ...prev];
+        syncWallet(remaining, mints, updated);
+        return updated;
+      });
+
+      return true;
+    } catch (e) {
+      console.error("Send failed logic, attempting recovery:", e);
+
+      // RECOVERY: Check if proofs were spent despite the error (False Negative)
+      try {
+        const validProofs = await walletServiceRef.current.verifyProofs(proofsToSpend);
+        const prevBal = WalletService.calculateBalance(proofsToSpend);
+        const newBal = WalletService.calculateBalance(validProofs);
+
+        // If balance dropped by at least the amount sent, assume it went through
+        if ((prevBal - newBal) >= amount) {
+          console.log("Transaction recovered: Funds were spent.");
+          setProofs(validProofs);
+
+          const newTx: WalletTransaction = {
             id: Date.now().toString(),
             type: 'send',
             amountSats: amount,
             description: 'Paid Invoice',
             timestamp: Date.now()
-        };
-        
-        setTransactions(prev => {
-            const updated = [newTx, ...prev];
-            syncWallet(remaining, mints, updated);
-            return updated;
-        });
-        
-        return true;
-    } catch(e) {
-        console.error("Send failed logic, attempting recovery:", e);
-        
-        // RECOVERY: Check if proofs were spent despite the error (False Negative)
-        try {
-             const validProofs = await walletServiceRef.current.verifyProofs(proofsToSpend);
-             const prevBal = WalletService.calculateBalance(proofsToSpend);
-             const newBal = WalletService.calculateBalance(validProofs);
-             
-             // If balance dropped by at least the amount sent, assume it went through
-             if ((prevBal - newBal) >= amount) {
-                 console.log("Transaction recovered: Funds were spent.");
-                 setProofs(validProofs);
-                 
-                 const newTx: WalletTransaction = {
-                    id: Date.now().toString(),
-                    type: 'send',
-                    amountSats: amount,
-                    description: 'Paid Invoice',
-                    timestamp: Date.now()
-                };
-                
-                setTransactions(prev => {
-                    const updated = [newTx, ...prev];
-                    syncWallet(validProofs, mints, updated);
-                    return updated;
-                });
-                
-                return true; // Return success to UI
-             }
-        } catch (recErr) {
-            console.error("Recovery failed:", recErr);
-        }
+          };
 
-        // If not recovered, sync the potentially changed balance and throw
-        await refreshWalletBalance();
-        throw e; 
+          setTransactions(prev => {
+            const updated = [newTx, ...prev];
+            syncWallet(validProofs, mints, updated);
+            return updated;
+          });
+
+          return true; // Return success to UI
+        }
+      } catch (recErr) {
+        console.error("Recovery failed:", recErr);
+      }
+
+      // If not recovered, sync the potentially changed balance and throw
+      await refreshWalletBalance();
+      throw e;
+    }
+  };
+
+  const createToken = async (amount: number): Promise<string> => {
+    if (!walletServiceRef.current) throw new Error("Wallet not connected");
+    if (walletBalance < amount) throw new Error("Insufficient funds");
+
+    try {
+      const { token, remaining } = await walletServiceRef.current.createTokenWithProofs(amount, proofs);
+      setProofs(remaining);
+
+      const newTx: WalletTransaction = {
+        id: Date.now().toString(),
+        type: 'send',
+        amountSats: amount,
+        description: 'Created Token',
+        timestamp: Date.now()
+      };
+
+      setTransactions(prev => {
+        const updated = [newTx, ...prev];
+        syncWallet(remaining, mints, updated);
+        return updated;
+      });
+
+      return token;
+    } catch (e) {
+      console.error("Create token failed", e);
+      throw e;
     }
   };
 
   const receiveEcash = async (token: string): Promise<boolean> => {
-      if (!walletServiceRef.current) return false;
-      try {
-          const newProofs = await walletServiceRef.current.receiveToken(token);
-          const updatedProofs = [...proofs, ...newProofs];
-          setProofs(updatedProofs);
-          const amount = WalletService.calculateBalance(newProofs);
-          
-          const newTx: WalletTransaction = {
-              id: Date.now().toString(),
-              type: 'receive',
-              amountSats: amount,
-              description: 'Received eCash',
-              timestamp: Date.now()
-          };
-          
-          setTransactions(prev => {
-              const updatedTxs = [newTx, ...prev];
-              syncWallet(updatedProofs, mints, updatedTxs);
-              return updatedTxs;
-          });
-          
-          return true;
-      } catch(e) {
-          console.error("Receive failed", e);
-          return false;
-      }
+    if (!walletServiceRef.current) return false;
+    try {
+      const newProofs = await walletServiceRef.current.receiveToken(token);
+      const updatedProofs = [...proofs, ...newProofs];
+      setProofs(updatedProofs);
+      const amount = WalletService.calculateBalance(newProofs);
+
+      const newTx: WalletTransaction = {
+        id: Date.now().toString(),
+        type: 'receive',
+        amountSats: amount,
+        description: 'Received eCash',
+        timestamp: Date.now()
+      };
+
+      setTransactions(prev => {
+        const updatedTxs = [newTx, ...prev];
+        syncWallet(updatedProofs, mints, updatedTxs);
+        return updatedTxs;
+      });
+
+      return true;
+    } catch (e) {
+      console.error("Receive failed", e);
+      return false;
+    }
   };
 
   const resetRound = () => {
@@ -798,6 +893,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       loginNip46,
       createAccount,
       performLogout,
+      createToken,
       refreshWalletBalance
     }}>
       {children}

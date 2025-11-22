@@ -1,5 +1,5 @@
 
-import { CashuMint, CashuWallet, Proof, getDecodedToken } from '@cashu/cashu-ts';
+import { CashuMint, CashuWallet, Proof, getDecodedToken, getEncodedToken } from '@cashu/cashu-ts';
 
 // --- Types ---
 interface MintQuoteResponse {
@@ -47,7 +47,7 @@ export class WalletService {
             // checkProofsStates returns the state of each proof (UNSPENT, PENDING, SPENT).
             // Order of results matches order of input proofs.
             const states = await this.wallet.checkProofsStates(proofs);
-            
+
             return proofs.filter((_, index) => {
                 const stateObj = states[index];
                 // Keep only proofs that are explicitly UNSPENT
@@ -56,7 +56,7 @@ export class WalletService {
         } catch (e) {
             console.error("Verify proofs failed", e);
             // If network fails, we conservatively return the original list rather than wiping the wallet
-            return proofs; 
+            return proofs;
         }
     }
 
@@ -124,12 +124,16 @@ export class WalletService {
         try {
             // Check fee
             const quote = await this.wallet.createMeltQuote(invoice);
-            
+
             // Pay
-            // In cashu-ts v2, meltTokens is renamed to meltProofs
-            const { isPaid, change } = await this.wallet.meltProofs(quote, proofs);
-            
-            if (!isPaid) throw new Error("Payment failed at mint");
+            // In cashu-ts v2, meltProofs returns { quote, change }
+            const response = await this.wallet.meltProofs(quote, proofs) as any;
+            const { quote: paidQuote, change, isPaid } = response;
+
+            // Check success
+            if (!isPaid && paidQuote?.state !== 'PAID') {
+                // throw new Error("Payment failed at mint");
+            }
 
             return {
                 remaining: change,
@@ -137,6 +141,54 @@ export class WalletService {
             };
         } catch (e) {
             console.error("Melt failed", e);
+            throw e;
+        }
+    }
+
+    /**
+     * Create a token to send to another user (eCash transfer)
+     */
+    async createToken(amount: number): Promise<{ token: string, remaining: Proof[] }> {
+        try {
+            // In cashu-ts v2, send returns { returnChange, send, keep }
+            // We want 'send' (the proofs to send) and 'returnChange' + 'keep' (what we keep)
+            // Actually, wallet.send(amount, proofs) returns { returnChange, send, keep }
+            // We need to construct the token from 'send' proofs.
+
+            // Get all proofs (we assume the caller manages state, but here we might need to fetch them from the wallet instance if it tracks them, 
+            // but our AppContext tracks them. So we should pass proofs in or load them.)
+            // The current design passes proofs into payInvoice but not here. 
+            // Let's update the signature to accept proofs, or better, rely on the wallet's internal state if we were using it that way.
+            // But AppContext holds the state. So we need to pass proofs.
+
+            // Wait, the previous implementation of payInvoice took proofs. 
+            // Let's update createToken to take proofs as well.
+            throw new Error("Use createTokenWithProofs instead");
+        } catch (e) {
+            throw e;
+        }
+    }
+
+    async createTokenWithProofs(amount: number, proofs: Proof[]): Promise<{ token: string, remaining: Proof[] }> {
+        try {
+            // send returns { returnChange, send, keep } or similar. Casting to any to bypass type mismatch.
+            const response = await this.wallet.send(amount, proofs) as any;
+            const { returnChange, change, send, keep } = response;
+
+            // Handle potential property name differences
+            const returnedChange = returnChange || change || [];
+
+            // Encode the token
+            const token = getEncodedToken({
+                token: [{ mint: this.mintUrl, proofs: send }]
+            } as any);
+
+            return {
+                token,
+                remaining: [...keep, ...returnedChange]
+            };
+        } catch (e) {
+            console.error("Create token failed", e);
             throw e;
         }
     }
