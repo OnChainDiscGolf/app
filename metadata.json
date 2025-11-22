@@ -1,0 +1,7 @@
+{
+  "name": "On-Chains Disc Golf",
+  "description": "A lightning-powered disc golf league manager. Create rounds, scan to pay entry fees with eCash/Lightning, track scores like UDisc, and automate payouts.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
