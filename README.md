@@ -1,20 +1,28 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# On-Chains Disc Golf
 
-# Run and deploy your AI Studio app
+A mobile-friendly Disc Golf Scorecard and Wallet application.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/1FYdnTtGwZKXW1SexlgGN8W5FEa2tlVQ2
+- **Scorecard:** Track your disc golf rounds with an easy-to-use interface.
+- **Wallet:** Integrated Bitcoin Lightning wallet (via Cashu) for wagers and payments.
+- **Social:** Connect with friends using Nostr.
+- **PWA:** Installable on mobile devices for a native app experience.
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+
+2. Run the app:
+   ```bash
+   npm run dev
+   ```
+
+## Deployment
+
+This app can be deployed to any static site host (Vercel, Netlify, GitHub Pages).

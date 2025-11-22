@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@cashu/cashu-ts": "2.1.0",
-    "@google/genai": "^1.30.0",
     "@noble/hashes": "^2.0.1",
     "buffer": "6.0.3",
     "lucide-react": "^0.554.0",
