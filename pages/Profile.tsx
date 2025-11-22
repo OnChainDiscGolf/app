@@ -14,6 +14,7 @@ export const Profile: React.FC = () => {
         isAuthenticated, isGuest, authMethod, performLogout, isProfileLoading,
         loginNsec, loginNip46, createAccount, currentUserPubkey
     } = useApp();
+
     const navigate = useNavigate();
 
     // Auth View States
@@ -371,7 +372,7 @@ export const Profile: React.FC = () => {
 
     if (isProfileLoading) {
         return (
-            <div className="flex flex-col items-center justify-center h-full p-6">
+            <div className="flex-1 flex flex-col items-center justify-center p-6 min-h-[50vh]">
                 <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mb-4"></div>
                 <h2 className="text-xl font-bold text-white">Syncing Profile...</h2>
                 <p className="text-slate-400 text-sm mt-2">Fetching latest data from Nostr relays</p>
