@@ -29,7 +29,7 @@ const SuccessOverlay: React.FC<{ message: string, onClose: () => void }> = ({ me
 };
 
 export const Home: React.FC = () => {
-    const { activeRound, players, createRound, joinRoundAndPay, recentPlayers, contacts, userProfile, resetRound, isAuthenticated, currentUserPubkey, addRecentPlayer, depositFunds, checkDepositStatus, confirmDeposit, sendFunds, walletBalance } = useApp();
+    const { activeRound, players, createRound, joinRoundAndPay, recentPlayers, contacts, userProfile, resetRound, isAuthenticated, isGuest, currentUserPubkey, addRecentPlayer, depositFunds, checkDepositStatus, confirmDeposit, sendFunds, walletBalance } = useApp();
     const navigate = useNavigate();
 
     // Local UI state for the creation wizard
@@ -1034,6 +1034,15 @@ export const Home: React.FC = () => {
                             <div className="flex items-center justify-center space-x-2">
                                 <Icons.Play fill="currentColor" />
                                 <span>Continue Round</span>
+                            </div>
+                        </Button>
+                    )}
+
+                    {isGuest && (
+                        <Button fullWidth onClick={() => navigate('/profile')} className="bg-brand-accent text-black font-bold shadow-lg shadow-brand-accent/20 mb-4 hover:bg-brand-accent/90">
+                            <div className="flex items-center justify-center space-x-2">
+                                <Icons.Users />
+                                <span>Login or Create Profile</span>
                             </div>
                         </Button>
                     )}
