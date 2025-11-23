@@ -877,22 +877,36 @@ export const Wallet: React.FC = () => {
                 </button>
             </div>
 
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-6 shadow-xl border border-slate-700 relative overflow-hidden mb-8">
-                <div className="absolute -top-6 -right-6 w-32 h-32 bg-brand-primary/10 rounded-full blur-2xl"></div>
-                <div className="relative z-10">
-                    <div className="flex justify-between items-start mb-2">
-                        <p className="text-slate-400 text-sm font-medium">Available Balance</p>
-                        <div className="flex items-center space-x-1 bg-black/30 px-2 py-1 rounded-lg">
-                            <div className={`w-2 h-2 rounded-full ${walletMode === 'nwc' ? 'bg-brand-secondary' : (activeMint ? 'bg-green-500' : 'bg-red-500')}`}></div>
-                            <span className="text-[10px] text-slate-300 uppercase font-bold tracking-wider">
-                                {walletMode === 'nwc' ? 'NWC Wallet' : (activeMint ? activeMint.nickname : 'No Mint')}
-                            </span>
-                        </div>
+            <div className={`rounded-3xl p-6 shadow-xl border relative overflow-hidden mb-8 transition-all duration-500 ${walletMode === 'nwc' ? 'bg-gradient-to-br from-slate-800 to-indigo-950 border-indigo-500/30' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700'}`}>
+                <div className={`absolute -top-6 -right-6 w-32 h-32 rounded-full blur-3xl ${walletMode === 'nwc' ? 'bg-indigo-500/10' : 'bg-brand-primary/5'}`}></div>
+
+                {/* Mode Indicator Header */}
+                <div className="relative z-10 flex items-center justify-between mb-6">
+                    <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border ${walletMode === 'nwc' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300' : 'bg-brand-primary/10 border-brand-primary/20 text-brand-primary'}`}>
+                        {walletMode === 'nwc' ? <Icons.Zap size={16} /> : <Icons.Wallet size={16} />}
+                        <span className="text-xs font-bold tracking-wider uppercase">
+                            {walletMode === 'nwc' ? 'NWC Wallet' : 'Cashu Wallet'}
+                        </span>
                     </div>
 
-                    <div className="flex items-baseline space-x-1 mb-6">
-                        <span className="text-5xl font-extrabold tracking-tight text-white">{walletBalance.toLocaleString()}</span>
-                        <span className="text-xl text-brand-accent font-bold">SATS</span>
+                    {walletMode === 'cashu' && activeMint && (
+                        <div className="flex items-center space-x-1.5 bg-black/30 px-2 py-1 rounded-md border border-white/5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></div>
+                            <span className="text-[10px] text-slate-400 font-mono truncate max-w-[100px]">
+                                {activeMint.nickname}
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="relative z-10">
+                    <div className="mb-1">
+                        <p className="text-slate-400 text-xs font-medium uppercase tracking-wide">Available Balance</p>
+                    </div>
+
+                    <div className="flex items-baseline space-x-1 mb-8">
+                        <span className="text-5xl font-extrabold tracking-tight text-white drop-shadow-sm">{walletBalance.toLocaleString()}</span>
+                        <span className={`text-xl font-bold ${walletMode === 'nwc' ? 'text-indigo-400' : 'text-brand-accent'}`}>SATS</span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -900,14 +914,14 @@ export const Wallet: React.FC = () => {
                             <div className="bg-brand-accent/20 p-2 rounded-full mb-1">
                                 <Icons.Send size={20} className="text-brand-accent" />
                             </div>
-                            <span className="text-sm font-bold">Send</span>
+                            <span className="text-sm font-bold text-white">Send</span>
                         </button>
 
                         <button onClick={() => setView('deposit')} className="flex flex-col items-center justify-center bg-brand-primary/20 hover:bg-brand-primary/30 border border-brand-primary/50 hover:border-brand-primary rounded-xl py-3 transition-all active:scale-95">
                             <div className="bg-brand-primary/20 p-2 rounded-full mb-1">
                                 <Icons.Receive size={20} className="text-brand-primary" />
                             </div>
-                            <span className="text-sm font-bold text-white">{walletMode === 'nwc' ? 'Receive' : 'Deposit'}</span>
+                            <span className="text-sm font-bold text-white">Receive</span>
                         </button>
                     </div>
                 </div>
@@ -921,28 +935,30 @@ export const Wallet: React.FC = () => {
                         <p>No transactions yet.</p>
                     </div>
                 ) : (
-                    transactions.map((tx) => (
-                        <div key={tx.id} className="flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                            <div className="flex items-center space-x-3">
-                                <div className={`p-2 rounded-full ${['deposit', 'receive'].includes(tx.type) ? 'bg-green-500/20 text-green-400' :
-                                    ['payout', 'ace_pot'].includes(tx.type) ? 'bg-brand-primary/20 text-brand-primary' :
-                                        ['send', 'payment'].includes(tx.type) ? 'bg-brand-accent/20 text-brand-accent' :
-                                            'bg-slate-600/30 text-slate-300'
-                                    }`}>
-                                    {['deposit', 'receive'].includes(tx.type) && <Icons.Zap size={16} />}
-                                    {(tx.type === 'payout' || tx.type === 'ace_pot') && <Icons.Trophy size={16} />}
-                                    {(tx.type === 'payment' || tx.type === 'send') && <Icons.Send size={16} />}
+                    transactions
+                        .filter(tx => (tx.walletType || 'cashu') === walletMode)
+                        .map((tx) => (
+                            <div key={tx.id} className="flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+                                <div className="flex items-center space-x-3">
+                                    <div className={`p-2 rounded-full ${['deposit', 'receive'].includes(tx.type) ? 'bg-green-500/20 text-green-400' :
+                                        ['payout', 'ace_pot'].includes(tx.type) ? 'bg-brand-primary/20 text-brand-primary' :
+                                            ['send', 'payment'].includes(tx.type) ? 'bg-brand-accent/20 text-brand-accent' :
+                                                'bg-slate-600/30 text-slate-300'
+                                        }`}>
+                                        {['deposit', 'receive'].includes(tx.type) && <Icons.Zap size={16} />}
+                                        {(tx.type === 'payout' || tx.type === 'ace_pot') && <Icons.Trophy size={16} />}
+                                        {(tx.type === 'payment' || tx.type === 'send') && <Icons.Send size={16} />}
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-sm text-white">{tx.description}</p>
+                                        <p className="text-xs text-slate-500">{new Date(tx.timestamp).toLocaleDateString()}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="font-medium text-sm text-white">{tx.description}</p>
-                                    <p className="text-xs text-slate-500">{new Date(tx.timestamp).toLocaleDateString()}</p>
-                                </div>
+                                <span className={`font-mono font-bold ${['deposit', 'payout', 'ace_pot', 'receive'].includes(tx.type) ? 'text-green-400' : 'text-white'}`}>
+                                    {['payment', 'send'].includes(tx.type) ? '-' : '+'}{tx.amountSats}
+                                </span>
                             </div>
-                            <span className={`font-mono font-bold ${['deposit', 'payout', 'ace_pot', 'receive'].includes(tx.type) ? 'text-green-400' : 'text-white'}`}>
-                                {['payment', 'send'].includes(tx.type) ? '-' : '+'}{tx.amountSats}
-                            </span>
-                        </div>
-                    ))
+                        ))
                 )}
             </div>
         </div >

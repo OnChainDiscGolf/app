@@ -45,6 +45,7 @@ export interface WalletTransaction {
   amountSats: number;
   description: string;
   timestamp: number;
+  walletType?: 'cashu' | 'nwc';
 }
 
 export interface Mint {

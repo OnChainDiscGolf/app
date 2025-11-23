@@ -489,13 +489,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const addTransaction = (type: WalletTransaction['type'], amount: number, description: string) => {
+  const addTransaction = (type: WalletTransaction['type'], amount: number, description: string, walletType?: 'cashu' | 'nwc') => {
     const tx: WalletTransaction = {
       id: Date.now().toString(),
       type,
       amountSats: amount,
       description,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      walletType: walletType || walletMode // Default to current mode if not specified
     };
     setTransactions(prev => [tx, ...prev]);
   };
@@ -824,12 +825,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!nwcServiceRef.current) throw new Error("NWC not connected");
       try {
         await nwcServiceRef.current.payInvoice(invoice);
-        addTransaction('send', amount, 'Paid via NWC');
+        addTransaction('send', amount, 'Paid via NWC', 'nwc');
         refreshWalletBalance();
         return true;
       } catch (e) {
         console.error("NWC Payment failed", e);
-        throw e; // Re-throw to let UI handle it
+        if (e instanceof Error && e.message === "NWC Timeout") {
+          alert("Payment timed out. It may have still gone through. Please check your wallet before retrying.");
+          // Optionally refresh balance anyway just in case
+          refreshWalletBalance();
+          return false; // Return false so UI doesn't show success immediately, but user is warned
+        }
+        throw e; // Re-throw other errors
       }
     }
 
@@ -848,7 +855,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'send',
         amountSats: amount,
         description: 'Paid Invoice',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        walletType: 'cashu'
       };
 
       setTransactions(prev => {
@@ -877,7 +885,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             type: 'send',
             amountSats: amount,
             description: 'Paid Invoice',
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            walletType: 'cashu'
           };
 
           setTransactions(prev => {
@@ -911,7 +920,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'send',
         amountSats: amount,
         description: 'Created Token',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        walletType: 'cashu'
       };
 
       setTransactions(prev => {
@@ -940,7 +950,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'receive',
         amountSats: amount,
         description: 'Received eCash',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        walletType: 'cashu'
       };
 
       setTransactions(prev => {

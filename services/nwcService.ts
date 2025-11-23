@@ -116,7 +116,7 @@ export class NWCService {
             setTimeout(() => {
                 sub.close();
                 reject(new Error("NWC Timeout"));
-            }, 10000);
+            }, 60000);
         });
 
         await Promise.any(pool.publish([this.connection.relay], event));
