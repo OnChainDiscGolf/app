@@ -12,6 +12,12 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
     const [isCameraLoading, setIsCameraLoading] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [scannedData, setScannedData] = useState<string | null>(null);
+    const [logs, setLogs] = useState<string[]>([]);
+
+    const log = (msg: string) => {
+        setLogs(prev => [...prev.slice(-4), `${new Date().toISOString().split('T')[1].slice(0, 8)}: ${msg}`]);
+    };
+
 
     // Internal refs to track state across async operations and renders
     const streamRef = useRef<MediaStream | null>(null);
@@ -62,6 +68,7 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
     const startScanner = useCallback(async () => {
         if (!active) return;
 
+        log("Starting scanner...");
         // Reset state
         setCameraError(null);
         setIsCameraLoading(true);
@@ -73,17 +80,21 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
 
             let mediaStream: MediaStream;
             try {
+                log("Requesting env camera...");
                 // Try environment camera first
                 mediaStream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment' }
                 });
+                log("Env camera acquired");
             } catch (envError) {
-                console.warn("Environment camera failed, trying user camera...", envError);
+                log("Env cam failed, trying user...");
                 // Fallback to any video source
                 mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                log("User camera acquired");
             }
 
             if (!isMountedRef.current || !active) {
+                log("Hook unmounted/inactive, stopping tracks");
                 mediaStream.getTracks().forEach(track => track.stop());
                 return;
             }
@@ -91,6 +102,7 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
             streamRef.current = mediaStream;
 
             if (videoRef.current) {
+                log("Attaching to video ref");
                 const video = videoRef.current;
                 video.srcObject = mediaStream;
                 video.setAttribute('playsinline', 'true'); // Critical for iOS
@@ -99,7 +111,9 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
                 // Robust play handling
                 try {
                     await video.play();
+                    log("Video playing");
                 } catch (playError) {
+                    log(`Play failed: ${playError}`);
                     console.error("Video play failed", playError);
                     // Sometimes play fails if the element isn't in DOM yet or user interaction is needed
                     // But usually with muted=true it works.
@@ -107,8 +121,11 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
 
                 setIsCameraLoading(false);
                 animationFrameRef.current = requestAnimationFrame(tick);
+            } else {
+                log("Video ref is null!");
             }
         } catch (err) {
+            log(`Error: ${err}`);
             console.error("Camera access denied or error", err);
             if (isMountedRef.current) {
                 setIsCameraLoading(false);
@@ -136,6 +153,7 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
         isCameraLoading,
         cameraError,
         scannedData,
-        restart: startScanner
+        restart: startScanner,
+        logs
     };
 };

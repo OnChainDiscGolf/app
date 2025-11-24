@@ -195,7 +195,7 @@ export const Wallet: React.FC = () => {
 
 
     // Camera & Scanning Logic
-    const { isCameraLoading, cameraError, scannedData } = useQrScanner({
+    const { isCameraLoading, cameraError, scannedData, logs } = useQrScanner({
         videoRef,
         canvasRef,
         active: view === 'send-scan',
@@ -848,6 +848,11 @@ export const Wallet: React.FC = () => {
                     <Button fullWidth variant="secondary" onClick={() => setView('send-details')} className="text-white">
                         <Icons.Plus className="mr-2" size={18} /> Paste Address
                     </Button>
+                </div>
+                <div className="absolute top-20 left-4 right-4 z-50 pointer-events-none">
+                    <div className="bg-black/50 p-2 rounded text-[10px] text-green-400 font-mono">
+                        {logs.map((l, i) => <div key={i}>{l}</div>)}
+                    </div>
                 </div>
                 {fileInput}
             </div>
