@@ -26,7 +26,8 @@ import {
   EyeOff,
   CircleHelp,
   Camera,
-  Share2
+  Share2,
+  RefreshCw
 } from 'lucide-react';
 
 // Custom Disc Golf Basket Icon matching Lucide style
@@ -96,5 +97,6 @@ export const Icons = {
   EyeOff,
   Help: CircleHelp,
   Camera,
-  Share: Share2
+  Share: Share2,
+  Refresh: RefreshCw
 };

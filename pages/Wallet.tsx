@@ -254,7 +254,15 @@ export const Wallet: React.FC = () => {
                 const jsQRModule = await import('jsqr');
                 const jsQR = jsQRModule.default;
 
-                const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                let mediaStream: MediaStream;
+                try {
+                    // Try environment camera first
+                    mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                } catch (envError) {
+                    console.warn("Environment camera failed, trying user camera...", envError);
+                    // Fallback to any video source
+                    mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                }
 
                 if (!isMounted) {
                     mediaStream.getTracks().forEach(track => track.stop());
@@ -265,7 +273,16 @@ export const Wallet: React.FC = () => {
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
                     videoRef.current.setAttribute('playsinline', 'true');
-                    try { await videoRef.current.play(); } catch (e) { }
+
+                    // Wait for video to be ready
+                    await new Promise<void>((resolve) => {
+                        if (!videoRef.current) return resolve();
+                        videoRef.current.onloadedmetadata = () => {
+                            resolve();
+                        };
+                    });
+
+                    await videoRef.current.play();
 
                     setIsCameraLoading(false);
                     requestAnimationFrame(() => tick(jsQR));
@@ -274,7 +291,7 @@ export const Wallet: React.FC = () => {
                 console.error("Camera access denied or error", err);
                 if (isMounted) {
                     setIsCameraLoading(false);
-                    setCameraError("Could not access camera. Check permissions or upload an image.");
+                    setCameraError("Could not access camera. Please check permissions.");
                 }
             }
         };
@@ -861,6 +878,10 @@ export const Wallet: React.FC = () => {
                             </p>
                         </div>
                         <div className="w-full max-w-sm space-y-3 pt-4">
+                            <Button fullWidth onClick={() => { setCameraError(null); setView('main'); setTimeout(() => setView('send-scan'), 100); }} className="bg-brand-primary text-white hover:bg-brand-primary/90">
+                                <Icons.Refresh className="mr-2" size={20} />
+                                <span>Retry Camera</span>
+                            </Button>
                             <Button fullWidth onClick={() => fileInputRef.current?.click()} className="bg-brand-surface border border-slate-600 hover:bg-slate-700 text-white">
                                 <Icons.QrCode className="mr-2 text-brand-primary" size={20} />
                                 <span>Upload QR Image</span>
@@ -931,82 +952,105 @@ export const Wallet: React.FC = () => {
                 {isProcessing && <ProcessingOverlay message="Processing..." />}
 
                 <div className="flex items-center mb-6">
-                    <button onClick={() => setView('send-scan')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700">
+                    <button onClick={() => setView('send-scan')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors">
                         <Icons.Prev />
                     </button>
                     <h2 className="text-xl font-bold">Transaction Details</h2>
                 </div>
 
-                {transactionError && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-start space-x-3 animate-in fade-in slide-in-from-top-2">
-                        <Icons.Close className="text-red-500 shrink-0 mt-0.5" size={20} />
-                        <div>
-                            <h3 className="text-red-500 font-bold text-sm">Error</h3>
-                            <p className="text-xs text-red-400 mt-1 leading-relaxed">
-                                {transactionError}
-                            </p>
+                <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700 rounded-3xl p-6 shadow-xl flex-1 flex flex-col">
+                    {transactionError && (
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-start space-x-3 animate-in fade-in slide-in-from-top-2">
+                            <Icons.Close className="text-red-500 shrink-0 mt-0.5" size={20} />
+                            <div>
+                                <h3 className="text-red-500 font-bold text-sm">Error</h3>
+                                <p className="text-xs text-red-400 mt-1 leading-relaxed">
+                                    {transactionError}
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {insufficientFunds && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-start space-x-3 animate-in fade-in slide-in-from-top-2">
-                        <Icons.Close className="text-red-500 shrink-0 mt-0.5" size={20} />
-                        <div>
-                            <h3 className="text-red-500 font-bold">Insufficient Funds</h3>
-                            <p className="text-xs text-red-400 mt-1">
-                                Wallet Balance: {walletBalance} Sats<br />
-                                Required: {parseInt(sendAmount || '0') + (quoteFee || 0)} Sats
-                            </p>
+                    {insufficientFunds && (
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-start space-x-3 animate-in fade-in slide-in-from-top-2">
+                            <Icons.Close className="text-red-500 shrink-0 mt-0.5" size={20} />
+                            <div>
+                                <h3 className="text-red-500 font-bold">Insufficient Funds</h3>
+                                <p className="text-xs text-red-400 mt-1">
+                                    Wallet Balance: {walletBalance} Sats<br />
+                                    Required: {parseInt(sendAmount || '0') + (quoteFee || 0)} Sats
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-sm text-slate-400 block mb-1">Amount (Sats)</label>
-                        <div className="relative">
-                            <input
-                                type="number"
-                                className={`w-full bg-slate-800 border border-slate-600 rounded-xl p-4 text-2xl font-mono focus:ring-2 focus:ring-brand-primary outline-none ${isFixedAmount ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                placeholder="0"
-                                value={sendAmount}
-                                onChange={e => setSendAmount(e.target.value)}
-                                readOnly={isFixedAmount}
-                            />
-                            {isFixedAmount && (
-                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs bg-slate-700 px-2 py-1 rounded text-slate-300">
-                                    Fixed
-                                </div>
+                    <div className="space-y-6 flex-1">
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Amount (Sats)</label>
+                            <div className="relative group">
+                                <input
+                                    type="number"
+                                    className={`w-full bg-slate-900/50 border border-slate-600 rounded-xl p-4 text-3xl font-mono text-white placeholder-slate-600 focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all ${isFixedAmount ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    placeholder="0"
+                                    value={sendAmount}
+                                    onChange={e => setSendAmount(e.target.value)}
+                                    readOnly={isFixedAmount}
+                                />
+                                {isFixedAmount && (
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs bg-slate-700 px-2 py-1 rounded text-slate-300 font-bold">
+                                        FIXED
+                                    </div>
+                                )}
+                            </div>
+                            {quoteFee !== null && (
+                                <p className="text-xs text-slate-500 mt-2 ml-1 flex items-center">
+                                    <Icons.Zap size={12} className="mr-1" />
+                                    + {quoteFee} sats network fee
+                                </p>
                             )}
                         </div>
-                        {quoteFee !== null && (
-                            <p className="text-xs text-slate-500 mt-2 ml-1">
-                                + {quoteFee} sats estimated network fee
-                            </p>
-                        )}
-                    </div>
 
-                    <div>
-                        <label className="text-sm text-slate-400 block mb-1">Invoice / Address / Token</label>
-                        <div className="relative">
-                            <textarea
-                                className="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-sm font-mono h-32 focus:ring-2 focus:ring-brand-primary outline-none resize-none"
-                                placeholder="lnbc... or user@domain.com or cashuA..."
-                                value={sendInput}
-                                onChange={e => setSendInput(e.target.value)}
-                            />
-                            {isCheckingInvoice && (
-                                <div className="absolute top-3 right-3">
-                                    <Icons.Zap size={16} className="text-brand-accent animate-pulse" />
-                                </div>
-                            )}
+                        <div className="flex-1">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Recipient</label>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const text = await navigator.clipboard.readText();
+                                            if (text) setSendInput(text);
+                                        } catch (e) {
+                                            console.error("Failed to read clipboard", e);
+                                        }
+                                    }}
+                                    className="text-xs text-brand-secondary hover:text-white transition-colors flex items-center"
+                                >
+                                    <Icons.Copy size={12} className="mr-1" /> Paste
+                                </button>
+                            </div>
+                            <div className="relative h-full max-h-48">
+                                <textarea
+                                    className="w-full h-full bg-slate-900/50 border border-slate-600 rounded-xl p-4 text-sm font-mono text-slate-300 focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none resize-none transition-all"
+                                    placeholder="lnbc... or user@domain.com or cashuA..."
+                                    value={sendInput}
+                                    onChange={e => setSendInput(e.target.value)}
+                                />
+                                {isCheckingInvoice && (
+                                    <div className="absolute top-4 right-4">
+                                        <Icons.Zap size={16} className="text-brand-accent animate-pulse" />
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    <div className="pt-4 flex space-x-3">
-                        <Button fullWidth variant="secondary" onClick={() => setView('main')}>Cancel</Button>
-                        <Button fullWidth onClick={handleSend} disabled={isProcessing || insufficientFunds || !sendAmount} className={insufficientFunds ? 'opacity-50 cursor-not-allowed' : ''}>
+                    <div className="pt-6 flex space-x-4 mt-auto">
+                        <Button fullWidth variant="secondary" onClick={() => setView('main')} className="bg-slate-800 hover:bg-slate-700 border-slate-600">Cancel</Button>
+                        <Button
+                            fullWidth
+                            onClick={handleSend}
+                            disabled={isProcessing || insufficientFunds || !sendAmount}
+                            className={`shadow-lg shadow-brand-primary/20 ${insufficientFunds ? 'opacity-50 cursor-not-allowed' : 'bg-gradient-to-r from-brand-primary to-brand-accent hover:opacity-90'}`}
+                        >
                             {isProcessing ? 'Processing...' : 'Confirm Send'}
                         </Button>
                     </div>
