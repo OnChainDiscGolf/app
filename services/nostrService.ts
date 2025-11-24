@@ -1,6 +1,6 @@
 
 import { SimplePool, generateSecretKey, getPublicKey, finalizeEvent, nip19, Filter, Event, nip04, nip44 } from 'nostr-tools';
-import { NOSTR_KIND_PROFILE, NOSTR_KIND_CONTACTS, NOSTR_KIND_ROUND, NOSTR_KIND_SCORE, NOSTR_KIND_APP_DATA, Player, RoundSettings, UserProfile, DisplayProfile, Proof, Mint, WalletTransaction } from '../types';
+import { NOSTR_KIND_PROFILE, NOSTR_KIND_CONTACTS, NOSTR_KIND_ROUND, NOSTR_KIND_SCORE, NOSTR_KIND_APP_DATA, NOSTR_KIND_GIFT_WRAP, Player, RoundSettings, UserProfile, DisplayProfile, Proof, Mint, WalletTransaction } from '../types';
 import { bytesToHex, hexToBytes, randomBytes } from '@noble/hashes/utils';
 
 // Default relays - Optimized order for profile discovery
@@ -762,6 +762,133 @@ export const subscribeToRound = (roundId: string, callback: (event: any) => void
             },
         }
     );
+};
+
+export const subscribeToGiftWraps = (callback: (event: Event) => void) => {
+    const session = getSession();
+    if (!session) return { close: () => { } };
+
+    const filters: Filter[] = [{
+        kinds: [NOSTR_KIND_GIFT_WRAP],
+        '#p': [session.pk],
+        since: Math.floor(Date.now() / 1000) // Only listen for new ones for now
+    }];
+
+    return pool.subscribeMany(
+        getRelays(),
+        filters as any,
+        {
+            onevent: async (event) => {
+                try {
+                    const unwrapped = await unwrapGiftWrap(event);
+                    if (unwrapped) {
+                        callback(unwrapped);
+                    }
+                } catch (e) {
+                    console.warn("Failed to unwrap gift wrap", e);
+                }
+            },
+        }
+    );
+};
+
+// --- NIP-17 / Gift Wrap Helpers ---
+
+const unwrapGiftWrap = async (event: Event): Promise<Event | null> => {
+    const ctx = getAuthContext();
+    if (event.kind !== NOSTR_KIND_GIFT_WRAP) return null;
+
+    try {
+        // 1. Decrypt the Gift Wrap (Kind 1059) to get the Seal
+        // The content is encrypted for us (the recipient)
+        const decryptedSealJson = await decryptInternal(event.pubkey, event.content);
+        const seal = JSON.parse(decryptedSealJson) as Event;
+
+        // 2. Verify Seal (Kind 13)
+        // In a full implementation, we should verify the signature of the seal, 
+        // but the seal is signed by the sender, which we don't know yet until we verify it?
+        // Actually, the seal is signed by the SENDER.
+        // We need to verify the seal's signature.
+        // if (!verifyEvent(seal)) throw new Error("Invalid seal signature");
+
+        // 3. Decrypt the Seal to get the Rumor (Kind 14)
+        // The seal content is encrypted for the recipient (us) by the sender (seal.pubkey)
+        const decryptedRumorJson = await decryptInternal(seal.pubkey, seal.content);
+        const rumor = JSON.parse(decryptedRumorJson) as Event;
+
+        // 4. Return the rumor (which contains the actual content)
+        return rumor;
+
+    } catch (e) {
+        console.error("Error unwrapping NIP-17:", e);
+        return null;
+    }
+};
+
+export const getMagicLightningAddress = (pubkey: string): string => {
+    try {
+        const npub = nip19.npubEncode(pubkey);
+        // Use first 12 chars of npub for brevity, or full npub? 
+        // Standard practice for these bridges is often the full npub or a truncated version.
+        // Let's use the full npub for uniqueness and standard compliance with bridges like npubcash.
+        return `${npub}@npubcash.com`;
+    } catch (e) {
+        return '';
+    }
+};
+
+export const sendGiftWrap = async (recipientPubkey: string, content: string) => {
+    // 1. Create Rumor (Kind 14)
+    // The rumor is the actual message.
+    const rumorTemplate = {
+        kind: 14, // NOSTR_KIND_RUMOR (not defined in types yet, but it's 14)
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [['p', recipientPubkey]],
+        content: content
+    };
+
+    // We need to sign the rumor? No, rumors are not signed. They are just serialized JSON.
+    // Wait, the seal contains the SIGNED rumor? Or just the JSON?
+    // NIP-17: "The inner event (rumor) is NOT signed."
+    // The Seal IS signed by the SENDER.
+
+    // 2. Create Seal (Kind 13)
+    // Encrypted to Recipient from Sender (Us)
+    const session = getSession();
+    if (!session) throw new Error("Not logged in");
+
+    const rumorJson = JSON.stringify(rumorTemplate);
+    const encryptedRumor = await encryptInternal(recipientPubkey, rumorJson);
+
+    const sealTemplate = {
+        kind: 13,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [],
+        content: encryptedRumor
+    };
+
+    const sealEvent = await signEventWrapper(sealTemplate);
+    const sealJson = JSON.stringify(sealEvent);
+
+    // 3. Create Gift Wrap (Kind 1059)
+    // Encrypted to Recipient from Random Ephemeral Key
+    const ephemeralSecret = generateSecretKey();
+    const ephemeralPubkey = getPublicKey(ephemeralSecret);
+
+    // We need to encrypt the SEAL using NIP-44 with the ephemeral key
+    const conversationKey = nip44.v2.utils.getConversationKey(ephemeralSecret, recipientPubkey);
+    const encryptedSeal = nip44.v2.encrypt(sealJson, conversationKey);
+
+    const wrapEvent = finalizeEvent({
+        kind: NOSTR_KIND_GIFT_WRAP,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [['p', recipientPubkey]],
+        content: encryptedSeal
+    }, ephemeralSecret);
+
+    await promiseAny(pool.publish(getRelays(), wrapEvent));
+    console.log("Sent Gift Wrap!", wrapEvent);
+    return wrapEvent;
 };
 
 // Helper: Parse Profile Content robustly

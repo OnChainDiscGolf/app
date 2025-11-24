@@ -110,6 +110,7 @@ export const NOSTR_KIND_CONTACTS = 3; // Contact List
 export const NOSTR_KIND_ROUND = 30001; // Replaceable event for a League Round
 export const NOSTR_KIND_SCORE = 30002; // Replaceable event for a Player's Score in a Round
 export const NOSTR_KIND_APP_DATA = 30078; // Application-specific Data
+export const NOSTR_KIND_GIFT_WRAP = 1059; // NIP-17 Gift Wrap
 
 export interface KeyPair {
   sk?: Uint8Array;

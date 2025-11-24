@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { sendGiftWrap } from '../services/nostrService';
 import { Button } from '../components/Button';
 import { Icons } from '../components/Icons';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +30,31 @@ const ProcessingOverlay: React.FC<{ message: string }> = ({ message }) => {
         <div className="absolute inset-0 z-50 bg-brand-dark/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200">
             <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mb-4"></div>
             <h3 className="text-xl font-bold text-white animate-pulse">{message}</h3>
+        </div>
+    );
+};
+
+const HelpModal: React.FC<{
+    isOpen: boolean;
+    title: string;
+    text: string;
+    onClose: () => void;
+}> = ({ isOpen, title, text, onClose }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-xl font-bold text-white">{title}</h3>
+                    <button onClick={onClose} className="text-slate-400 hover:text-white">
+                        <Icons.Close size={24} />
+                    </button>
+                </div>
+                <p className="text-slate-300 leading-relaxed">
+                    {text}
+                </p>
+                <Button fullWidth className="mt-6" onClick={onClose}>Got it</Button>
+            </div>
         </div>
     );
 };
@@ -62,6 +88,7 @@ export const Wallet: React.FC = () => {
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [showNwcError, setShowNwcError] = useState(false);
     const [isWiggling, setIsWiggling] = useState(false);
+    const [helpModal, setHelpModal] = useState<{ isOpen: boolean, title: string, text: string } | null>(null);
 
     // Scanner Refs
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -423,6 +450,19 @@ export const Wallet: React.FC = () => {
         }
     };
 
+    const handleTestBridge = async () => {
+        if (!currentUserPubkey) return;
+        // Mock Token (Base64 encoded JSON)
+        const mockToken = "cashuAeyJ0b2tlbiI6W3sibWludCI6Imh0dHBzOi8vbWludC5taW5pYml0cy5jYXNoL0JpdGNvaW4iLCJwcm9vZnMiOlt7ImlkIjoiMDBiMjRjOGQ4OCIsImFtb3VudCI6MSwic2VjcmV0IjoiZTE4YmU5OGEwY2EwZThhMDc0YmU5OGEwY2EwZThhMDc0YmU5OGEwY2EwZThhMDc0YmU5OGEwY2EwZThhMDc0IiwiQyI6IjAyZTE4YmU5OGEwY2EwZThhMDc0YmU5OGEwY2EwZThhMDc0YmU5OGEwY2EwZThhMDc0YmU5OGEwY2EwZThhMDc0In1dfV19";
+
+        try {
+            await sendGiftWrap(currentUserPubkey, `Payment received! ${mockToken}`);
+            alert("Simulated Bridge Payment Sent! Watch for 'Auto-redeemed' or 'Failed to redeem' in logs.");
+        } catch (e) {
+            alert("Failed to send simulation: " + e);
+        }
+    };
+
     // --- Success Overlay Renders ---
 
     if (depositSuccess) {
@@ -626,9 +666,27 @@ export const Wallet: React.FC = () => {
                             <input className="w-full bg-slate-900 border border-slate-600 rounded p-2 mb-3 text-sm" placeholder="Mint URL" value={newMintUrl} onChange={e => setNewMintUrl(e.target.value)} />
                             <Button fullWidth onClick={handleAddMint} disabled={!newMintName || !newMintUrl}>Add Mint</Button>
                         </div>
+
+
+                        <div className="mt-8 pt-6 border-t border-slate-700">
+                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Developer Tools</h3>
+                            <Button
+                                variant="secondary"
+                                fullWidth
+                                onClick={handleTestBridge}
+                                className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10"
+                            >
+                                <Icons.Zap size={16} className="mr-2" />
+                                Simulate Bridge Payment (NIP-17)
+                            </Button>
+                            <p className="text-[10px] text-slate-500 mt-2 text-center">
+                                Sends a self-encrypted Gift Wrap with a mock token to test the listener.
+                            </p>
+                        </div>
                     </div>
-                )}
-            </div>
+                )
+                }
+            </div >
         );
     }
 
@@ -639,12 +697,24 @@ export const Wallet: React.FC = () => {
                     <button onClick={() => setView('main')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700">
                         <Icons.Prev />
                     </button>
-                    <h2 className="text-xl font-bold">Mint Deposit</h2>
+                    <div className="flex items-center justify-center space-x-2">
+                        <h2 className="text-xl font-bold">Create Invoice</h2>
+                        <button
+                            onClick={() => setHelpModal({
+                                isOpen: true,
+                                title: "When to use an Invoice?",
+                                text: "Use an invoice when you need to request a specific amount of money. Unlike your Lightning Address, an invoice is valid for only one payment and expires after a short time."
+                            })}
+                            className="text-slate-500 hover:text-brand-primary transition-colors"
+                        >
+                            <Icons.Help size={18} />
+                        </button>
+                    </div>
                 </div>
 
                 {!depositInvoice ? (
                     <div className="space-y-4">
-                        <p className="text-slate-400 text-sm">Convert Lightning (Sats) into eCash tokens.</p>
+                        <p className="text-slate-400 text-sm">Generate a request for a specific amount.</p>
                         <label className="block text-sm font-bold text-slate-500">Amount</label>
                         <input
                             type="number"
@@ -675,6 +745,8 @@ export const Wallet: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+                {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} />}
             </div>
         );
     }
@@ -689,20 +761,71 @@ export const Wallet: React.FC = () => {
                         <Icons.Prev />
                     </button>
                 </div>
-                <h2 className="text-2xl font-bold mb-2">Receive Sats</h2>
-                <p className="text-slate-400 text-sm mb-8">Scan to send funds to this wallet</p>
+                <div className="flex items-center justify-center space-x-2 mb-2">
+                    <h2 className="text-2xl font-bold">Lightning Address</h2>
+                    <button
+                        onClick={() => setHelpModal({
+                            isOpen: true,
+                            title: "What is a Lightning Address?",
+                            text: "Think of this like your email address for money. It's permanent, so you don't need to create a new QR code every time. You can share it with anyone to receive payments instantly."
+                        })}
+                        className="text-slate-500 hover:text-brand-primary transition-colors"
+                    >
+                        <Icons.Help size={20} />
+                    </button>
+                </div>
+                <p className="text-slate-400 text-sm mb-6 max-w-xs mx-auto">
+                    Your permanent address for receiving payments. Share it like a username.
+                </p>
+
                 <div className="bg-white p-4 rounded-2xl shadow-xl mb-6">
                     <img src={qrUrl} alt="Wallet QR Code" className="w-48 h-48" />
                 </div>
-                <Button fullWidth variant="secondary" onClick={() => setView('deposit')} className="mb-4">
-                    <Icons.Plus size={18} className="mr-2" /> Mint Tokens (Deposit)
-                </Button>
-                <div className="w-full max-w-xs bg-slate-800 p-3 rounded-lg flex items-center justify-between mb-4">
-                    <span className="text-xs text-slate-400 truncate mr-2">{receiveAddress}</span>
-                    <button onClick={() => handleCopy(receiveAddress)} className="text-brand-primary hover:text-white">
-                        <Icons.Copy size={18} />
+
+                <div className="w-full max-w-xs mb-6">
+                    <button
+                        onClick={() => handleCopy(receiveAddress)}
+                        className="w-full flex items-center justify-between bg-slate-800 p-4 rounded-xl border border-slate-700 hover:border-brand-primary transition-all group"
+                    >
+                        <div className="flex items-center space-x-3 overflow-hidden">
+                            <div className="bg-brand-primary/10 p-2 rounded-lg">
+                                <Icons.Zap size={18} className="text-brand-primary" />
+                            </div>
+                            <div className="flex flex-col items-start overflow-hidden">
+                                <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Your Address</span>
+                                <span className="text-sm text-white font-mono truncate w-full text-left">
+                                    {receiveAddress.length > 25
+                                        ? receiveAddress.substring(0, 12) + '...' + receiveAddress.substring(receiveAddress.length - 12)
+                                        : receiveAddress}
+                                </span>
+                            </div>
+                        </div>
+                        <Icons.Copy size={18} className="text-slate-500 group-hover:text-white transition-colors" />
                     </button>
                 </div>
+
+                <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            if (navigator.share) {
+                                navigator.share({
+                                    title: 'My Lightning Address',
+                                    text: receiveAddress,
+                                    url: `lightning:${receiveAddress}`
+                                }).catch(console.error);
+                            } else {
+                                handleCopy(receiveAddress);
+                            }
+                        }}
+                    >
+                        <Icons.Share size={18} className="mr-2" /> Share
+                    </Button>
+                    <Button variant="secondary" onClick={() => setView('deposit')}>
+                        <Icons.Plus size={18} className="mr-2" /> Invoice
+                    </Button>
+                </div>
+                {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} />}
             </div>
         );
     }
@@ -945,7 +1068,7 @@ export const Wallet: React.FC = () => {
                             <span className="text-sm font-bold text-white">Send</span>
                         </button>
 
-                        <button onClick={() => setView('deposit')} className="flex flex-col items-center justify-center bg-brand-primary/20 hover:bg-brand-primary/30 border border-brand-primary/50 hover:border-brand-primary rounded-xl py-3 transition-all active:scale-95">
+                        <button onClick={() => setView('receive')} className="flex flex-col items-center justify-center bg-brand-primary/20 hover:bg-brand-primary/30 border border-brand-primary/50 hover:border-brand-primary rounded-xl py-3 transition-all active:scale-95">
                             <div className="bg-brand-primary/20 p-2 rounded-full mb-1">
                                 <Icons.Receive size={20} className="text-brand-primary" />
                             </div>
@@ -989,6 +1112,7 @@ export const Wallet: React.FC = () => {
                         ))
                 )}
             </div>
+            {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} />}
         </div >
     );
 };

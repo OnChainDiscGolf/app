@@ -4,7 +4,7 @@ import { getDecodedToken } from '@cashu/cashu-ts';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, Player, RoundSettings, WalletTransaction, UserProfile, UserStats, NOSTR_KIND_SCORE, Mint, DisplayProfile, Proof } from '../types';
 import { DEFAULT_HOLE_COUNT } from '../constants';
-import { publishProfile, publishRound, publishScore, subscribeToRound, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages } from '../services/nostrService';
+import { publishProfile, publishRound, publishScore, subscribeToRound, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages, subscribeToGiftWraps } from '../services/nostrService';
 import { WalletService } from '../services/walletService';
 import { NWCService } from '../services/nwcService';
 import { bytesToHex } from '@noble/hashes/utils';
@@ -404,6 +404,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return () => sub.close();
     }
   }, [isAuthenticated, isGuest, activeRound?.id]);
+
+  // Listen for NIP-17 Gift Wraps (Bridge Payments)
+  useEffect(() => {
+    if (isAuthenticated && !isGuest) {
+      const sub = subscribeToGiftWraps(async (event) => {
+        console.log("Received NIP-17 Gift Wrap!", event);
+        // The event content is the "Rumor". We check it for tokens.
+        const content = event.content;
+        if (content && content.includes('cashuA')) {
+          console.log("Found Cashu token in Gift Wrap!");
+          const tokens = content.match(/cashuA[A-Za-z0-9_=-]+/g);
+          if (tokens) {
+            for (const token of tokens) {
+              try {
+                const success = await receiveEcash(token);
+                if (success) {
+                  console.log("Auto-redeemed token from Gift Wrap!");
+                  // Notify user (could add a toast here later)
+                  addTransaction('receive', 0, 'Received via Lightning Bridge', 'cashu'); // Amount will be updated by receiveEcash logic if we tracked it better, but for now this logs the event. 
+                  // Actually receiveEcash updates the proofs, so balance updates automatically.
+                }
+              } catch (e) {
+                console.warn("Failed to redeem token from Gift Wrap", e);
+              }
+            }
+          }
+        }
+      });
+
+      return () => sub.close();
+    }
+  }, [isAuthenticated, isGuest]);
 
 
   // --- Actions ---

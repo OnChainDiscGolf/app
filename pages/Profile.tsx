@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Icons } from '../components/Icons';
 import { Button } from '../components/Button';
-import { getSession, getRelays, addRelay, removeRelay, resetRelays, uploadProfileImage } from '../services/nostrService';
+import { getSession, getRelays, addRelay, removeRelay, resetRelays, uploadProfileImage, getMagicLightningAddress } from '../services/nostrService';
 import { nip19 } from 'nostr-tools';
 import { bytesToHex } from '@noble/hashes/utils';
 
@@ -27,6 +27,26 @@ export const Profile: React.FC = () => {
     // Authenticated View States
     const [view, setView] = useState<'main' | 'settings'>('main');
     const [isEditing, setIsEditing] = useState(false);
+    const [copiedAddress, setCopiedAddress] = useState(false);
+
+    const lightningAddress = userProfile.lud16 || getMagicLightningAddress(currentUserPubkey);
+
+    const formatLightningAddress = (addr: string) => {
+        if (!addr) return '';
+        const parts = addr.split('@');
+        if (parts.length !== 2) return addr.length > 20 ? addr.substring(0, 20) + '...' : addr;
+
+        const [user, domain] = parts;
+        if (user.length <= 12) return addr;
+        return `${user.substring(0, 6)}...${user.substring(user.length - 6)}@${domain}`;
+    };
+
+    const handleCopyAddress = () => {
+        if (!lightningAddress) return;
+        navigator.clipboard.writeText(lightningAddress);
+        setCopiedAddress(true);
+        setTimeout(() => setCopiedAddress(false), 2000);
+    };
     const [showSecrets, setShowSecrets] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [helpModal, setHelpModal] = useState<{ isOpen: boolean, title: string, text: string } | null>(null);
@@ -50,7 +70,7 @@ export const Profile: React.FC = () => {
         if (isAuthenticated && !isProfileLoading) {
             setFormData({
                 name: userProfile.name,
-                lud16: userProfile.lud16 || '',
+                lud16: userProfile.lud16 || getMagicLightningAddress(currentUserPubkey),
                 about: userProfile.about || '',
                 nip05: userProfile.nip05 || '',
                 picture: userProfile.picture || ''
@@ -594,10 +614,18 @@ export const Profile: React.FC = () => {
                                     <span>{userProfile.nip05}</span>
                                 </div>
                             )}
-                            <div className="flex items-center text-slate-400 text-sm space-x-1">
+                            <button
+                                onClick={handleCopyAddress}
+                                className="flex items-center text-slate-400 text-sm space-x-2 bg-slate-800/50 hover:bg-slate-800 px-3 py-1.5 rounded-full transition-all group active:scale-95"
+                            >
                                 <Icons.Zap size={12} className="text-brand-accent" />
-                                <span>{userProfile.lud16 || 'No Lightning Address'}</span>
-                            </div>
+                                <span className="font-mono text-xs">{formatLightningAddress(lightningAddress)}</span>
+                                {copiedAddress ? (
+                                    <Icons.CheckMark size={12} className="text-green-500" />
+                                ) : (
+                                    <Icons.Copy size={12} className="opacity-0 group-hover:opacity-50 transition-opacity" />
+                                )}
+                            </button>
                         </div>
 
                         <button
