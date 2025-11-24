@@ -792,7 +792,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const depositFunds = async (amount: number): Promise<{ request: string, quote: string }> => {
     if (walletMode === 'nwc') {
       if (!nwcServiceRef.current) throw new Error("NWC not connected");
-      const { invoice, paymentHash } = await nwcServiceRef.current.makeInvoice(amount, "Deposit to NWC");
+      const { invoice, paymentHash } = await nwcServiceRef.current.makeInvoice(amount, "Deposit to NWC Wallet");
       return { request: invoice, quote: paymentHash };
     }
 

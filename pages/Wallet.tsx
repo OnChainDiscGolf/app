@@ -427,10 +427,10 @@ export const Wallet: React.FC = () => {
         }
     };
 
-    const handleRequestDeposit = async () => {
+    const handleCreateInvoice = async () => {
         const amount = parseInt(depositAmount);
         if (isNaN(amount) || amount < 10) {
-            alert("Minimum deposit 10 sats");
+            alert("Minimum amount 10 sats");
             return;
         }
         try {
@@ -438,7 +438,7 @@ export const Wallet: React.FC = () => {
             setDepositInvoice(request);
             setDepositQuote(quote);
         } catch (e) {
-            alert("Failed to contact mint.");
+            alert("Failed to create invoice: " + (e instanceof Error ? e.message : "Unknown error"));
         }
     };
 
@@ -722,7 +722,7 @@ export const Wallet: React.FC = () => {
                             onChange={e => setDepositAmount(e.target.value)}
                             className="w-full bg-slate-800 p-4 rounded-xl text-2xl font-mono text-white border border-slate-600"
                         />
-                        <Button fullWidth onClick={handleRequestDeposit}>Generate Invoice</Button>
+                        <Button fullWidth onClick={handleCreateInvoice}>Generate Invoice</Button>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center space-y-4 animate-in fade-in relative">
@@ -1068,7 +1068,7 @@ export const Wallet: React.FC = () => {
                             <span className="text-sm font-bold text-white">Send</span>
                         </button>
 
-                        <button onClick={() => setView('receive')} className="flex flex-col items-center justify-center bg-brand-primary/20 hover:bg-brand-primary/30 border border-brand-primary/50 hover:border-brand-primary rounded-xl py-3 transition-all active:scale-95">
+                        <button onClick={() => walletMode === 'nwc' ? setView('deposit') : setView('receive')} className="flex flex-col items-center justify-center bg-brand-primary/20 hover:bg-brand-primary/30 border border-brand-primary/50 hover:border-brand-primary rounded-xl py-3 transition-all active:scale-95">
                             <div className="bg-brand-primary/20 p-2 rounded-full mb-1">
                                 <Icons.Receive size={20} className="text-brand-primary" />
                             </div>
