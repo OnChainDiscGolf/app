@@ -195,7 +195,7 @@ export const Wallet: React.FC = () => {
 
 
     // Camera & Scanning Logic
-    const { isCameraLoading, cameraError, scannedData } = useQrScanner({
+    const { isCameraLoading, cameraError, scannedData, logs, restart } = useQrScanner({
         videoRef,
         canvasRef,
         active: view === 'send-scan',
@@ -810,11 +810,18 @@ export const Wallet: React.FC = () => {
                 <div className="flex-1 relative overflow-hidden">
                     <video
                         ref={videoRef}
-                        className="absolute inset-0 w-full h-full object-cover z-10"
+                        className="absolute inset-0 w-full h-full object-cover z-10 border-2 border-red-500"
                         muted autoPlay playsInline
-                        onLoadedMetadata={() => { videoRef.current?.play().catch(e => console.warn("Auto-play prevented", e)); }}
                     />
                     <canvas ref={canvasRef} className="hidden" />
+
+                    {/* Debug Logs */}
+                    <div className="absolute top-20 left-4 right-4 z-50 pointer-events-none">
+                        <div className="bg-black/70 p-2 rounded text-[10px] text-green-400 font-mono border border-green-900/50 shadow-lg backdrop-blur-sm">
+                            {logs.map((l, i) => <div key={i}>{l}</div>)}
+                        </div>
+                    </div>
+
                     {isCameraLoading && (
                         <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/50 backdrop-blur-sm">
                             <div className="flex flex-col items-center bg-slate-900/90 p-6 rounded-2xl border border-slate-700">
@@ -837,6 +844,17 @@ export const Wallet: React.FC = () => {
                     <div className="absolute top-8 left-0 right-0 z-20 text-center pointer-events-none">
                         <h2 className="text-white font-bold text-lg drop-shadow-md bg-black/30 inline-block px-4 py-1 rounded-full backdrop-blur-sm">Scan Invoice or Token</h2>
                     </div>
+
+                    {/* Manual Start Button */}
+                    <div className="absolute bottom-40 left-0 right-0 z-50 flex justify-center pointer-events-auto">
+                        <button
+                            onClick={() => restart()}
+                            className="bg-brand-primary/80 hover:bg-brand-primary text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-sm transition-all"
+                        >
+                            Force Restart Camera
+                        </button>
+                    </div>
+
                     <button onClick={() => setView('main')} className="absolute top-6 left-6 z-30 p-3 bg-black/40 rounded-full text-white hover:bg-black/60 backdrop-blur-md transition-all">
                         <Icons.Close size={24} />
                     </button>

@@ -136,7 +136,7 @@ export const Home: React.FC = () => {
     }, [showPaymentModal, paymentQuote, paymentSuccess, checkDepositStatus]);
 
     // Scanner Logic for Adding Players
-    const { isCameraLoading } = useQrScanner({
+    const { isCameraLoading, logs, restart } = useQrScanner({
         videoRef,
         canvasRef,
         active: view === 'scan_player',
@@ -394,8 +394,16 @@ export const Home: React.FC = () => {
         return (
             <div className="relative h-full bg-black flex flex-col">
                 <div className="flex-1 relative overflow-hidden">
-                    <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover z-10" muted autoPlay playsInline />
+                    <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover z-10 border-2 border-red-500" muted autoPlay playsInline />
                     <canvas ref={canvasRef} className="hidden" />
+
+                    {/* Debug Logs */}
+                    <div className="absolute top-20 left-4 right-4 z-50 pointer-events-none">
+                        <div className="bg-black/70 p-2 rounded text-[10px] text-green-400 font-mono border border-green-900/50 shadow-lg backdrop-blur-sm">
+                            {logs.map((l, i) => <div key={i}>{l}</div>)}
+                        </div>
+                    </div>
+
                     <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
                         <div className="w-64 h-64 border-2 border-brand-primary rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
                             {!isCameraLoading && (
@@ -403,6 +411,17 @@ export const Home: React.FC = () => {
                             )}
                         </div>
                     </div>
+
+                    {/* Manual Start Button if stuck */}
+                    <div className="absolute bottom-32 left-0 right-0 z-50 flex justify-center pointer-events-auto">
+                        <button
+                            onClick={() => restart()}
+                            className="bg-brand-primary/80 hover:bg-brand-primary text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-sm transition-all"
+                        >
+                            Force Restart Camera
+                        </button>
+                    </div>
+
                     <button
                         onClick={() => setView('select_players')}
                         className="absolute top-4 left-4 z-30 p-3 bg-black/50 rounded-full text-white hover:bg-black/70 backdrop-blur-sm"
