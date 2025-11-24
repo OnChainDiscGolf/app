@@ -1,4 +1,4 @@
-# On-Chains Disc Golf
+# On-Chain Disc Golf
 
 A mobile-friendly Disc Golf Scorecard and Wallet application.
 

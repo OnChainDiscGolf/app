@@ -1,4 +1,4 @@
-const CACHE_NAME = 'on-chains-v6';
+const CACHE_NAME = 'on-chain-v6';
 const urlsToCache = [
   '/',
   '/index.html',

@@ -1024,7 +1024,7 @@ export const Home: React.FC = () => {
                         <Icons.Trophy size={50} className="text-brand-primary" strokeWidth={1.5} />
                         <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse" />
                     </div>
-                    <h1 className="text-4xl font-extrabold tracking-tight text-white">On-Chains Disc Golf</h1>
+                    <h1 className="text-4xl font-extrabold tracking-tight text-white">On-Chain Disc Golf</h1>
                     <p className="text-slate-400 text-sm">Decentralized Disc Golf powered by Bitcoin, Nostr, and eCash</p>
                 </div>
 
@@ -1089,7 +1089,7 @@ export const Home: React.FC = () => {
                                     <Icons.Trophy size={28} className="text-brand-dark" />
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl font-black text-white tracking-tight">ON-CHAINS</h1>
+                                    <h1 className="text-2xl font-black text-white tracking-tight">ON-CHAIN</h1>
                                     <p className="text-xs text-brand-primary font-bold tracking-wider uppercase">Disc Golf</p>
                                 </div>
                             </div>
@@ -1121,7 +1121,7 @@ export const Home: React.FC = () => {
                 </div>
             )}
 
-            {/* What is On-Chains Info Modal */}
+            {/* What is On-Chain Info Modal */}
             {showInfoModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                     <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full h-[80vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 relative">
@@ -1134,14 +1134,14 @@ export const Home: React.FC = () => {
 
                         <div className="flex items-center space-x-3 mb-6">
                             <Icons.Help size={28} className="text-brand-primary" />
-                            <h2 className="text-xl font-bold text-white">What is On-Chains?</h2>
+                            <h2 className="text-xl font-bold text-white">What is On-Chain?</h2>
                         </div>
 
                         <div className="flex-1 overflow-y-auto space-y-4 pr-2">
                             <p className="text-slate-300 text-sm leading-relaxed">
-                                On-Chains is a disc golf scorekeeping application that integrates payment with scorekeeping.
+                                On-Chain is a disc golf scorekeeping application that integrates payment with scorekeeping.
                                 <br /><br />
-                                We built On-Chains Disc Golf on decentralized technologies to give players and organizers true ownership and financial freedom.
+                                We built On-Chain Disc Golf on decentralized technologies to give players and organizers true ownership and financial freedom.
                             </p>
 
                             <div className="space-y-2">
