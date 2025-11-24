@@ -1020,8 +1020,12 @@ export const Home: React.FC = () => {
 
             <div className="flex-1 flex flex-col justify-center items-center space-y-10">
                 <div className="text-center space-y-2">
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-brand-primary/10 mb-4 relative">
-                        <Icons.Trophy size={50} className="text-brand-primary" strokeWidth={1.5} />
+                    <div className="inline-flex items-center justify-center mb-4 relative home-logo-container">
+                        <img
+                            src="/icon.jpg"
+                            alt="On-Chain Logo"
+                            className="w-20 h-20 rounded-2xl shadow-xl shadow-brand-primary/20"
+                        />
                         <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse" />
                     </div>
                     <h1 className="text-4xl font-extrabold tracking-tight text-white">On-Chain Disc Golf</h1>

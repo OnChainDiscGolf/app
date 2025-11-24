@@ -11,6 +11,57 @@ body {
 }
 
 /* Animations */
+
+/* Splash Screen Animations */
+@keyframes splashFadeOut {
+  0% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Logo exits upward off the screen */
+@keyframes logoExitUp {
+  0% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0.8) translateY(-120vh);
+    opacity: 0;
+  }
+}
+
+.splash-logo-container {
+  animation: logoExitUp 0.5s ease-in 1s forwards;
+}
+
+/* Logo enters downward from top to final position */
+@keyframes logoEnterDown {
+  0% {
+    transform: scale(0.5) translateY(-100vh);
+    opacity: 0;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.home-logo-container {
+  animation: logoEnterDown 0.6s ease-out 1.3s both;
+}
+
+/* Wiggle Animation */
 @keyframes wiggle {
 
   0%,
