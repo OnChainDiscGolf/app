@@ -116,6 +116,8 @@ export const Profile: React.FC = () => {
         setIsLoading(true);
         try {
             await createAccount();
+            // Cheeky secret: Set default bio for new users
+            setFormData(prev => ({ ...prev, about: "I <3 OnChainDiscGolf.com" }));
             setIsEditing(true); // Automatically open edit mode
         } catch (e) {
             setAuthError('Failed to generate keys.');
