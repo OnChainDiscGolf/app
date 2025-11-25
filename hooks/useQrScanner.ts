@@ -83,128 +83,87 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
 
         if (retryCount === 0) log("Starting scanner...");
 
+        // Start safety timeout to prevent hanging the UI
+        const timeoutId = setTimeout(() => {
+            log("Initialization timeout reached!");
+            setCameraError("CameraInitTimeout - Initialization took too long.");
+            setIsCameraLoading(false);
+            stopScanner();
+        }, 5000);
+
         // Check if video ref is ready
         if (!videoRef.current) {
             if (retryCount < 10) {
-                log(`Video ref null, retrying (${retryCount + 1}/10)...`);
                 setTimeout(() => startScanner(retryCount + 1), 100);
                 return;
             } else {
-                log("Video ref missing after retries. Aborting.");
                 setCameraError("Camera initialization failed (Video Element Missing).");
+                clearTimeout(timeoutId);
                 return;
             }
         }
 
-        // Reset state
+        // Clear any previous attempts or errors
         setCameraError(null);
         setIsCameraLoading(true);
-        setScannedData(null);
-
-        // Start a 5-second initialization timeout
-        initializationTimeoutRef.current = setTimeout(() => {
-            if (isMountedRef.current && streamRef.current === null) {
-                log("Initialization timeout reached!");
-                setCameraError("CameraInitTimeout - Initialization took too long.");
-                setIsCameraLoading(false);
-                stopScanner(); // Clean up attempts
-            }
-        }, 5000);
+        stopScanner(); // Stop old tracks, but clear timeout *after* this section
 
         try {
-            // Stop any existing stream first
-            stopScanner();
-
             let mediaStream: MediaStream;
 
-            // Aggressive Camera Request: Generic first, Environment fallback
+            // Aggressive Camera Request (Generic first, then Environment fallback)
             try {
-                log("Requesting generic camera...");
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error("navigator.mediaDevices not supported");
-                }
-
-                // 1. Try generic video first (Maximum Compatibility)
                 mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 log("Generic camera acquired");
             } catch (genericError) {
-                log("Generic failed, trying environment...");
                 try {
-                    // 2. Fallback to specific environment camera
                     mediaStream = await navigator.mediaDevices.getUserMedia({
                         video: { facingMode: 'environment' }
                     });
                     log("Environment camera acquired via fallback");
                 } catch (envError) {
-                    // 3. Propagate specific error if both fail
-                    throw envError;
+                    throw envError; // Throw the specific error if both fail
                 }
             }
 
-            if (!isMountedRef.current || !active) {
-                log("Hook unmounted/inactive, stopping tracks");
-                mediaStream.getTracks().forEach(track => track.stop());
-                return;
-            }
+            // --- SUCCESS PATH ---
 
-            // Clear the timeout immediately on successful stream acquisition
-            if (initializationTimeoutRef.current) {
-                clearTimeout(initializationTimeoutRef.current);
-                initializationTimeoutRef.current = null;
-            }
+            // Clear the external timeout as acquisition was successful
+            clearTimeout(timeoutId);
 
             streamRef.current = mediaStream;
+            const video = videoRef.current;
+            video.srcObject = mediaStream;
 
-            if (videoRef.current) {
-                const video = videoRef.current;
-                log("Attaching stream to video");
-                video.srcObject = mediaStream;
-                video.setAttribute('playsinline', 'true'); // Critical for iOS
-                video.muted = true; // Critical for auto-play policies
-
-                // Robust play handling - Suppress AbortError (Fixes Freezing)
-                try {
-                    await video.play();
-                    log("Video playing");
-                } catch (playError) {
-                    // Ignore AbortError (common in React StrictMode or rapid toggling)
-                    if ((playError as any).name === 'AbortError') {
-                        log("Play aborted (harmless race condition) - Cleared loading state.");
-                        setIsCameraLoading(false); // CRITICAL FIX: Clear loading state
-                        return;
-                    }
-                    log(`Play failed: ${playError}`);
-                    console.error("Video play failed", playError);
-                }
-
-                setIsCameraLoading(false);
+            // Robust play handling - Suppress AbortError
+            try {
+                await video.play();
+                log("Video playing");
+                setIsCameraLoading(false); // Only clear loading state on successful play
                 animationFrameRef.current = requestAnimationFrame(tick);
+            } catch (playError) {
+                // Check if the component was aborted by a subsequent render/cleanup
+                if ((playError as any).name === 'AbortError') {
+                    log("Play aborted (harmless race condition) - Stream killed by cleanup.");
+                    setIsCameraLoading(false); // CRITICAL: Clear loading state immediately on abort
+                    return;
+                }
+                throw playError; // Throw other errors (NotAllowedError, etc.)
             }
+
         } catch (err) {
-            // Granular Error Reporting
+            // --- FAILURE PATH ---
             const errorName = (err as any).name || 'UnknownError';
-            const errorMessage = (err as Error).message || String(err);
+            clearTimeout(timeoutId);
+            stopScanner(); // Ensure tracks are stopped on failure
 
-            log(`Critical Error: ${errorName} - ${errorMessage}`);
-            console.error("Camera access failed", err);
+            log(`Critical Error: ${errorName}`);
 
-            // Ensure timeout is cleared on failure
-            if (initializationTimeoutRef.current) {
-                clearTimeout(initializationTimeoutRef.current);
-                initializationTimeoutRef.current = null;
-            }
-
-            if (isMountedRef.current) {
-                setIsCameraLoading(false);
-                // Present the specific error name to the user for diagnosis
-                const userMessage = errorName === 'NotAllowedError'
-                    ? "Access Denied: Check OS/Browser permissions."
-                    : `Camera failed: ${errorName}`;
-
-                setCameraError(userMessage);
-            }
+            // Set error state to trigger the fallback UI
+            setCameraError(errorName === 'NotAllowedError' ? "Access Denied: Check OS/Browser permissions." : `Camera failed: ${errorName}`);
+            setIsCameraLoading(false);
         }
-    }, [active, stopScanner, tick, videoRef]);
+    }, [active, stopScanner, tick, videoRef]); // Removed startScanner dependency
 
     useEffect(() => {
         isMountedRef.current = true;
