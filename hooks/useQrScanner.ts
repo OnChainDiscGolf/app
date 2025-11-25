@@ -169,7 +169,8 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
                 } catch (playError) {
                     // Ignore AbortError (common in React StrictMode or rapid toggling)
                     if ((playError as any).name === 'AbortError') {
-                        log("Play aborted (harmless race condition)");
+                        log("Play aborted (harmless race condition) - Cleared loading state.");
+                        setIsCameraLoading(false); // CRITICAL FIX: Clear loading state
                         return;
                     }
                     log(`Play failed: ${playError}`);
