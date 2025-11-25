@@ -869,10 +869,11 @@ export const fetchHistoricalGiftWraps = async (
 export const getMagicLightningAddress = (pubkey: string): string => {
     try {
         const npub = nip19.npubEncode(pubkey);
-        // Use npub.cash Lightning bridge service
-        return `${npub}@npub.cash`;
+        // Use npubx.cash Lightning bridge service
+        return `${npub}@npubx.cash`;
     } catch (e) {
-        return '';
+        console.error("Failed to generate magic lightning address", e);
+        return "";
     }
 };
 

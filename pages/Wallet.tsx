@@ -15,7 +15,7 @@ const SuccessOverlay: React.FC<{ message: string, subMessage?: string, onClose: 
     }, [onClose]);
 
     return (
-        <div className="absolute inset-0 z-50 bg-brand-dark flex flex-col items-center justify-center animate-in zoom-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-brand-dark flex flex-col items-center justify-center animate-in zoom-in duration-300">
             <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-green-500/30 animate-in fade-in zoom-in-75 delay-100 duration-500">
                 <Icons.CheckMark size={48} className="text-white" strokeWidth={4} />
             </div>
@@ -68,6 +68,39 @@ export const Wallet: React.FC = () => {
     const [sendAmount, setSendAmount] = useState('');
     const [sendInput, setSendInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+
+    // Check for payments when Wallet tab is opened
+    useEffect(() => {
+        checkForPayments();
+    }, []);
+
+    // Poll for payments when in Receive view
+    useEffect(() => {
+        if (view !== 'receive') return;
+
+        let timeoutId: NodeJS.Timeout;
+        const startTime = Date.now();
+        const TWO_MINUTES = 2 * 60 * 1000;
+
+        const poll = async () => {
+            const count = await checkForPayments();
+
+            if (count > 0) {
+                setSuccessMode('received');
+                return;
+            }
+
+            const elapsed = Date.now() - startTime;
+            const delay = elapsed < TWO_MINUTES ? 5000 : 10000;
+
+            timeoutId = setTimeout(poll, delay);
+        };
+
+        // Start polling
+        poll();
+
+        return () => clearTimeout(timeoutId);
+    }, [view]);
 
     // Pull-to-refresh state
     const [pullDistance, setPullDistance] = useState(0);
@@ -803,26 +836,10 @@ export const Wallet: React.FC = () => {
                 </div>
 
                 <div className="mt-6 w-full flex justify-center">
-                    <button
-                        onClick={async () => {
-                            setIsProcessing(true);
-                            const count = await checkForPayments();
-                            setIsProcessing(false);
-                            if (count === 0) {
-                                alert("No new payments found.");
-                            }
-                        }}
-                        className="text-xs text-brand-primary hover:text-brand-primary/80 underline flex items-center justify-center transition-colors"
-                        disabled={isProcessing}
-                    >
-                        {isProcessing ? (
-                            <span className="animate-pulse">Checking...</span>
-                        ) : (
-                            <>
-                                <Icons.Refresh size={12} className="mr-1" /> Check for incoming payments
-                            </>
-                        )}
-                    </button>
+                    <div className="flex items-center space-x-2 text-brand-primary animate-pulse">
+                        <Icons.Zap size={18} />
+                        <span className="text-sm font-bold">Waiting for payment...</span>
+                    </div>
                 </div>
                 {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} />}
             </div>

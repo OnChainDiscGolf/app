@@ -8,7 +8,7 @@ let clientInstance: NPCClient | null = null;
 const getClient = () => {
     if (clientInstance) return clientInstance;
 
-    const baseUrl = "https://npub.cash";
+    const baseUrl = "https://npubx.cash";
 
     // Wrapper to adapt signEventWrapper to what SDK expects
     // SDK expects: (e: Omit<NostrEvent, "id" | "sig" | "pubkey">) => Promise<NostrEvent>
@@ -47,6 +47,12 @@ export const checkPendingPayments = async (): Promise<NpubCashQuote[]> => {
         // TODO: We could optimize this with getQuotesSince if we track last check time
         const quotes = await client.getAllQuotes();
         console.log(`Fetched ${quotes.length} quotes from npub.cash`);
+
+        // Log the first few quotes to see their structure and state
+        if (quotes.length > 0) {
+            console.log("Sample quote:", JSON.stringify(quotes[0], null, 2));
+            quotes.forEach(q => console.log(`Quote ${q.quoteId}: state=${q.state}, amount=${q.amount}`));
+        }
 
         // Filter for PAID quotes
         // We cast to any because the SDK types might be strict but we want to be sure
