@@ -298,7 +298,7 @@ const getAuthContext = () => {
     throw new Error("Unknown auth method");
 };
 
-const signEventWrapper = async (template: any) => {
+export const signEventWrapper = async (template: any) => {
     const ctx = getAuthContext();
 
     if (ctx.type === 'local') {

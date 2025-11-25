@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { AppState, Player, RoundSettings, WalletTransaction, UserProfile, UserStats, NOSTR_KIND_SCORE, Mint, DisplayProfile, Proof } from '../types';
 import { DEFAULT_HOLE_COUNT } from '../constants';
 import { publishProfile, publishRound, publishScore, subscribeToRound, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages, subscribeToGiftWraps, fetchHistoricalGiftWraps } from '../services/nostrService';
+import { checkPendingPayments } from '../services/npubCashService';
 import { WalletService } from '../services/walletService';
 import { NWCService } from '../services/nwcService';
 import { bytesToHex } from '@noble/hashes/utils';
@@ -50,6 +51,7 @@ interface AppContextType extends AppState {
   // NWC Actions
   setWalletMode: (mode: 'cashu' | 'nwc') => void;
   setNwcConnection: (uri: string) => void;
+  checkForPayments: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -356,6 +358,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
       }).catch(e => console.warn("Historical Gift Wrap fetch failed:", e));
+
+      // 6. Check for pending npub.cash payments (SDK Polling)
+      checkForPayments();
     }
   }, [currentUserPubkey, isGuest]);
 
@@ -803,6 +808,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- Wallet Actions ---
 
+  const checkForPayments = async () => {
+    if (!currentUserPubkey || isGuest) return;
+
+    // Check npub.cash
+    try {
+      const tokens = await checkPendingPayments();
+      if (tokens.length > 0) {
+        console.log(`Found ${tokens.length} pending npub.cash payments!`);
+        let claimedCount = 0;
+        for (const token of tokens) {
+          try {
+            const tokenId = token.substring(0, 20);
+            const processedKey = `processed_token_${tokenId}`;
+            if (localStorage.getItem(processedKey)) {
+              console.log(`Token ${tokenId} already processed, skipping...`);
+              continue;
+            }
+
+            const success = await receiveEcash(token);
+            if (success) {
+              claimedCount++;
+              localStorage.setItem(processedKey, Date.now().toString());
+              console.log(`Auto-claimed npub.cash payment!`);
+            }
+          } catch (e) {
+            console.warn("Failed to claim npub.cash token", e);
+          }
+        }
+        if (claimedCount > 0) {
+          console.log(`✅ Recovered ${claimedCount} npub.cash payments!`);
+        }
+      }
+    } catch (e) {
+      console.warn("npub.cash check failed:", e);
+    }
+  };
+
   const refreshWalletBalance = async () => {
     if (walletMode === 'nwc') {
       if (nwcServiceRef.current) {
@@ -847,6 +889,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           }
         }).catch(e => console.warn("Refresh Gift Wrap check failed:", e));
+
+        // Check for pending npub.cash payments
+        checkForPayments();
       }
       return;
     }
@@ -890,6 +935,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           }
         }).catch(e => console.warn("Refresh Gift Wrap check failed:", e));
+
+        // Check for pending npub.cash payments
+        checkForPayments();
       }
     } catch (e) {
       console.error("Wallet refresh failed:", e);
@@ -1183,7 +1231,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isProfileLoading,
       createToken,
       setWalletMode: setWalletModeAction,
-      setNwcConnection
+      setNwcConnection,
+      checkForPayments
     }}>
       {children}
     </AppContext.Provider>

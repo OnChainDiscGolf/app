@@ -61,7 +61,7 @@ const HelpModal: React.FC<{
 };
 
 export const Wallet: React.FC = () => {
-    const { walletBalance, transactions, userProfile, currentUserPubkey, mints, setActiveMint, addMint, removeMint, sendFunds, receiveEcash, depositFunds, checkDepositStatus, confirmDeposit, getLightningQuote, isAuthenticated, refreshWalletBalance, walletMode, nwcString, setWalletMode, setNwcConnection } = useApp();
+    const { walletBalance, transactions, userProfile, currentUserPubkey, mints, setActiveMint, addMint, removeMint, sendFunds, receiveEcash, depositFunds, checkDepositStatus, confirmDeposit, getLightningQuote, isAuthenticated, refreshWalletBalance, walletMode, nwcString, setWalletMode, setNwcConnection, checkForPayments } = useApp();
     const navigate = useNavigate();
 
     const [view, setView] = useState<'main' | 'receive' | 'deposit' | 'send-scan' | 'send-details' | 'settings'>('main');
@@ -800,6 +800,27 @@ export const Wallet: React.FC = () => {
                     <Button variant="secondary" onClick={() => setView('deposit')}>
                         <Icons.Plus size={18} className="mr-2" /> Invoice
                     </Button>
+                </div>
+
+                <div className="mt-6 w-full flex justify-center">
+                    <button
+                        onClick={async () => {
+                            setIsProcessing(true);
+                            await checkForPayments();
+                            setIsProcessing(false);
+                            alert("Checked for payments!");
+                        }}
+                        className="text-xs text-brand-primary hover:text-brand-primary/80 underline flex items-center justify-center transition-colors"
+                        disabled={isProcessing}
+                    >
+                        {isProcessing ? (
+                            <span className="animate-pulse">Checking...</span>
+                        ) : (
+                            <>
+                                <Icons.Refresh size={12} className="mr-1" /> Check for incoming payments
+                            </>
+                        )}
+                    </button>
                 </div>
                 {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} />}
             </div>
