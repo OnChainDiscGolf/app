@@ -651,10 +651,11 @@ export const Profile: React.FC = () => {
                                     <p className="text-xs text-slate-400 mb-2 font-bold uppercase">Try your key on these apps:</p>
                                     <div className="flex flex-wrap gap-2">
                                         <a href="https://damus.io" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Damus (iOS)</a>
-                                        <a href="https://amethyst.social" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Amethyst (Android)</a>
                                         <a href="https://primal.net" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Primal</a>
+                                        <a href="https://github.com/greenart7c3/Amber/releases" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Amber (Android)</a>
                                         <a href="https://jesterui.github.io" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Jester (Chess)</a>
                                         <a href="https://zap.stream" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Zap.Stream</a>
+                                        <a href="https://zapstore.dev" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Zapstore</a>
                                     </div>
                                 </div>
                             )}
