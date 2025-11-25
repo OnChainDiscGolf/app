@@ -3,7 +3,7 @@ import { CashuMint, CashuWallet, getDecodedToken } from '@cashu/cashu-ts';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, Player, RoundSettings, WalletTransaction, UserProfile, UserStats, NOSTR_KIND_SCORE, Mint, DisplayProfile, Proof } from '../types';
 import { DEFAULT_HOLE_COUNT } from '../constants';
-import { publishProfile, publishRound, publishScore, subscribeToRound, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages, subscribeToGiftWraps, fetchHistoricalGiftWraps } from '../services/nostrService';
+import { publishProfile, publishRound, publishScore, subscribeToRound, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, loginWithAmber, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages, subscribeToGiftWraps, fetchHistoricalGiftWraps } from '../services/nostrService';
 import { checkPendingPayments, NpubCashQuote } from '../services/npubCashService';
 import { WalletService } from '../services/walletService';
 import { NWCService } from '../services/nwcService';
@@ -42,6 +42,7 @@ interface AppContextType extends AppState {
   // Auth Actions
   loginNsec: (nsec: string) => Promise<void>;
   loginNip46: (bunkerUrl: string) => Promise<void>;
+  loginAmber: () => Promise<void>;
   createAccount: () => Promise<void>;
   performLogout: () => void;
   isProfileLoading: boolean;
@@ -60,7 +61,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
-  const [authMethod, setAuthMethod] = useState<'local' | 'nip46' | null>(null);
+  const [authMethod, setAuthMethod] = useState<'local' | 'nip46' | 'amber' | null>(null);
   const [currentUserPubkey, setCurrentUserPubkey] = useState('');
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
@@ -508,6 +509,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated(true);
     setIsGuest(false);
     localStorage.removeItem('is_guest_mode');
+  };
+
+  const loginAmber = async () => {
+    await loginWithAmber(); // Opens Amber app
+    // Note: Actual login completion happens when user returns from Amber
+    // The app will redirect to nostrconnect://, so we can't continue here
   };
 
   const createAccount = async () => {
@@ -1318,6 +1325,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addRecentPlayer,
       loginNsec,
       loginNip46,
+      loginAmber,
       createAccount,
       performLogout,
       isProfileLoading,

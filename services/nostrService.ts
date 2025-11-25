@@ -2,6 +2,7 @@
 import { SimplePool, generateSecretKey, getPublicKey, finalizeEvent, nip19, Filter, Event, nip04, nip44 } from 'nostr-tools';
 import { NOSTR_KIND_PROFILE, NOSTR_KIND_CONTACTS, NOSTR_KIND_ROUND, NOSTR_KIND_SCORE, NOSTR_KIND_APP_DATA, NOSTR_KIND_GIFT_WRAP, Player, RoundSettings, UserProfile, DisplayProfile, Proof, Mint, WalletTransaction } from '../types';
 import { bytesToHex, hexToBytes, randomBytes } from '@noble/hashes/utils';
+import { generateNostrConnectURI, signEventWithAmber, nip04EncryptWithAmber, nip04DecryptWithAmber } from './amberSigner';
 
 // Default relays - Optimized order for profile discovery
 const DEFAULT_RELAYS = [
@@ -132,7 +133,7 @@ export const getSession = () => {
 
     if (!method || !pk) return null;
     return {
-        method: method as 'local' | 'nip46',
+        method: method as 'local' | 'nip46' | 'amber',
         pk,
         sk: sk ? hexToBytes(sk) : undefined
     };
@@ -263,6 +264,54 @@ export const loginWithNip46 = async (bunkerUrl: string) => {
     }
 };
 
+// --- Amber (NIP-46) Implementation ---
+
+export const loginWithAmber = async (relay: string = 'wss://relay.damus.io') => {
+    try {
+        // Generate ephemeral keypair for Amber connection
+        const ephemeralSk = generateSecretKey();
+        const clientPubkey = getPublicKey(ephemeralSk);
+        const ephemeralSkHex = bytesToHex(ephemeralSk);
+
+        // Create nostrconnect:// URI
+        const connectURI = generateNostrConnectURI(clientPubkey, relay);
+
+        // Save session info
+        localStorage.setItem('amber_ephemeral_sk', ephemeralSkHex);
+        localStorage.setItem('amber_relay', relay);
+        localStorage.setItem('amber_pending', 'true'); // Flag to check when user returns
+
+        // Open Amber app via deep-link
+        window.location.href = connectURI;
+
+        // Return pending state - the actual connection will complete when user returns
+        return { pending: true };
+
+    } catch (e) {
+        console.error("Amber Login Failed:", e);
+        throw new Error(e instanceof Error ? e.message : "Failed to connect to Amber");
+    }
+};
+
+// Complete Amber login after user returns from Amber app
+export const completeAmberLogin = async (userPubkey: string) => {
+    const ephemeralSkHex = localStorage.getItem('amber_ephemeral_sk');
+    const relay = localStorage.getItem('amber_relay');
+
+    if (!ephemeralSkHex || !relay) {
+        throw new Error('Amber session not found');
+    }
+
+    // Save the connection
+    localStorage.setItem('nostr_pk', userPubkey);
+    localStorage.setItem('amber_remote_pk', userPubkey);
+    localStorage.setItem('auth_method', 'amber');
+    localStorage.removeItem('amber_pending');
+    localStorage.removeItem('nostr_sk'); // Clear any local keys
+
+    return { pk: userPubkey };
+};
+
 export const logout = () => {
     localStorage.removeItem('nostr_sk');
     localStorage.removeItem('nostr_pk');
@@ -270,6 +319,11 @@ export const logout = () => {
     localStorage.removeItem('nostr_ephemeral_sk');
     localStorage.removeItem('nostr_remote_pk');
     localStorage.removeItem('nostr_remote_relays');
+    // Amber-specific cleanup
+    localStorage.removeItem('amber_ephemeral_sk');
+    localStorage.removeItem('amber_remote_pk');
+    localStorage.removeItem('amber_relay');
+    localStorage.removeItem('amber_pending');
 };
 
 // --- Wrappers for Auth & Encryption ---
@@ -279,7 +333,7 @@ const getAuthContext = () => {
     if (!session) throw new Error("Not authenticated");
 
     if (session.method === 'local' && session.sk) {
-        return { type: 'local', sk: session.sk, pk: session.pk };
+        return { type: 'local' as const, sk: session.sk, pk: session.pk };
     } else if (session.method === 'nip46') {
         const ephemeralSkHex = localStorage.getItem('nostr_ephemeral_sk');
         const remotePubkey = localStorage.getItem('nostr_remote_pk');
@@ -288,10 +342,23 @@ const getAuthContext = () => {
         if (!ephemeralSkHex || !remotePubkey || !relaysStr) throw new Error("Missing NIP-46 session data");
 
         return {
-            type: 'nip46',
+            type: 'nip46' as const,
             ephemeralSk: hexToBytes(ephemeralSkHex),
             remotePubkey,
             relays: JSON.parse(relaysStr) as string[]
+        };
+    } else if (session.method === 'amber') {
+        const ephemeralSkHex = localStorage.getItem('amber_ephemeral_sk');
+        const remotePubkey = localStorage.getItem('amber_remote_pk');
+        const relay = localStorage.getItem('amber_relay');
+
+        if (!ephemeralSkHex || !remotePubkey || !relay) throw new Error("Missing Amber session data");
+
+        return {
+            type: 'amber' as const,
+            ephemeralSk: hexToBytes(ephemeralSkHex),
+            remotePubkey,
+            relay
         };
     }
     throw new Error("Unknown auth method");
@@ -302,7 +369,11 @@ export const signEventWrapper = async (template: any) => {
 
     if (ctx.type === 'local') {
         return finalizeEvent(template, ctx.sk);
+    } else if (ctx.type === 'amber') {
+        // Use Amber signer
+        return await signEventWithAmber(template, ctx.ephemeralSk, ctx.remotePubkey, ctx.relay);
     } else {
+        // NIP-46 bunker
         const id = Math.random().toString(36).substring(7);
         const reqContent = {
             id,
@@ -335,6 +406,8 @@ const encryptWrapper = async (recipientPubkey: string, plaintext: string): Promi
     const ctx = getAuthContext();
     if (ctx.type === 'local') {
         return nip04.encrypt(ctx.sk, recipientPubkey, plaintext);
+    } else if (ctx.type === 'amber') {
+        return await nip04EncryptWithAmber(recipientPubkey, plaintext, ctx.ephemeralSk, ctx.remotePubkey, ctx.relay);
     } else {
         // NIP-46 nip04_encrypt
         const id = Math.random().toString(36).substring(7);
@@ -368,6 +441,8 @@ const decryptWrapper = async (senderPubkey: string, ciphertext: string): Promise
     const ctx = getAuthContext();
     if (ctx.type === 'local') {
         return nip04.decrypt(ctx.sk, senderPubkey, ciphertext);
+    } else if (ctx.type === 'amber') {
+        return await nip04DecryptWithAmber(senderPubkey, ciphertext, ctx.ephemeralSk, ctx.remotePubkey, ctx.relay);
     } else {
         // NIP-46 nip04_decrypt
         const id = Math.random().toString(36).substring(7);

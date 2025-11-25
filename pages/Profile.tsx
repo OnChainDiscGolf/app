@@ -13,7 +13,7 @@ export const Profile: React.FC = () => {
     const {
         userProfile, userStats, updateUserProfile, resetRound, refreshStats,
         isAuthenticated, isGuest, authMethod, performLogout, isProfileLoading,
-        loginNsec, loginNip46, createAccount, currentUserPubkey
+        loginNsec, loginNip46, loginAmber, createAccount, currentUserPubkey
     } = useApp();
 
     const navigate = useNavigate();
@@ -345,6 +345,39 @@ export const Profile: React.FC = () => {
                             </div>
 
                             <div className="space-y-3">
+                                <div className="flex items-center gap-2 ml-1">
+                                    <label className="text-sm text-slate-400 font-bold">Amber (Android)</label>
+                                    <button
+                                        onClick={() => openHelp(
+                                            'What is Amber?',
+                                            'Amber is a free Android app that keeps your Nostr key safe on your phone - like a password manager, but for social media.\\n\\nInstead of typing your password into websites (which can be hacked), Amber holds your key and signs things for you when you approve them.\\n\\nThink of it like TouchID for your online identity - tap to approve each action, and your key never leaves your phone!'
+                                        )}
+                                        className="text-slate-500 hover:text-brand-primary transition-colors"
+                                    >
+                                        <Icons.Help size={14} />
+                                    </button>
+                                </div>
+                                <Button
+                                    fullWidth
+                                    onClick={() => loginAmber()}
+                                    disabled={isLoading}
+                                    className="flex items-center justify-center gap-2"
+                                >
+                                    <Icons.Android size={20} />
+                                    <span>{isLoading ? 'Opening Amber...' : 'Connect with Amber'}</span>
+                                </Button>
+                                <p className="text-[10px] text-slate-500 text-center">
+                                    Android users only. <a href="https://github.com/greenart7c3/Amber/releases" target="_blank" rel="noreferrer" className="underline hover:text-brand-primary">Download Amber</a>
+                                </p>
+                            </div>
+
+                            <div className="relative flex items-center py-2">
+                                <div className="flex-grow border-t border-slate-700"></div>
+                                <span className="flex-shrink-0 mx-4 text-slate-500 text-xs font-bold uppercase">OR</span>
+                                <div className="flex-grow border-t border-slate-700"></div>
+                            </div>
+
+                            <div className="space-y-3">
                                 <label className="text-sm text-slate-400 font-bold ml-1">Remote Signer (NIP-46)</label>
                                 <div className="relative">
                                     <input
@@ -360,7 +393,7 @@ export const Profile: React.FC = () => {
                                     Connect Remote Signer
                                 </Button>
                                 <p className="text-[10px] text-slate-500 text-center">
-                                    Use a NIP-46 provider like nsec.app, Amber (Android), or other remote signers.
+                                    Use a NIP-46 provider like nsec.app or other remote signers.
                                 </p>
                             </div>
                         </div>
@@ -625,6 +658,19 @@ export const Profile: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                            {helpModal.title === 'What is Amber?' && (
+                                <div className="mt-4 pt-4 border-t border-slate-700">
+                                    <a
+                                        href="https://github.com/greenart7c3/Amber/releases"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="w-full flex items-center justify-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/50 font-bold py-3 px-4 rounded-xl transition-colors"
+                                    >
+                                        <Icons.Android size={18} />
+                                        <span>Download Amber for Android</span>
+                                    </a>
+                                </div>
+                            )}
                         </div>
 
                         <Button variant="secondary" fullWidth onClick={() => setHelpModal(null)}>
@@ -682,6 +728,13 @@ export const Profile: React.FC = () => {
                             <div className="flex items-center space-x-2 text-xs text-brand-primary bg-brand-primary/10 p-2 rounded">
                                 <Icons.Shield size={14} />
                                 <span>Keys managed by Remote Signer (NIP-46)</span>
+                            </div>
+                        )}
+
+                        {authMethod === 'amber' && (
+                            <div className="flex items-center space-x-2 text-xs text-green-400 bg-green-400/10 p-2 rounded">
+                                <Icons.Android size={14} />
+                                <span>Keys managed by Amber (Android Signer)</span>
                             </div>
                         )}
 

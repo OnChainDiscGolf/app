@@ -69,6 +69,41 @@ const Basket = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number,
   </svg>
 );
 
+// Custom Android Icon for Amber app
+const Android = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={`lucide lucide-android ${className}`}
+  >
+    {/* Head */}
+    <path d="M6 9h12v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z" />
+
+    {/* Antennas */}
+    <path d="M8 5l-1.5-2.5" />
+    <path d="M16 5l1.5-2.5" />
+
+    {/* Eyes */}
+    <circle cx="10" cy="12" r="0.5" fill="currentColor" />
+    <circle cx="14" cy="12" r="0.5" fill="currentColor" />
+
+    {/* Arms */}
+    <path d="M4 10v4" />
+    <path d="M20 10v4" />
+
+    {/* Legs */}
+    <path d="M9 18v3" />
+    <path d="M15 18v3" />
+  </svg>
+);
+
 export const Icons = {
   Trophy: Basket, // Replaced Trophy with Basket
   Wallet,
@@ -98,5 +133,6 @@ export const Icons = {
   Help: CircleHelp,
   Camera,
   Share: Share2,
-  Refresh: RefreshCw
+  Refresh: RefreshCw,
+  Android
 };
