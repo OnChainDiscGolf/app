@@ -806,9 +806,11 @@ export const Wallet: React.FC = () => {
                     <button
                         onClick={async () => {
                             setIsProcessing(true);
-                            await checkForPayments();
+                            const count = await checkForPayments();
                             setIsProcessing(false);
-                            alert("Checked for payments!");
+                            if (count === 0) {
+                                alert("No new payments found.");
+                            }
                         }}
                         className="text-xs text-brand-primary hover:text-brand-primary/80 underline flex items-center justify-center transition-colors"
                         disabled={isProcessing}

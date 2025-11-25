@@ -50,7 +50,7 @@ interface AppContextType extends AppState {
   // NWC Actions
   setWalletMode: (mode: 'cashu' | 'nwc') => void;
   setNwcConnection: (uri: string) => void;
-  checkForPayments: () => Promise<void>;
+  checkForPayments: () => Promise<number>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -807,14 +807,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- Wallet Actions ---
 
-  const checkForPayments = async () => {
-    if (!currentUserPubkey || isGuest) return;
+  const checkForPayments = async (): Promise<number> => {
+    if (!currentUserPubkey || isGuest) return 0;
 
     // Check npub.cash
     try {
+      // alert("Checking npub.cash..."); // Too noisy for auto-check
       const quotes = await checkPendingPayments();
+
       if (quotes.length > 0) {
         console.log(`Found ${quotes.length} pending npub.cash payments!`);
+        // Only alert if we found something, so we don't annoy user on auto-check
+        // But for manual check, we want to know.
+        // We can't easily distinguish manual vs auto here without passing a flag.
+        // Let's assume if we find quotes, we want to know what happens.
+
         let claimedCount = 0;
 
         for (const quote of quotes) {
@@ -827,12 +834,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
 
             console.log(`Attempting to mint ${quote.amount} sats from ${quote.mintUrl} for quote ${quoteId}...`);
+            // alert(`Found payment! Minting ${quote.amount} sats...`);
+
             const mint = new CashuMint(quote.mintUrl);
             const wallet = new CashuWallet(mint);
             await wallet.loadMint();
 
             // Mint the tokens
-            // cashu-ts v2: wallet.mintProofs(amount, quoteId)
             const newProofs = await wallet.mintProofs(quote.amount, quote.quoteId);
 
             if (newProofs && newProofs.length > 0) {
@@ -851,22 +859,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
               // Add transaction record
               addTransaction('receive', quote.amount, 'Received via npub.cash', 'cashu');
+              alert(`Successfully received ${quote.amount} sats from npub.cash!`);
             }
           } catch (e) {
             console.warn("Failed to mint npub.cash quote", e);
+            alert(`Failed to claim payment: ${e instanceof Error ? e.message : JSON.stringify(e)}`);
           }
         }
 
         if (claimedCount > 0) {
           console.log(`✅ Recovered ${claimedCount} npub.cash payments!`);
           // Trigger a sync to save new state
-          // We can't call syncWallet directly easily because it needs current state, 
+          // We can't call syncWallet directly easily because it needs current state,
           // but updating state triggers effects or we can rely on next sync.
           // Ideally we should sync here.
         }
+        return claimedCount;
+      } else {
+        // If called manually, user wants to know if nothing was found.
+        // We'll rely on the UI button to say "Checked!" but maybe we should return the count.
+        return 0;
       }
     } catch (e) {
       console.warn("npub.cash check failed:", e);
+      alert(`Error checking npub.cash: ${e instanceof Error ? e.message : JSON.stringify(e)}`);
+      return 0;
     }
   };
 
