@@ -1155,9 +1155,24 @@ export const Wallet: React.FC = () => {
                 <h1 className="text-2xl font-bold flex items-center">
                     <Icons.Wallet className="mr-2 text-brand-primary" /> Wallet
                 </h1>
-                <button onClick={() => setView('settings')} className="p-2 bg-slate-800 rounded-full hover:text-brand-primary transition-colors">
-                    <Icons.Settings size={20} />
-                </button>
+                <div className="flex space-x-2">
+                    <button
+                        onClick={() => setHelpModal({
+                            isOpen: true,
+                            title: "Wallet Help",
+                            text: "Your wallet allows you to send and receive Bitcoin instantly. You can use eCash for private, instant payments or connect your own Lightning node via NWC."
+                        })}
+                        className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                    >
+                        <Icons.Help size={20} />
+                    </button>
+                    <button
+                        onClick={() => setView('settings')}
+                        className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                    >
+                        <Icons.Settings size={20} />
+                    </button>
+                </div>
             </div>
 
             <div className={`rounded-3xl p-6 shadow-xl border relative overflow-hidden mb-8 transition-all duration-500 ${walletMode === 'nwc' ? 'bg-gradient-to-br from-slate-800 to-indigo-950 border-indigo-500/30' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700'}`}>

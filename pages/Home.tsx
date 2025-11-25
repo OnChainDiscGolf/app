@@ -33,7 +33,7 @@ export const Home: React.FC = () => {
     const navigate = useNavigate();
 
     // Local UI state for the creation wizard
-    const [view, setView] = useState<'menu' | 'setup' | 'select_players' | 'customize' | 'scan_player'>('menu');
+    const [view, setView] = useState<'menu' | 'setup' | 'select_players' | 'customize' | 'scan_player' | 'settings'>('menu');
 
     // Setup Form State
     const [courseName, setCourseName] = useState(COURSE_PRESETS[0].name);
@@ -977,16 +977,39 @@ export const Home: React.FC = () => {
         );
     }
 
+    // --- SETTINGS VIEW ---
+    if (view === 'settings') {
+        return (
+            <div className="p-6 flex flex-col h-full bg-brand-dark">
+                <div className="flex items-center mb-6">
+                    <button onClick={() => setView('menu')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700">
+                        <Icons.Prev />
+                    </button>
+                    <h2 className="text-xl font-bold">Settings</h2>
+                </div>
+                <div className="text-slate-400 text-center mt-10">
+                    <p>Settings coming soon...</p>
+                </div>
+            </div>
+        );
+    }
+
     // Default Menu View
     return (
         <div className="p-6 flex flex-col flex-1 w-full relative pb-20">
-            {/* Help Button */}
-            <div className="absolute top-6 right-6 z-10">
+            {/* Header Icons */}
+            <div className="absolute top-6 right-6 z-10 flex space-x-2">
+                <button
+                    onClick={() => setView('settings')}
+                    className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                >
+                    <Icons.Settings size={20} />
+                </button>
                 <button
                     onClick={() => setShowInfoModal(true)}
                     className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                 >
-                    <Icons.Help size={24} />
+                    <Icons.Help size={20} />
                 </button>
             </div>
 

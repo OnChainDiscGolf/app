@@ -402,8 +402,14 @@ export const Profile: React.FC = () => {
     return (
         <div className="p-6 pt-10 space-y-8 pb-24 overflow-y-auto flex-1 w-full relative">
 
-            {/* Settings Button */}
-            <div className="absolute top-6 right-6 z-10">
+            {/* Header Icons */}
+            <div className="absolute top-6 right-6 z-10 flex space-x-2">
+                <button
+                    onClick={() => openHelp('Profile Help', 'Edit your profile, manage your keys, and view your stats.')}
+                    className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                >
+                    <Icons.Help size={20} />
+                </button>
                 <button
                     onClick={() => setView('settings')}
                     className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
