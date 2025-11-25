@@ -1,11 +1,10 @@
 
-
-import { getDecodedToken } from '@cashu/cashu-ts';
+import { CashuMint, CashuWallet, getDecodedToken } from '@cashu/cashu-ts';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, Player, RoundSettings, WalletTransaction, UserProfile, UserStats, NOSTR_KIND_SCORE, Mint, DisplayProfile, Proof } from '../types';
 import { DEFAULT_HOLE_COUNT } from '../constants';
 import { publishProfile, publishRound, publishScore, subscribeToRound, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages, subscribeToGiftWraps, fetchHistoricalGiftWraps } from '../services/nostrService';
-import { checkPendingPayments } from '../services/npubCashService';
+import { checkPendingPayments, NpubCashQuote } from '../services/npubCashService';
 import { WalletService } from '../services/walletService';
 import { NWCService } from '../services/nwcService';
 import { bytesToHex } from '@noble/hashes/utils';
@@ -813,31 +812,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Check npub.cash
     try {
-      const tokens = await checkPendingPayments();
-      if (tokens.length > 0) {
-        console.log(`Found ${tokens.length} pending npub.cash payments!`);
+      const quotes = await checkPendingPayments();
+      if (quotes.length > 0) {
+        console.log(`Found ${quotes.length} pending npub.cash payments!`);
         let claimedCount = 0;
-        for (const token of tokens) {
+
+        for (const quote of quotes) {
           try {
-            const tokenId = token.substring(0, 20);
-            const processedKey = `processed_token_${tokenId}`;
+            const quoteId = quote.quoteId;
+            const processedKey = `processed_quote_${quoteId}`;
             if (localStorage.getItem(processedKey)) {
-              console.log(`Token ${tokenId} already processed, skipping...`);
+              console.log(`Quote ${quoteId} already processed, skipping...`);
               continue;
             }
 
-            const success = await receiveEcash(token);
-            if (success) {
+            console.log(`Attempting to mint ${quote.amount} sats from ${quote.mintUrl} for quote ${quoteId}...`);
+            const mint = new CashuMint(quote.mintUrl);
+            const wallet = new CashuWallet(mint);
+            await wallet.loadMint();
+
+            // Mint the tokens
+            // cashu-ts v2: wallet.mintProofs(amount, quoteId)
+            const newProofs = await wallet.mintProofs(quote.amount, quote.quoteId);
+
+            if (newProofs && newProofs.length > 0) {
+              // Add proofs to state
+              setProofs(prev => [...prev, ...newProofs]);
+
+              // Add mint to state if not exists
+              setMints(prev => {
+                if (prev.find(m => m.url === quote.mintUrl)) return prev;
+                return [...prev, { url: quote.mintUrl, nickname: 'npub.cash', isActive: true }];
+              });
+
               claimedCount++;
               localStorage.setItem(processedKey, Date.now().toString());
               console.log(`Auto-claimed npub.cash payment!`);
+
+              // Add transaction record
+              addTransaction('receive', quote.amount, 'Received via npub.cash', 'cashu');
             }
           } catch (e) {
-            console.warn("Failed to claim npub.cash token", e);
+            console.warn("Failed to mint npub.cash quote", e);
           }
         }
+
         if (claimedCount > 0) {
           console.log(`✅ Recovered ${claimedCount} npub.cash payments!`);
+          // Trigger a sync to save new state
+          // We can't call syncWallet directly easily because it needs current state, 
+          // but updating state triggers effects or we can rely on next sync.
+          // Ideally we should sync here.
         }
       }
     } catch (e) {

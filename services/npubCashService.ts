@@ -27,7 +27,15 @@ const getClient = () => {
     return client;
 };
 
-export const checkPendingPayments = async (): Promise<string[]> => {
+export interface NpubCashQuote {
+    quoteId: string;
+    mintUrl: string;
+    amount: number;
+    state: string;
+    request: string;
+}
+
+export const checkPendingPayments = async (): Promise<NpubCashQuote[]> => {
     const session = getSession();
     if (!session) return [];
 
@@ -38,29 +46,16 @@ export const checkPendingPayments = async (): Promise<string[]> => {
         // Fetch all quotes
         // TODO: We could optimize this with getQuotesSince if we track last check time
         const quotes = await client.getAllQuotes();
+        console.log(`Fetched ${quotes.length} quotes from npub.cash`);
 
-        const tokens: string[] = [];
+        // Filter for PAID quotes
+        // We cast to any because the SDK types might be strict but we want to be sure
+        const paidQuotes = quotes.filter((q: any) => q.state === 'PAID');
 
-        for (const q of quotes) {
-            const quote = q as any;
-            // Check if paid and has a token
-            // The SDK Quote type should have 'state' and 'token' (or similar fields)
-            // Based on docs: state === 'PAID'
-
-            // We need to check the actual shape of Quote from SDK or logs
-            // Assuming standard Cashu-Address flow:
-            // Quote has 'state' enum.
-
-            if (quote.state === 'PAID' && quote.token) {
-                console.log(`Found paid quote ${quote.id}, token: ${quote.token.substring(0, 20)}...`);
-                tokens.push(quote.token);
-            }
-        }
-
-        return tokens;
-
+        console.log(`Found ${paidQuotes.length} PAID quotes`);
+        return paidQuotes as unknown as NpubCashQuote[];
     } catch (e) {
-        console.warn("Failed to check npub.cash payments:", e);
+        console.error("Failed to check npub.cash payments", e);
         return [];
     }
 };
