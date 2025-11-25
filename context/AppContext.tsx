@@ -844,8 +844,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const newProofs = await wallet.mintProofs(quote.amount, quote.quoteId);
 
             if (newProofs && newProofs.length > 0) {
-              // Add proofs to state
-              setProofs(prev => [...prev, ...newProofs]);
+              // Add proofs to state with mintUrl attached
+              const proofsWithMint = newProofs.map(p => ({ ...p, mintUrl: quote.mintUrl }));
+              setProofs(prev => [...prev, ...proofsWithMint]);
 
               // Add mint to state if not exists
               setMints(prev => {
@@ -939,13 +940,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      console.log("Verifying wallet proofs...");
-      const validProofs = await walletServiceRef.current.verifyProofs(proofs);
+      console.log("Verifying wallet proofs across all mints...");
 
-      if (validProofs.length !== proofs.length) {
-        console.log(`Found spent proofs. Updating balance. (${proofs.length} -> ${validProofs.length})`);
-        setProofs(validProofs);
-        syncWallet(validProofs, mints, transactions); // Sync the corrected state
+      // Group proofs by Mint URL
+      const proofsByMint: Record<string, Proof[]> = {};
+      const activeMintUrl = mints.find(m => m.isActive)?.url || mints[0]?.url;
+
+      proofs.forEach(p => {
+        const url = p.mintUrl || activeMintUrl; // Default to active mint if missing
+        if (!url) return; // Should not happen
+        if (!proofsByMint[url]) proofsByMint[url] = [];
+        proofsByMint[url].push(p);
+      });
+
+      let allValidProofs: Proof[] = [];
+      let hasChanges = false;
+
+      // Verify each batch
+      for (const [mintUrl, mintProofs] of Object.entries(proofsByMint)) {
+        try {
+          console.log(`Verifying ${mintProofs.length} proofs for ${mintUrl}...`);
+          // Use existing service if it matches, otherwise create temp one
+          let service = walletServiceRef.current;
+          if (!service || service['mintUrl'] !== mintUrl) {
+            service = new WalletService(mintUrl);
+            // We don't strictly need to connect() for verify, but good practice if loadMint needed
+            // await service.connect(); 
+          }
+
+          const validProofs = await service.verifyProofs(mintProofs);
+
+          // Ensure valid proofs keep their mintUrl
+          const validWithUrl = validProofs.map(p => ({ ...p, mintUrl }));
+          allValidProofs = [...allValidProofs, ...validWithUrl];
+
+          if (validProofs.length !== mintProofs.length) {
+            console.log(`Found spent proofs for ${mintUrl}. (${mintProofs.length} -> ${validProofs.length})`);
+            hasChanges = true;
+          }
+        } catch (e) {
+          console.warn(`Failed to verify proofs for ${mintUrl}, keeping existing.`, e);
+          // If verification fails (network), keep original proofs to be safe
+          allValidProofs = [...allValidProofs, ...mintProofs];
+        }
+      }
+
+      if (hasChanges) {
+        console.log("Updating wallet state with verified proofs.");
+        setProofs(allValidProofs);
+        syncWallet(allValidProofs, mints, transactions);
       } else {
         console.log("All proofs valid.");
       }
@@ -1173,7 +1216,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!walletServiceRef.current) return false;
     try {
       const newProofs = await walletServiceRef.current.receiveToken(token);
-      const updatedProofs = [...proofs, ...newProofs];
+
+      // Extract mint URL from token to ensure we tag proofs correctly
+      const decoded = getDecodedToken(token) as any;
+      const tokenMintUrl = decoded.token[0].mint;
+
+      const proofsWithMint = newProofs.map(p => ({ ...p, mintUrl: tokenMintUrl }));
+      const updatedProofs = [...proofs, ...proofsWithMint];
+
       setProofs(updatedProofs);
       const amount = WalletService.calculateBalance(newProofs);
 

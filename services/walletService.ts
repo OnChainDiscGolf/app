@@ -17,7 +17,7 @@ interface MeltQuoteDetails {
 export class WalletService {
     private mint: CashuMint;
     private wallet: CashuWallet;
-    private mintUrl: string;
+    public mintUrl: string;
 
     constructor(mintUrl: string) {
         this.mintUrl = mintUrl;

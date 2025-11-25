@@ -60,6 +60,7 @@ export interface Proof {
   amount: number;
   secret: string;
   C: string;
+  mintUrl?: string;
 }
 
 export interface UserProfile {
