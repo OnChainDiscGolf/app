@@ -6,7 +6,6 @@ import { bytesToHex, hexToBytes, randomBytes } from '@noble/hashes/utils';
 // Default relays - Optimized order for profile discovery
 const DEFAULT_RELAYS = [
     'wss://relay.damus.io',
-    'wss://relay.nostr.band',
     'wss://nos.lol',
     'wss://relay.snort.social',
     'wss://relay.nostr.net',
@@ -942,100 +941,36 @@ const parseProfileContent = (content: any): UserProfile => {
     };
 };
 
-// Fallback fetch via HTTP for profiles (Purplepag.es)
-const fetchProfileFromPurplePages = async (pubkey: string): Promise<{ profile: UserProfile, created_at: number } | null> => {
-    try {
-        console.log("Attempting PurplePages fallback fetch...");
-        const res = await fetch(`https://purplepag.es/${pubkey}`);
-        if (!res.ok) return null;
 
-        const data = await res.json();
-        if (data && data.content) {
-            const content = JSON.parse(data.content);
-            return {
-                profile: parseProfileContent(content),
-                created_at: data.created_at || 0
-            };
-        }
-        return null;
-    } catch (e) {
-        // console.warn("PurplePages fallback failed", e);
-        return null;
-    }
-};
-
-// Fallback fetch via HTTP for profiles (Nostr.band)
-const fetchProfileFromNostrBand = async (pubkey: string): Promise<{ profile: UserProfile, created_at: number } | null> => {
-    try {
-        console.log("Attempting NostrBand fallback fetch...");
-        const res = await fetch(`https://api.nostr.band/v0/profile/${pubkey}`);
-        if (!res.ok) return null;
-
-        const data = await res.json();
-        if (data && data.profile) {
-            // Nostr.band returns processed profile object directly in 'profile'
-            return {
-                profile: parseProfileContent(data.profile),
-                created_at: data.profile.created_at || Date.now() / 1000 // Approximation if missing
-            };
-        }
-        return null;
-    } catch (e) {
-        // console.warn("NostrBand fallback failed", e);
-        return null;
-    }
-};
 
 export const fetchProfile = async (pubkey: string): Promise<UserProfile | null> => {
     console.log(`Fetching profile for ${pubkey.substring(0, 8)}...`);
 
-    const wsFetchPromise = listEvents(getRelays(), [{
-        kinds: [NOSTR_KIND_PROFILE],
-        authors: [pubkey],
-    }], 3000).then(events => { // ✅ 3 second timeout for faster profile loading
-        if (events.length === 0) return null;
-        return events.sort((a, b) => b.created_at - a.created_at)[0];
-    });
-
-    const ppFetchPromise = fetchProfileFromPurplePages(pubkey);
-    const nbFetchPromise = fetchProfileFromNostrBand(pubkey);
-
     try {
-        const results = await Promise.allSettled([wsFetchPromise, ppFetchPromise, nbFetchPromise]);
+        const events = await listEvents(getRelays(), [{
+            kinds: [NOSTR_KIND_PROFILE],
+            authors: [pubkey],
+        }], 3000); // 3 second timeout for faster profile loading
 
-        let bestProfile: UserProfile | null = null;
-        let bestTimestamp = 0;
+        if (events.length === 0) {
+            console.log(`No profile found for ${pubkey.substring(0, 8)}`);
+            return null;
+        }
 
-        results.forEach((result, index) => {
-            if (result.status === 'fulfilled' && result.value) {
-                let profile: UserProfile | null = null;
-                let timestamp = 0;
-                const source = index === 0 ? "WebSocket" : (index === 1 ? "PurplePages" : "NostrBand");
+        // Get the most recent profile event
+        const latestEvent = events.sort((a, b) => b.created_at - a.created_at)[0];
 
-                if (index === 0) { // WS Result (Event)
-                    const event = result.value as Event;
-                    try {
-                        profile = parseProfileContent(JSON.parse(event.content));
-                        timestamp = event.created_at;
-                    } catch (e) { }
-                } else { // HTTP Result (Object)
-                    const obj = result.value as { profile: UserProfile, created_at: number };
-                    profile = obj.profile;
-                    timestamp = obj.created_at;
-                }
-
-                if (profile && timestamp > bestTimestamp) {
-                    bestTimestamp = timestamp;
-                    bestProfile = profile;
-                    console.log(`New best profile found via ${source} (TS: ${timestamp})`);
-                }
-            }
-        });
-
-        return bestProfile;
+        try {
+            const profile = parseProfileContent(JSON.parse(latestEvent.content));
+            console.log(`Profile found via WebSocket relays (TS: ${latestEvent.created_at})`);
+            return profile;
+        } catch (e) {
+            console.warn("Failed to parse profile content", e);
+            return null;
+        }
 
     } catch (e) {
-        console.warn("Parallel profile fetch failed completely:", e);
+        console.warn("Failed to fetch profile from relays:", e);
         return null;
     }
 };

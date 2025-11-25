@@ -736,12 +736,15 @@ export const Wallet: React.FC = () => {
                 ) : (
                     <div className="flex flex-col items-center space-y-4 animate-in fade-in relative">
                         <h3 className="text-lg font-bold text-white">Pay this Invoice</h3>
-                        <div className="bg-white p-4 rounded-xl">
-                            <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(depositInvoice)}`}
-                                alt="Deposit Invoice"
-                                className="w-48 h-48"
-                            />
+                        <div className="bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 p-1 rounded-2xl shadow-2xl shadow-purple-500/20">
+                            <div className="bg-white p-3 rounded-xl">
+                                <img
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(depositInvoice)}`}
+                                    alt="Deposit Invoice"
+                                    className="w-48 h-48"
+                                    loading="eager"
+                                />
+                            </div>
                         </div>
                         <div className="w-full bg-slate-800 p-3 rounded text-xs font-mono text-slate-400 break-all">
                             {depositInvoice.substring(0, 30)}...
@@ -787,8 +790,10 @@ export const Wallet: React.FC = () => {
                     Your permanent address for receiving payments. Share it like a username.
                 </p>
 
-                <div className="bg-white p-4 rounded-2xl shadow-xl mb-6">
-                    <img src={qrUrl} alt="Wallet QR Code" className="w-48 h-48" />
+                <div className="bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 p-1 rounded-2xl shadow-2xl shadow-purple-500/20 mb-6">
+                    <div className="bg-white p-3 rounded-xl">
+                        <img src={qrUrl} alt="Wallet QR Code" className="w-48 h-48" loading="eager" />
+                    </div>
                 </div>
 
                 <div className="w-full max-w-xs mb-6">
