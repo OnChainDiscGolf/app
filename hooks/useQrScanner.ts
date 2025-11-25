@@ -24,6 +24,7 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
     // Internal refs to track state across async operations and renders
     const streamRef = useRef<MediaStream | null>(null);
     const animationFrameRef = useRef<number | null>(null);
+    const initializationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isMountedRef = useRef(true);
 
     // Use a ref for the callback to prevent restarting the scanner when the callback function identity changes
@@ -40,6 +41,10 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
         if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
             animationFrameRef.current = null;
+        }
+        if (initializationTimeoutRef.current) {
+            clearTimeout(initializationTimeoutRef.current);
+            initializationTimeoutRef.current = null;
         }
     }, []);
 
@@ -96,43 +101,56 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
         setIsCameraLoading(true);
         setScannedData(null);
 
+        // Start a 5-second initialization timeout
+        initializationTimeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current && streamRef.current === null) {
+                log("Initialization timeout reached!");
+                setCameraError("CameraInitTimeout - Initialization took too long.");
+                setIsCameraLoading(false);
+                stopScanner(); // Clean up attempts
+            }
+        }, 5000);
+
         try {
             // Stop any existing stream first
             stopScanner();
 
             let mediaStream: MediaStream;
+
+            // Aggressive Camera Request: Generic first, Environment fallback
             try {
-                log("Requesting env camera...");
-                // Check if mediaDevices exists
+                log("Requesting generic camera...");
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                     throw new Error("navigator.mediaDevices not supported");
                 }
 
-                // Try environment camera first with relaxed constraints
-                mediaStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { ideal: 'environment' },
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                });
-                log("Env camera acquired");
-            } catch (envError) {
-                log(`Env cam failed (${envError}), trying user...`);
-                // Fallback to any video source with minimal constraints
-                mediaStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                });
-                log("User camera acquired");
+                // 1. Try generic video first (Maximum Compatibility)
+                mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                log("Generic camera acquired");
+            } catch (genericError) {
+                log("Generic failed, trying environment...");
+                try {
+                    // 2. Fallback to specific environment camera
+                    mediaStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment' }
+                    });
+                    log("Environment camera acquired via fallback");
+                } catch (envError) {
+                    // 3. Propagate specific error if both fail
+                    throw envError;
+                }
             }
 
             if (!isMountedRef.current || !active) {
                 log("Hook unmounted/inactive, stopping tracks");
                 mediaStream.getTracks().forEach(track => track.stop());
                 return;
+            }
+
+            // Clear the timeout immediately on successful stream acquisition
+            if (initializationTimeoutRef.current) {
+                clearTimeout(initializationTimeoutRef.current);
+                initializationTimeoutRef.current = null;
             }
 
             streamRef.current = mediaStream;
@@ -144,29 +162,45 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
                 video.setAttribute('playsinline', 'true'); // Critical for iOS
                 video.muted = true; // Critical for auto-play policies
 
-                // Robust play handling with AbortError tolerance
+                // Robust play handling - Suppress AbortError (Fixes Freezing)
                 try {
                     await video.play();
                     log("Video playing");
-                } catch (playError: any) {
-                    // AbortError is benign (race condition between play() calls)
-                    if (playError.name === 'AbortError') {
-                        log("Play aborted (benign race condition), continuing...");
-                    } else {
-                        log(`Play failed: ${playError}`);
-                        console.error("Video play failed", playError);
+                } catch (playError) {
+                    // Ignore AbortError (common in React StrictMode or rapid toggling)
+                    if ((playError as any).name === 'AbortError') {
+                        log("Play aborted (harmless race condition)");
+                        return;
                     }
+                    log(`Play failed: ${playError}`);
+                    console.error("Video play failed", playError);
                 }
 
                 setIsCameraLoading(false);
                 animationFrameRef.current = requestAnimationFrame(tick);
             }
         } catch (err) {
-            log(`Error: ${err}`);
-            console.error("Camera access denied or error", err);
+            // Granular Error Reporting
+            const errorName = (err as any).name || 'UnknownError';
+            const errorMessage = (err as Error).message || String(err);
+
+            log(`Critical Error: ${errorName} - ${errorMessage}`);
+            console.error("Camera access failed", err);
+
+            // Ensure timeout is cleared on failure
+            if (initializationTimeoutRef.current) {
+                clearTimeout(initializationTimeoutRef.current);
+                initializationTimeoutRef.current = null;
+            }
+
             if (isMountedRef.current) {
                 setIsCameraLoading(false);
-                setCameraError(`Could not access camera: ${err}`);
+                // Present the specific error name to the user for diagnosis
+                const userMessage = errorName === 'NotAllowedError'
+                    ? "Access Denied: Check OS/Browser permissions."
+                    : `Camera failed: ${errorName}`;
+
+                setCameraError(userMessage);
             }
         }
     }, [active, stopScanner, tick, videoRef]);
