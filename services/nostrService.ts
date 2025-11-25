@@ -53,7 +53,7 @@ const promiseAny = <T>(promises: Iterable<Promise<T>>): Promise<T> => {
 
 // --- Helper for list (Improved Robustness) ---
 
-export const listEvents = async (relays: string[], filters: Filter[]): Promise<Event[]> => {
+export const listEvents = async (relays: string[], filters: Filter[], timeoutMs: number = 6000): Promise<Event[]> => {
     // Ensure we have valid relays
     const targetRelays = (relays && relays.length > 0) ? relays : DEFAULT_RELAYS;
 
@@ -88,12 +88,12 @@ export const listEvents = async (relays: string[], filters: Filter[]): Promise<E
             }
         });
 
-        // Timeout - wait up to 6 seconds.
+        // Configurable timeout - default 6s, but can be reduced for faster queries like profile fetching
         setTimeout(() => {
             if (!isResolved) {
                 finish();
             }
-        }, 6000);
+        }, timeoutMs);
     });
 };
 
@@ -950,7 +950,7 @@ export const fetchProfile = async (pubkey: string): Promise<UserProfile | null> 
     const wsFetchPromise = listEvents(getRelays(), [{
         kinds: [NOSTR_KIND_PROFILE],
         authors: [pubkey],
-    }]).then(events => {
+    }], 3000).then(events => { // ✅ 3 second timeout for faster profile loading
         if (events.length === 0) return null;
         return events.sort((a, b) => b.created_at - a.created_at)[0];
     });

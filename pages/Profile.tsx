@@ -7,6 +7,7 @@ import { Button } from '../components/Button';
 import { getSession, getRelays, addRelay, removeRelay, resetRelays, uploadProfileImage, getMagicLightningAddress } from '../services/nostrService';
 import { nip19 } from 'nostr-tools';
 import { bytesToHex } from '@noble/hashes/utils';
+import { DiscGolfBasketLoader } from '../components/DiscGolfBasketLoader';
 
 export const Profile: React.FC = () => {
     const {
@@ -393,9 +394,7 @@ export const Profile: React.FC = () => {
     if (isProfileLoading) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center p-6 min-h-[50vh]">
-                <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-                <h2 className="text-xl font-bold text-white">Syncing Profile...</h2>
-                <p className="text-slate-400 text-sm mt-2">Fetching latest data from Nostr relays</p>
+                <DiscGolfBasketLoader />
             </div>
         );
     }
