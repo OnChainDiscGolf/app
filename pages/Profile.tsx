@@ -372,6 +372,61 @@ export const Profile: React.FC = () => {
                     </div>
 
                     <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+                        <h3 className="font-bold text-white mb-2 flex items-center">
+                            <Icons.Settings size={18} className="mr-2 text-brand-primary" />
+                            Advanced Profile Settings
+                        </h3>
+                        <p className="text-xs text-slate-400 mb-4">
+                            Manage your technical identity settings.
+                        </p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lightning Address</label>
+                                    <button
+                                        onClick={() => openHelp('Lightning Address', 'An internet identifier (like an email) that allows anyone to send you Bitcoin/Sats instantly over the Lightning Network.')}
+                                        className="text-slate-500 hover:text-brand-primary transition-colors"
+                                    >
+                                        <Icons.Help size={14} />
+                                    </button>
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="user@domain.com"
+                                    value={formData.lud16}
+                                    onChange={e => setFormData({ ...formData, lud16: e.target.value })}
+                                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white text-sm focus:ring-1 focus:ring-brand-primary outline-none"
+                                />
+                            </div>
+
+                            <div>
+                                <div className="flex items-center gap-2 mb-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Verified Nostr ID</label>
+                                    <button
+                                        onClick={() => openHelp('Verified Nostr ID', 'Also known as NIP-05. This verifies your account by linking your public key to a domain name (e.g., name@nostr.com) and adds a checkmark to your profile.')}
+                                        className="text-slate-500 hover:text-brand-primary transition-colors"
+                                    >
+                                        <Icons.Help size={14} />
+                                    </button>
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="name@nostr.com"
+                                    value={formData.nip05}
+                                    onChange={e => setFormData({ ...formData, nip05: e.target.value })}
+                                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white text-sm focus:ring-1 focus:ring-brand-primary outline-none"
+                                />
+                            </div>
+
+                            <Button onClick={() => {
+                                handleSaveProfile();
+                                alert("Settings saved!");
+                            }} fullWidth className="h-10 py-0">Save Changes</Button>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
                         <h3 className="font-bold text-white mb-2">App Data</h3>
                         <button
                             onClick={() => {
@@ -383,6 +438,24 @@ export const Profile: React.FC = () => {
                             <Icons.Trash size={14} className="mr-2" />
                             Clear active round cache
                         </button>
+                    </div>
+
+                    <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+                        <h3 className="font-bold text-white mb-2">About</h3>
+                        <div className="space-y-3 text-sm text-slate-400">
+                            <div className="flex justify-between">
+                                <span>Version</span>
+                                <span className="font-mono text-white">v0.1.0</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Source Code</span>
+                                <a href="https://github.com/Plebeian-Tech/on-chain-disc-golf" target="_blank" rel="noreferrer" className="text-brand-primary hover:underline">GitHub</a>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Developer</span>
+                                <a href="https://njump.me/npub1..." target="_blank" rel="noreferrer" className="text-brand-primary hover:underline">Nostr Profile</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -567,39 +640,13 @@ export const Profile: React.FC = () => {
 
                         <div>
                             <div className="flex items-center gap-2 mb-1.5">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lightning Address</label>
-                                <button
-                                    onClick={() => openHelp('Lightning Address', 'An internet identifier (like an email) that allows anyone to send you Bitcoin/Sats instantly over the Lightning Network.')}
-                                    className="text-slate-500 hover:text-brand-primary transition-colors"
-                                >
-                                    <Icons.Help size={14} />
-                                </button>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">About Me (Bio)</label>
                             </div>
-                            <input
-                                type="text"
-                                placeholder="user@domain.com"
-                                value={formData.lud16}
-                                onChange={e => setFormData({ ...formData, lud16: e.target.value })}
-                                className="w-full bg-slate-800 p-3 rounded-xl border border-slate-600 text-white text-sm focus:ring-1 focus:ring-brand-primary outline-none"
-                            />
-                        </div>
-
-                        <div>
-                            <div className="flex items-center gap-2 mb-1.5">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Verified Nostr ID</label>
-                                <button
-                                    onClick={() => openHelp('Verified Nostr ID', 'Also known as NIP-05. This verifies your account by linking your public key to a domain name (e.g., name@nostr.com) and adds a checkmark to your profile.')}
-                                    className="text-slate-500 hover:text-brand-primary transition-colors"
-                                >
-                                    <Icons.Help size={14} />
-                                </button>
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="name@nostr.com"
-                                value={formData.nip05}
-                                onChange={e => setFormData({ ...formData, nip05: e.target.value })}
-                                className="w-full bg-slate-800 p-3 rounded-xl border border-slate-600 text-white text-sm focus:ring-1 focus:ring-brand-primary outline-none"
+                            <textarea
+                                placeholder="Tell us about yourself..."
+                                value={formData.about}
+                                onChange={e => setFormData({ ...formData, about: e.target.value })}
+                                className="w-full bg-slate-800 p-3 rounded-xl border border-slate-600 text-white text-sm focus:ring-1 focus:ring-brand-primary outline-none h-24 resize-none"
                             />
                         </div>
 
