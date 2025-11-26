@@ -867,11 +867,9 @@ export const Home: React.FC = () => {
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
 
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         <div className="flex items-center text-slate-400 space-x-2">
-                            <div className="w-4 h-4 rounded-full border border-slate-400 flex items-center justify-center">
-                                <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
-                            </div>
+                            <Icons.Location size={16} className="text-brand-primary" />
                             <span className="text-sm font-bold uppercase tracking-wider">Course</span>
                         </div>
                         <input
@@ -880,11 +878,28 @@ export const Home: React.FC = () => {
                             onChange={(e) => setCourseName(e.target.value)}
                             className="text-2xl font-bold bg-transparent border-none outline-none w-full placeholder-slate-600"
                             placeholder="Enter Course Name"
-                            list="course-suggestions"
                         />
-                        <datalist id="course-suggestions">
-                            {recentCourses.map(c => <option key={c} value={c} />)}
-                        </datalist>
+
+                        {/* Recent Courses Quick Select */}
+                        {recentCourses.length > 0 && (
+                            <div className="space-y-2">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Recent Courses</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {recentCourses.slice(0, 6).map((course) => (
+                                        <button
+                                            key={course}
+                                            onClick={() => setCourseName(course)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${courseName === course
+                                                    ? 'bg-brand-primary text-black shadow-lg shadow-brand-primary/20'
+                                                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-brand-primary/30'
+                                                }`}
+                                        >
+                                            {course}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <hr className="border-slate-800" />
