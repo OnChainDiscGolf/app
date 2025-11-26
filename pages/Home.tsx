@@ -27,6 +27,29 @@ const SuccessOverlay: React.FC<{ message: string, onClose: () => void }> = ({ me
     );
 };
 
+// TypeScript interface for persistable round creation state
+interface RoundCreationState {
+    view: 'setup' | 'select_players' | 'customize';
+    courseName: string;
+    layout: '9' | '18' | 'custom';
+    customHoles: number;
+    hasEntryFee: boolean;
+    entryFee: number;
+    acePot: number;
+    selectedCardmates: DisplayProfile[];
+    excludedPlayers: string[];
+    paidStatus: Record<string, boolean>;
+    startDate: string;
+    startTime: string;
+    trackPenalties: boolean;
+}
+
+// Helper to clear persisted round creation state
+const clearRoundCreationState = () => {
+    localStorage.removeItem('cdg_round_creation');
+};
+
+
 export const Home: React.FC = () => {
     const { activeRound, players, createRound, joinRoundAndPay, recentPlayers, contacts, userProfile, resetRound, isAuthenticated, isGuest, currentUserPubkey, addRecentPlayer, depositFunds, checkDepositStatus, confirmDeposit, sendFunds, walletBalance } = useApp();
     const navigate = useNavigate();
@@ -141,6 +164,59 @@ export const Home: React.FC = () => {
         }
     }, [view, currentUserPubkey, selectedCardmates]);
 
+    // Save round creation state to localStorage
+    useEffect(() => {
+        // Only persist if user is actively creating a round
+        if (view === 'setup' || view === 'select_players' || view === 'customize') {
+            const state: RoundCreationState = {
+                view,
+                courseName,
+                layout,
+                customHoles,
+                hasEntryFee,
+                entryFee,
+                acePot,
+                selectedCardmates,
+                excludedPlayers: Array.from(excludedPlayers),
+                paidStatus,
+                startDate,
+                startTime,
+                trackPenalties,
+            };
+            localStorage.setItem('cdg_round_creation', JSON.stringify(state));
+        } else if (view === 'menu') {
+            // Clear if user returns to menu without creating
+            clearRoundCreationState();
+        }
+    }, [view, courseName, layout, customHoles, hasEntryFee, entryFee, acePot,
+        selectedCardmates, excludedPlayers, paidStatus, startDate, startTime, trackPenalties]);
+
+    // Restore round creation state on mount
+    useEffect(() => {
+        const saved = localStorage.getItem('cdg_round_creation');
+        if (saved && !activeRound) {
+            try {
+                const state: RoundCreationState = JSON.parse(saved);
+                setView(state.view);
+                setCourseName(state.courseName);
+                setLayout(state.layout);
+                setCustomHoles(state.customHoles);
+                setHasEntryFee(state.hasEntryFee);
+                setEntryFee(state.entryFee);
+                setAcePot(state.acePot);
+                setSelectedCardmates(state.selectedCardmates);
+                setExcludedPlayers(new Set(state.excludedPlayers));
+                setPaidStatus(state.paidStatus);
+                setStartDate(state.startDate);
+                setStartTime(state.startTime);
+                setTrackPenalties(state.trackPenalties);
+            } catch (e) {
+                console.error('Failed to restore round creation state:', e);
+                clearRoundCreationState();
+            }
+        }
+    }, []); // Run only on mount
+
     // Polling for Player Payment
     useEffect(() => {
         if (showPaymentModal && paymentQuote && !paymentSuccess) {
@@ -225,6 +301,7 @@ export const Home: React.FC = () => {
             hideOverallScore
         }, finalPlayers);
 
+        clearRoundCreationState(); // Clear persisted state
         setView('menu');
         navigate('/play');
     };
@@ -292,6 +369,7 @@ export const Home: React.FC = () => {
 
     const confirmNewRound = () => {
         resetRound();
+        clearRoundCreationState(); // Clear persisted state
         setShowResetConfirm(false);
         setView('setup');
     };
@@ -415,6 +493,18 @@ export const Home: React.FC = () => {
     const handleOpenLightningWallet = () => {
         if (paymentInvoice) {
             window.location.href = `lightning:${paymentInvoice}`;
+        }
+    };
+
+    const handleCopyInvoice = async () => {
+        if (paymentInvoice) {
+            try {
+                await navigator.clipboard.writeText(paymentInvoice);
+                // Show a brief success indicator (could add a toast or temp message here)
+            } catch (e) {
+                console.error('Failed to copy invoice:', e);
+                setPaymentError('Failed to copy to clipboard');
+            }
         }
     };
 
@@ -692,10 +782,22 @@ export const Home: React.FC = () => {
                             </button>
 
                             <div className="text-center space-y-4 pt-2">
-                                <h3 className="text-xl font-bold text-white">Collect Entry Fee</h3>
-                                <p className="text-slate-400 text-sm">
-                                    Ask <span className="text-white font-bold">{paymentTarget.name}</span> to pay this invoice.
-                                </p>
+                                {/* Conditional header and body based on who is paying */}
+                                {paymentTarget.pubkey === currentUserPubkey ? (
+                                    <>
+                                        <h3 className="text-xl font-bold text-white">Pay Your Entry Fee</h3>
+                                        <p className="text-slate-400 text-sm">
+                                            Scan this invoice to deposit your entry fee into the round pot.
+                                        </p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <h3 className="text-xl font-bold text-white">Collect Entry Fee from {paymentTarget.name}</h3>
+                                        <p className="text-slate-400 text-sm">
+                                            Ask <span className="text-white font-bold">{paymentTarget.name}</span> to scan and pay this invoice.
+                                        </p>
+                                    </>
+                                )}
 
                                 {/* Error Banner */}
                                 {paymentError && (
@@ -720,6 +822,18 @@ export const Home: React.FC = () => {
                                     )}
                                 </div>
 
+                                {/* Copy Invoice Button */}
+                                {!isGeneratingInvoice && (
+                                    <Button
+                                        fullWidth
+                                        onClick={handleCopyInvoice}
+                                        variant="secondary"
+                                        className="text-xs py-2"
+                                    >
+                                        Copy Lightning Invoice
+                                    </Button>
+                                )}
+
                                 <div>
                                     <p className="text-2xl font-bold text-brand-accent">{entryFee + acePot} SATS</p>
                                     <p className="text-xs text-slate-500">Entry: {entryFee} | Ace Pot: {acePot}</p>
@@ -733,38 +847,52 @@ export const Home: React.FC = () => {
                                 )}
 
                                 <div className="pt-2 space-y-2">
-                                    <Button
-                                        fullWidth
-                                        onClick={handleOpenLightningWallet}
-                                        variant="secondary"
-                                        className="text-xs py-2"
-                                    >
-                                        Open Lightning Wallet
-                                    </Button>
-                                    <Button
-                                        fullWidth
-                                        onClick={handlePayWithWallet}
-                                        variant="secondary"
-                                        className="text-xs py-2"
-                                        disabled={isPayingWallet}
-                                    >
-                                        {isPayingWallet ? 'Processing...' : 'Pay with Wallet / Cash'}
-                                    </Button>
-
-                                    {/* Host Pays for Cardmate Option */}
-                                    {paymentTarget.pubkey !== currentUserPubkey && (
+                                    {/* Conditional payment options */}
+                                    {paymentTarget.pubkey === currentUserPubkey ? (
+                                        /* Host Self-Payment: Only show Open Lightning Wallet */
                                         <Button
                                             fullWidth
-                                            onClick={handleHostPaysForCardmate}
+                                            onClick={handleOpenLightningWallet}
                                             variant="secondary"
                                             className="text-xs py-2"
-                                            disabled={walletBalance < (entryFee + acePot) || isPayingWallet}
                                         >
-                                            {walletBalance < (entryFee + acePot)
-                                                ? `Insufficient Balance (${walletBalance} sats)`
-                                                : `Pay for ${paymentTarget.name} from My Wallet`
-                                            }
+                                            Open Lightning Wallet
                                         </Button>
+                                    ) : (
+                                        /* Cardmate Payment Collection: Show all options */
+                                        <>
+                                            <Button
+                                                fullWidth
+                                                onClick={handleOpenLightningWallet}
+                                                variant="secondary"
+                                                className="text-xs py-2"
+                                            >
+                                                Open Lightning Wallet
+                                            </Button>
+                                            <Button
+                                                fullWidth
+                                                onClick={handlePayWithWallet}
+                                                variant="secondary"
+                                                className="text-xs py-2"
+                                                disabled={isPayingWallet}
+                                            >
+                                                {isPayingWallet ? 'Processing...' : 'Pay with Wallet / Cash'}
+                                            </Button>
+
+                                            {/* Host Pays for Cardmate Option */}
+                                            <Button
+                                                fullWidth
+                                                onClick={handleHostPaysForCardmate}
+                                                variant="secondary"
+                                                className="text-xs py-2"
+                                                disabled={walletBalance < (entryFee + acePot) || isPayingWallet}
+                                            >
+                                                {walletBalance < (entryFee + acePot)
+                                                    ? `Insufficient Balance (${walletBalance} sats)`
+                                                    : `Pay for ${paymentTarget.name} from My Wallet`
+                                                }
+                                            </Button>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -1374,14 +1502,52 @@ export const Home: React.FC = () => {
                 </div>
 
                 <div className="w-full max-w-sm space-y-4">
-                    {activeRound && !activeRound.isFinalized && (
+                    {activeRound && (
                         <Button fullWidth onClick={() => navigate('/play')} className="bg-brand-accent text-black hover:bg-brand-accent/80 shadow-lg shadow-brand-accent/20">
                             <div className="flex items-center justify-center space-x-2">
                                 <Icons.Play fill="currentColor" />
-                                <span>Continue Round</span>
+                                <span>{activeRound.isFinalized ? 'View Final Score' : 'Continue Round'}</span>
                             </div>
                         </Button>
                     )}
+
+                    {!activeRound && (() => {
+                        const saved = localStorage.getItem('cdg_round_creation');
+                        return saved ? (
+                            <Button
+                                fullWidth
+                                onClick={() => {
+                                    // Restore state is handled by the useEffect on mount,
+                                    // but we can trigger it immediately by reloading the state
+                                    try {
+                                        const state: RoundCreationState = JSON.parse(saved);
+                                        setView(state.view);
+                                        setCourseName(state.courseName);
+                                        setLayout(state.layout);
+                                        setCustomHoles(state.customHoles);
+                                        setHasEntryFee(state.hasEntryFee);
+                                        setEntryFee(state.entryFee);
+                                        setAcePot(state.acePot);
+                                        setSelectedCardmates(state.selectedCardmates);
+                                        setExcludedPlayers(new Set(state.excludedPlayers));
+                                        setPaidStatus(state.paidStatus);
+                                        setStartDate(state.startDate);
+                                        setStartTime(state.startTime);
+                                        setTrackPenalties(state.trackPenalties);
+                                    } catch (e) {
+                                        console.error('Failed to restore round creation state:', e);
+                                        clearRoundCreationState();
+                                    }
+                                }}
+                                className="bg-brand-secondary text-white hover:bg-brand-secondary/80 shadow-lg shadow-brand-secondary/20"
+                            >
+                                <div className="flex items-center justify-center space-x-2">
+                                    <Icons.Play fill="currentColor" />
+                                    <span>Resume Round Setup</span>
+                                </div>
+                            </Button>
+                        ) : null;
+                    })()}
 
                     {isGuest && (
                         <Button
@@ -1431,15 +1597,7 @@ export const Home: React.FC = () => {
                 </div>
             </div>
 
-            {activeRound?.isFinalized && (
-                <div className="bg-slate-800/50 rounded-lg p-4 mb-4">
-                    <h3 className="text-sm font-bold text-slate-300 mb-2">Last Round</h3>
-                    <div className="flex justify-between text-sm">
-                        <span>{activeRound.name}</span>
-                        <span className="text-brand-primary">Complete</span>
-                    </div>
-                </div>
-            )}
+
 
             {/* New Round Confirmation Modal */}
             {showResetConfirm && (
