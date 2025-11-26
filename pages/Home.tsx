@@ -135,6 +135,18 @@ export const Home: React.FC = () => {
         };
     }, [showPaymentModal, paymentQuote, paymentSuccess, checkDepositStatus]);
 
+    // Listen for "Pop to Root" navigation event
+    useEffect(() => {
+        const handlePopToRoot = (e: CustomEvent) => {
+            if (e.detail.path === '/') {
+                setView('menu');
+            }
+        };
+
+        window.addEventListener('popToRoot', handlePopToRoot as EventListener);
+        return () => window.removeEventListener('popToRoot', handlePopToRoot as EventListener);
+    }, []);
+
     // Scanner Logic for Adding Players
     const { isCameraLoading, logs, restart } = useQrScanner({
         videoRef,
@@ -999,12 +1011,15 @@ export const Home: React.FC = () => {
         <div className="p-6 flex flex-col flex-1 w-full relative pb-20">
             {/* Wallet Balance Pill - Top Left */}
             <div className="absolute top-6 left-6 z-10">
-                <div className="px-4 py-2 bg-gradient-to-r from-brand-primary/20 to-emerald-500/20 border border-brand-primary/40 rounded-full backdrop-blur-sm">
+                <button
+                    onClick={() => navigate('/wallet')}
+                    className="px-4 py-2 bg-gradient-to-r from-brand-primary/20 to-emerald-500/20 border border-brand-primary/40 rounded-full backdrop-blur-sm hover:from-brand-primary/30 hover:to-emerald-500/30 hover:border-brand-primary/60 active:scale-95 transition-all duration-200 cursor-pointer"
+                >
                     <div className="flex items-center space-x-2">
                         <Icons.Wallet size={16} className="text-brand-primary" />
                         <span className="text-sm font-bold text-white">{walletBalance.toLocaleString()} Sats</span>
                     </div>
-                </div>
+                </button>
             </div>
 
             {/* Header Icons - Top Right */}

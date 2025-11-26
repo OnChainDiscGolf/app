@@ -265,6 +265,18 @@ export const Wallet: React.FC = () => {
         };
     }, [sendInput, walletBalance, getLightningQuote]);
 
+    // Listen for "Pop to Root" navigation event
+    useEffect(() => {
+        const handlePopToRoot = (e: CustomEvent) => {
+            if (e.detail.path === '/wallet') {
+                setView('main');
+            }
+        };
+
+        window.addEventListener('popToRoot', handlePopToRoot as EventListener);
+        return () => window.removeEventListener('popToRoot', handlePopToRoot as EventListener);
+    }, []);
+
 
     // Camera & Scanning Logic
     const { isCameraLoading, cameraError, scannedData, logs, restart } = useQrScanner({

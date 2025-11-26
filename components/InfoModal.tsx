@@ -62,14 +62,35 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                         <p className="text-slate-300 text-sm leading-relaxed">
                             This app uses <strong>Bitcoin Lightning</strong> and <strong>Cashu</strong> for instant payments. You'll need to deposit funds to play for money.
                         </p>
-                        <a
-                            href="https://bitcoin.org/en/buy"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-sm font-bold text-brand-primary hover:underline"
-                        >
-                            Learn how to acquire Bitcoin <Icons.Send size={12} className="ml-1" />
-                        </a>
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3">
+                            <p className="text-xs text-slate-400 mb-2">We like:</p>
+                            <div className="flex flex-wrap gap-2">
+                                <a
+                                    href="https://strike.me"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center px-3 py-1.5 bg-brand-primary/10 border border-brand-primary/30 rounded-lg text-sm font-bold text-brand-primary hover:bg-brand-primary/20 transition-colors"
+                                >
+                                    Strike <Icons.Send size={12} className="ml-1" />
+                                </a>
+                                <a
+                                    href="https://cash.app"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center px-3 py-1.5 bg-brand-primary/10 border border-brand-primary/30 rounded-lg text-sm font-bold text-brand-primary hover:bg-brand-primary/20 transition-colors"
+                                >
+                                    Cash App <Icons.Send size={12} className="ml-1" />
+                                </a>
+                                <a
+                                    href="https://www.walletofsatoshi.com"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center px-3 py-1.5 bg-brand-primary/10 border border-brand-primary/30 rounded-lg text-sm font-bold text-brand-primary hover:bg-brand-primary/20 transition-colors"
+                                >
+                                    WoS <Icons.Send size={12} className="ml-1" />
+                                </a>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Step 3: Gameplay */}

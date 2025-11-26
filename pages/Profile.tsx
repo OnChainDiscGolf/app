@@ -149,6 +149,18 @@ export const Profile: React.FC = () => {
         setImgError(false);
     }, [userProfile.picture, formData.picture]);
 
+    // Listen for "Pop to Root" navigation event
+    useEffect(() => {
+        const handlePopToRoot = (e: CustomEvent) => {
+            if (e.detail.path === '/profile') {
+                setView('main');
+            }
+        };
+
+        window.addEventListener('popToRoot', handlePopToRoot as EventListener);
+        return () => window.removeEventListener('popToRoot', handlePopToRoot as EventListener);
+    }, []);
+
     // Handlers
 
     const handleLogin = async () => {
@@ -604,10 +616,7 @@ export const Profile: React.FC = () => {
             {/* Header Icons */}
             <div className="absolute top-6 right-6 z-10 flex space-x-2">
                 <button
-                    onClick={() => openHelp(
-                        'What is Nostr?',
-                        'Nostr gives you ownership over your digital identity. Instead of relying on a company that can delete your data, you have a "Key Pair" that is yours forever.\n\nThink of it like a magical mailbox that holds both your messages AND your money:\n\n• Public Key (npub): Your mailing address. Share this so people can find you and send you payments.\n\n• Private Key (nsec): The only key to open the mailbox. It controls your profile, your history, and your <span class="text-brand-accent font-bold">FUNDS</span>. If you lose this key, you lose your money forever.\n\nOne Key, Many Apps:\nYou can use this same key to log in to any other Nostr app. No more creating new usernames and passwords for every social media site. Your friends, followers, and profile come with you everywhere.'
-                    )}
+                    onClick={() => setHelpModal({ isOpen: true, title: 'collapsible', text: '' })}
                     className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                 >
                     <Icons.Help size={20} />
@@ -623,60 +632,181 @@ export const Profile: React.FC = () => {
             {/* Help Modal */}
             {helpModal && helpModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full space-y-4 animate-in zoom-in-95 duration-200 relative">
+                    <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 relative">
                         <button
                             onClick={() => setHelpModal(null)}
-                            className="absolute top-4 right-4 text-slate-400 hover:text-white"
+                            className="absolute top-4 right-4 z-10 text-slate-400 hover:text-white"
                         >
                             <Icons.Close size={20} />
                         </button>
 
-                        <div className="flex flex-col items-center text-center space-y-2 pt-2">
-                            <div className="w-12 h-12 rounded-full bg-brand-secondary/10 flex items-center justify-center text-brand-secondary mb-2">
-                                <Icons.Help size={24} />
+                        <div className="p-6 border-b border-slate-800">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary">
+                                    <Icons.Help size={20} />
+                                </div>
+                                <h2 className="text-xl font-bold text-white">How It Works</h2>
                             </div>
-                            <h3 className="text-xl font-bold text-white">
-                                {helpModal.title === 'What is Nostr?' ? (
-                                    <a href="https://nostr.com" target="_blank" rel="noreferrer" className="text-purple-400 hover:text-purple-300 transition-colors underline decoration-purple-400/50">
-                                        What is Nostr?
-                                    </a>
-                                ) : helpModal.title}
-                            </h3>
-                            <div
-                                className="text-slate-300 text-sm leading-relaxed text-left whitespace-pre-line"
-                                dangerouslySetInnerHTML={{ __html: helpModal.text }}
-                            />
-                            {helpModal.title === 'What is Nostr?' && (
-                                <div className="mt-4 pt-4 border-t border-slate-700">
-                                    <p className="text-xs text-slate-400 mb-2 font-bold uppercase">Try your key on these apps:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        <a href="https://damus.io" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Damus (iOS)</a>
-                                        <a href="https://primal.net" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Primal</a>
-                                        <a href="https://github.com/greenart7c3/Amber/releases" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Amber (Android)</a>
-                                        <a href="https://jesterui.github.io" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Jester (Chess)</a>
-                                        <a href="https://zap.stream" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Zap.Stream</a>
-                                        <a href="https://zapstore.dev" target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-[10px] text-brand-primary transition-colors">Zapstore</a>
-                                    </div>
-                                </div>
-                            )}
-                            {helpModal.title === 'What is Amber?' && (
-                                <div className="mt-4 pt-4 border-t border-slate-700">
-                                    <a
-                                        href="https://github.com/greenart7c3/Amber/releases"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="w-full flex items-center justify-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/50 font-bold py-3 px-4 rounded-xl transition-colors"
-                                    >
-                                        <Icons.Android size={18} />
-                                        <span>Download Amber for Android</span>
-                                    </a>
-                                </div>
-                            )}
                         </div>
 
-                        <Button variant="secondary" fullWidth onClick={() => setHelpModal(null)}>
-                            Got it
-                        </Button>
+                        {helpModal.title === 'collapsible' ? (
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                {/* What is Nostr? */}
+                                <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
+                                    <button
+                                        onClick={() => toggleSection('nostr-help')}
+                                        className="w-full flex items-center justify-between p-4 hover:bg-slate-700/50 transition-colors text-left"
+                                    >
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-500 flex items-center justify-center font-bold text-sm">N</div>
+                                            <span className="font-bold text-white">What is Nostr?</span>
+                                        </div>
+                                        <Icons.Next size={16} className={`transition-transform ${openSection === 'nostr-help' ? 'rotate-90' : ''}`} />
+                                    </button>
+                                    {openSection === 'nostr-help' && (
+                                        <div className="p-4 pt-0 text-sm text-slate-300 leading-relaxed bg-slate-900/30 space-y-3">
+                                            <p>
+                                                <strong className="text-white">Your identity, your control.</strong> Think of Nostr like having your own house key instead of renting an apartment from a landlord who can kick you out anytime.
+                                            </p>
+                                            <p>
+                                                With traditional apps (Twitter, Instagram), the company owns your account. They can delete it, ban you, or change the rules whenever they want.
+                                            </p>
+                                            <p>
+                                                <strong className="text-purple-400">With Nostr, YOU own your identity.</strong> You have a private key (like a master password) that proves you're you. No company can take it away.
+                                            </p>
+                                            <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
+                                                <p className="text-xs text-purple-200 font-bold mb-2">🔑 The Key Analogy:</p>
+                                                <p className="text-xs text-purple-100">
+                                                    Your <strong>private key (nsec)</strong> is like a master key that unlocks your digital life. You can copy and paste it into <strong>any Nostr app</strong> - Damus, Primal, Amethyst, or this disc golf app - and instantly access your profile, friends, and history.
+                                                </p>
+                                                <p className="text-xs text-purple-100 mt-2">
+                                                    No more creating new usernames and passwords for every website. One key, infinite apps. Your identity travels with you.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* What is Cashu? */}
+                                <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
+                                    <button
+                                        onClick={() => toggleSection('cashu-help')}
+                                        className="w-full flex items-center justify-between p-4 hover:bg-slate-700/50 transition-colors text-left"
+                                    >
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-8 h-8 rounded-full bg-brand-primary/20 text-brand-primary flex items-center justify-center">
+                                                <Icons.Zap size={16} />
+                                            </div>
+                                            <span className="font-bold text-white">What is Cashu?</span>
+                                        </div>
+                                        <Icons.Next size={16} className={`transition-transform ${openSection === 'cashu-help' ? 'rotate-90' : ''}`} />
+                                    </button>
+                                    {openSection === 'cashu-help' && (
+                                        <div className="p-4 pt-0 text-sm text-slate-300 leading-relaxed bg-slate-900/30 space-y-3">
+                                            <p>
+                                                <strong className="text-white">Digital cash that actually works like cash.</strong> Remember handing someone a $20 bill? No banks, no permission, instant.
+                                            </p>
+                                            <p>
+                                                Cashu (also called "eCash") lets you do that with Bitcoin. It's <strong>instant</strong>, <strong>private</strong>, and works even when the internet is slow.
+                                            </p>
+                                            <p className="text-brand-primary font-bold">
+                                                Perfect for disc golf: Pay your entry fee, split the pot, settle side bets - all in seconds, right from your phone.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* What is Bitcoin? */}
+                                <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
+                                    <button
+                                        onClick={() => toggleSection('bitcoin-help')}
+                                        className="w-full flex items-center justify-between p-4 hover:bg-slate-700/50 transition-colors text-left"
+                                    >
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-8 h-8 rounded-full bg-orange-500/20 text-orange-500 flex items-center justify-center font-bold text-sm">₿</div>
+                                            <span className="font-bold text-white">What is Bitcoin?</span>
+                                        </div>
+                                        <Icons.Next size={16} className={`transition-transform ${openSection === 'bitcoin-help' ? 'rotate-90' : ''}`} />
+                                    </button>
+                                    {openSection === 'bitcoin-help' && (
+                                        <div className="p-4 pt-0 text-sm text-slate-300 leading-relaxed bg-slate-900/30 space-y-3">
+                                            <p>
+                                                <strong className="text-white">Money that can't be stopped.</strong> Bitcoin is digital money that no government, bank, or company controls.
+                                            </p>
+                                            <p>
+                                                Ever had Venmo or PayPal freeze your account? Or charge you fees? Or take days to transfer money? Bitcoin fixes that.
+                                            </p>
+                                            <p>
+                                                <strong className="text-orange-400">For disc golf:</strong> Many tournament directors have had their Venmo/PayPal accounts flagged for "suspicious activity" (collecting entry fees). With Bitcoin, that's impossible. No one can stop your transactions.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Why Does It Matter? */}
+                                <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
+                                    <button
+                                        onClick={() => toggleSection('why-help')}
+                                        className="w-full flex items-center justify-between p-4 hover:bg-slate-700/50 transition-colors text-left"
+                                    >
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-8 h-8 rounded-full bg-brand-accent/20 text-brand-accent flex items-center justify-center">
+                                                <Icons.Trophy size={16} />
+                                            </div>
+                                            <span className="font-bold text-white">Why Does It Matter?</span>
+                                        </div>
+                                        <Icons.Next size={16} className={`transition-transform ${openSection === 'why-help' ? 'rotate-90' : ''}`} />
+                                    </button>
+                                    {openSection === 'why-help' && (
+                                        <div className="p-4 pt-0 text-sm text-slate-300 leading-relaxed bg-slate-900/30 space-y-3">
+                                            <p className="text-white font-bold">
+                                                Because your disc golf stats and money shouldn't disappear when a company shuts down.
+                                            </p>
+                                            <ul className="space-y-2 text-sm">
+                                                <li className="flex items-start space-x-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-brand-primary mt-2 shrink-0" />
+                                                    <span><strong>Your data is yours:</strong> Scores, stats, and profile travel with you to any Nostr app</span>
+                                                </li>
+                                                <li className="flex items-start space-x-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-brand-primary mt-2 shrink-0" />
+                                                    <span><strong>Instant payouts:</strong> Win money? It's in your wallet immediately, not "pending" for days</span>
+                                                </li>
+                                                <li className="flex items-start space-x-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-brand-primary mt-2 shrink-0" />
+                                                    <span><strong>No middleman:</strong> Play with friends anywhere in the world, no payment processor taking a cut</span>
+                                                </li>
+                                                <li className="flex items-start space-x-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-brand-primary mt-2 shrink-0" />
+                                                    <span><strong>Unstoppable:</strong> No company can ban you, freeze your funds, or delete your history</span>
+                                                </li>
+                                            </ul>
+                                            <p className="text-brand-accent font-bold text-center pt-2">
+                                                Play disc golf. Own your game.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto p-6">
+                                <div className="flex flex-col items-center text-center space-y-2">
+                                    <div className="w-12 h-12 rounded-full bg-brand-secondary/10 flex items-center justify-center text-brand-secondary mb-2">
+                                        <Icons.Help size={24} />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white">{helpModal.title}</h3>
+                                    <div
+                                        className="text-slate-300 text-sm leading-relaxed text-left whitespace-pre-line"
+                                        dangerouslySetInnerHTML={{ __html: helpModal.text }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="p-4 border-t border-slate-800">
+                            <Button variant="secondary" fullWidth onClick={() => setHelpModal(null)}>
+                                Got it
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
