@@ -526,7 +526,7 @@ export const Home: React.FC = () => {
                     <div className="w-6"></div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-48">
+                <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
                     <div className="space-y-3">
                         {allPlayers.map((p, idx) => {
                             const isExcluded = excludedPlayers.has(p.pubkey);
@@ -634,7 +634,7 @@ export const Home: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="p-4 bg-brand-dark border-t border-slate-800 fixed bottom-20 left-0 right-0 max-w-md mx-auto">
+                <div className="fixed bottom-20 left-0 right-0 bg-brand-dark border-t border-slate-800 p-4 max-w-md mx-auto z-20">
                     <Button
                         fullWidth
                         onClick={handleStartRound}
@@ -847,7 +847,7 @@ export const Home: React.FC = () => {
                 </div>
 
                 {/* Scrollable Player List - with padding for fixed button */}
-                <div className="flex-1 overflow-y-auto pb-20">
+                <div className="flex-1 overflow-y-auto pb-32">
                     <div className="flex border-b border-slate-800 px-4 mb-2">
                         {!searchQuery && (
                             <>
@@ -912,8 +912,8 @@ export const Home: React.FC = () => {
                 </div>
 
                 {/* Fixed Button - outside scrollable area */}
-                <div className="fixed bottom-20 left-0 right-0 p-4 bg-brand-dark border-t border-slate-800 z-10 max-w-md mx-auto">
-                    <Button fullWidth onClick={() => setView('customize')} className="bg-brand-accent hover:bg-brand-accent/80 text-black">
+                <div className="fixed bottom-20 left-0 right-0 bg-brand-dark border-t border-slate-800 p-4 max-w-md mx-auto z-20">
+                    <Button fullWidth onClick={() => setView('customize')} className="bg-brand-accent text-black font-bold py-4 rounded-full shadow-lg shadow-brand-accent/20">
                         Confirm cardmates
                     </Button>
                 </div>
@@ -925,7 +925,7 @@ export const Home: React.FC = () => {
     if (view === 'setup') {
         return (
             <div className="flex flex-col h-full">
-                <div className="p-4 flex items-center justify-between">
+                <div className="px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                         <button onClick={() => setView('menu')} className="text-slate-400 hover:text-white">
                             <Icons.Prev size={24} />
@@ -948,31 +948,31 @@ export const Home: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                <div className="flex-1 overflow-y-auto px-4 py-3 pb-32 space-y-4">
 
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         <div className="flex items-center text-slate-400 space-x-2">
-                            <Icons.Location size={16} className="text-brand-primary" />
-                            <span className="text-sm font-bold uppercase tracking-wider">Course</span>
+                            <Icons.Location size={14} className="text-brand-primary" />
+                            <span className="text-xs font-bold uppercase tracking-wider">Course</span>
                         </div>
                         <input
                             type="text"
                             value={courseName}
                             onChange={(e) => setCourseName(e.target.value)}
-                            className="text-2xl font-bold bg-transparent border-none outline-none w-full placeholder-slate-600"
+                            className="text-xl font-bold bg-transparent border-none outline-none w-full placeholder-slate-600"
                             placeholder="Enter Course Name"
                         />
 
                         {/* Recent Courses Quick Select */}
                         {recentCourses.length > 0 && (
-                            <div className="space-y-2">
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Recent Courses</p>
+                            <div className="space-y-1.5">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Recent</p>
                                 <div className="flex flex-wrap gap-2">
                                     {recentCourses.slice(0, 6).map((course) => (
                                         <button
                                             key={course}
                                             onClick={() => setCourseName(course)}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${courseName === course
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${courseName === course
                                                 ? 'bg-brand-primary text-black shadow-lg shadow-brand-primary/20'
                                                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-brand-primary/30'
                                                 }`}
@@ -987,35 +987,35 @@ export const Home: React.FC = () => {
 
                     <hr className="border-slate-800" />
 
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         <div className="flex items-center text-slate-400 space-x-2">
-                            <Icons.Trophy size={16} className="text-brand-secondary" />
-                            <span className="text-sm font-bold uppercase tracking-wider">Number of Holes</span>
+                            <Icons.Trophy size={14} className="text-brand-secondary" />
+                            <span className="text-xs font-bold uppercase tracking-wider">Holes</span>
                         </div>
 
                         <div className="grid grid-cols-3 gap-0 bg-slate-800 rounded-lg p-1 border border-slate-700">
                             <button
                                 onClick={() => setLayout('9')}
-                                className={`py-2 rounded-md text-sm font-bold transition-all ${layout === '9' ? 'bg-brand-secondary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                className={`py-1.5 rounded-md text-sm font-bold transition-all ${layout === '9' ? 'bg-brand-secondary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                             >
-                                9 Holes
+                                9
                             </button>
                             <button
                                 onClick={() => setLayout('18')}
-                                className={`py-2 rounded-md text-sm font-bold transition-all ${layout === '18' ? 'bg-brand-secondary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                className={`py-1.5 rounded-md text-sm font-bold transition-all ${layout === '18' ? 'bg-brand-secondary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                             >
-                                18 Holes
+                                18
                             </button>
                             <button
                                 onClick={() => setLayout('custom')}
-                                className={`py-2 rounded-md text-sm font-bold transition-all ${layout === 'custom' ? 'bg-brand-secondary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                className={`py-1.5 rounded-md text-sm font-bold transition-all ${layout === 'custom' ? 'bg-brand-secondary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                             >
                                 Custom
                             </button>
                         </div>
                         {layout === 'custom' && (
-                            <div className="flex items-center justify-between bg-slate-800/50 p-3 rounded-lg">
-                                <span className="text-sm text-slate-400">Number of Holes</span>
+                            <div className="flex items-center justify-between bg-slate-800/50 p-2.5 rounded-lg">
+                                <span className="text-sm text-slate-400">Holes</span>
                                 <input
                                     type="number"
                                     value={customHoles}
@@ -1028,24 +1028,24 @@ export const Home: React.FC = () => {
 
                     <hr className="border-slate-800" />
 
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         {/* Section Header with Zap Icon */}
                         <div className="flex items-center text-slate-400 space-x-2">
-                            <Icons.Zap size={16} className="text-brand-primary" />
-                            <span className="text-sm font-bold uppercase tracking-wider">Entry Fee & Stakes</span>
+                            <Icons.Zap size={14} className="text-brand-primary" />
+                            <span className="text-xs font-bold uppercase tracking-wider">Entry Fee & Stakes</span>
                         </div>
 
                         {/* Entry Fee Toggle */}
                         <div className="bg-slate-800 rounded-lg p-1 border border-slate-700 flex">
                             <button
                                 onClick={() => setHasEntryFee(true)}
-                                className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${hasEntryFee ? 'bg-brand-primary text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                className={`flex-1 py-1.5 rounded-md text-sm font-bold transition-all ${hasEntryFee ? 'bg-brand-primary text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
                             >
                                 Entry Fee
                             </button>
                             <button
                                 onClick={() => setHasEntryFee(false)}
-                                className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${!hasEntryFee ? 'bg-brand-primary text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                className={`flex-1 py-1.5 rounded-md text-sm font-bold transition-all ${!hasEntryFee ? 'bg-brand-primary text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
                             >
                                 No Entry Fee
                             </button>
@@ -1054,70 +1054,67 @@ export const Home: React.FC = () => {
                         {hasEntryFee && (
                             <>
                                 <div className="space-y-2">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Entry Fee (Sats)</label>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Entry Fee (Sats)</label>
                                     <input
                                         type="number"
                                         step="1000"
                                         value={entryFee}
                                         onChange={(e) => setEntryFee(Number(e.target.value))}
-                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:ring-1 focus:ring-brand-primary outline-none"
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-brand-primary outline-none"
                                     />
 
                                     {/* Preset Entry Fee Buttons */}
-                                    <div className="space-y-2">
-                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quick Select</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {/* Default Presets */}
-                                            {[1000, 5000, 10000].map(amount => (
+                                    <div className="flex flex-wrap gap-2">
+                                        {/* Default Presets */}
+                                        {[1000, 5000, 10000].map(amount => (
+                                            <button
+                                                key={amount}
+                                                onClick={() => setEntryFee(amount)}
+                                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${entryFee === amount
+                                                    ? 'bg-brand-primary text-black shadow-lg shadow-brand-primary/20'
+                                                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-brand-primary/30'
+                                                    }`}
+                                            >
+                                                {amount / 1000}k
+                                            </button>
+                                        ))}
+
+                                        {/* Custom Presets */}
+                                        {customPresets.map(preset => (
+                                            <div key={preset.id} className="relative group">
                                                 <button
-                                                    key={amount}
-                                                    onClick={() => setEntryFee(amount)}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${entryFee === amount
-                                                        ? 'bg-brand-primary text-black shadow-lg shadow-brand-primary/20'
-                                                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-brand-primary/30'
+                                                    onClick={() => setEntryFee(preset.amount)}
+                                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${entryFee === preset.amount
+                                                        ? 'bg-brand-secondary text-white shadow-lg shadow-brand-secondary/20'
+                                                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-brand-secondary/30'
                                                         }`}
                                                 >
-                                                    {amount / 1000}k
+                                                    {preset.amount >= 1000 ? `${preset.amount / 1000}k` : preset.amount}
                                                 </button>
-                                            ))}
-
-                                            {/* Custom Presets */}
-                                            {customPresets.map(preset => (
-                                                <div key={preset.id} className="relative group">
-                                                    <button
-                                                        onClick={() => setEntryFee(preset.amount)}
-                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${entryFee === preset.amount
-                                                            ? 'bg-brand-secondary text-white shadow-lg shadow-brand-secondary/20'
-                                                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-brand-secondary/30'
-                                                            }`}
-                                                    >
-                                                        {preset.amount >= 1000 ? `${preset.amount / 1000}k` : preset.amount}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteCustomPreset(preset.id)}
-                                                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        title="Delete preset"
-                                                    >
-                                                        <Icons.Close size={10} className="text-white" strokeWidth={3} />
-                                                    </button>
-                                                </div>
-                                            ))}
-
-                                            {/* Add Custom Button */}
-                                            {customPresets.length < 3 && !showCustomInput && (
                                                 <button
-                                                    onClick={() => setShowCustomInput(true)}
-                                                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-brand-primary border border-brand-primary/30 hover:bg-brand-primary/10 transition-all"
+                                                    onClick={() => handleDeleteCustomPreset(preset.id)}
+                                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    title="Delete preset"
                                                 >
-                                                    + Custom
+                                                    <Icons.Close size={10} className="text-white" strokeWidth={3} />
                                                 </button>
-                                            )}
-                                        </div>
+                                            </div>
+                                        ))}
+
+                                        {/* Add Custom Button */}
+                                        {customPresets.length < 3 && !showCustomInput && (
+                                            <button
+                                                onClick={() => setShowCustomInput(true)}
+                                                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-brand-primary border border-brand-primary/30 hover:bg-brand-primary/10 transition-all"
+                                            >
+                                                + Custom
+                                            </button>
+                                        )}
                                     </div>
 
                                     {/* Custom Input UI */}
                                     {showCustomInput && (
-                                        <div className="flex items-center gap-2 bg-slate-800/50 p-3 rounded-lg border border-brand-primary/30 animate-in fade-in slide-in-from-top-2">
+                                        <div className="flex items-center gap-2 bg-slate-800/50 p-2.5 rounded-lg border border-brand-primary/30 animate-in fade-in slide-in-from-top-2">
                                             <input
                                                 type="number"
                                                 value={customAmount}
@@ -1145,15 +1142,31 @@ export const Home: React.FC = () => {
                                     )}
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ace Pot (Sats)</label>
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ace Pot (Sats)</label>
                                     <input
                                         type="number"
                                         step="500"
                                         value={acePot}
                                         onChange={(e) => setAcePot(Number(e.target.value))}
-                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:ring-1 focus:ring-brand-primary outline-none"
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-brand-primary outline-none"
                                     />
+
+                                    {/* Ace Pot Quick Select */}
+                                    <div className="flex flex-wrap gap-2">
+                                        {[1000, 2000, 5000, 10000].map(amount => (
+                                            <button
+                                                key={amount}
+                                                onClick={() => setAcePot(amount)}
+                                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${acePot === amount
+                                                    ? 'bg-brand-primary text-black shadow-lg shadow-brand-primary/20'
+                                                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-brand-primary/30'
+                                                    }`}
+                                            >
+                                                {amount / 1000}k
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </>
                         )}
@@ -1161,11 +1174,11 @@ export const Home: React.FC = () => {
 
                 </div>
 
-                <div className="p-4 pb-24 bg-brand-dark border-t border-slate-800">
+                <div className="fixed bottom-20 left-0 right-0 bg-brand-dark border-t border-slate-800 p-4 max-w-md mx-auto z-20">
                     <Button
                         fullWidth
                         onClick={() => setView('select_players')}
-                        className="bg-brand-primary text-black font-bold py-4 rounded-2xl"
+                        className="bg-brand-accent text-black font-bold py-4 rounded-full shadow-lg shadow-brand-accent/20"
                     >
                         Next
                     </Button>
