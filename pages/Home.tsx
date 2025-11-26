@@ -52,6 +52,7 @@ export const Home: React.FC = () => {
     const [foundUser, setFoundUser] = useState<DisplayProfile | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const [playerTab, setPlayerTab] = useState<'frequent' | 'recent' | 'a-z'>('frequent');
+    const [wiggleSearchButton, setWiggleSearchButton] = useState(false);
 
     // Player Scanner State
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -727,13 +728,12 @@ export const Home: React.FC = () => {
         );
     }
 
-    // ... (rest of the file remains unchanged)
-
-    // --- STEP 2: SELECT PLAYERS ---
+    // --- WHO'S PLAYING? (PLAYER SELECTION) ---
     if (view === 'select_players') {
         return (
-            <div className="flex flex-col h-full bg-brand-dark">
-                <div className="px-4 py-4 flex items-center space-x-3 bg-brand-dark border-b border-slate-800">
+            <div className="flex flex-col h-full relative">
+                {/* Header */}
+                <div className="p-4 flex items-center space-x-2">
                     <button onClick={() => setView('setup')} className="text-slate-400 hover:text-white">
                         <Icons.Prev size={24} />
                     </button>
@@ -743,6 +743,7 @@ export const Home: React.FC = () => {
                     <h1 className="text-xl font-bold">Who's playing?</h1>
                 </div>
 
+                {/* Current Card Section */}
                 <div className="px-4 py-3 bg-brand-surface/50 border-b border-slate-800">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                         Current Card ({selectedCardmates.length + 1})
@@ -781,6 +782,7 @@ export const Home: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Search Section */}
                 <div className="p-4">
                     <div className="relative flex items-center space-x-2">
                         <div className="relative flex-1">
@@ -792,6 +794,11 @@ export const Home: React.FC = () => {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                onPaste={() => {
+                                    // Golden glow on search button when user pastes
+                                    setWiggleSearchButton(true);
+                                    setTimeout(() => setWiggleSearchButton(false), 2000);
+                                }}
                             />
                         </div>
 
@@ -804,7 +811,10 @@ export const Home: React.FC = () => {
 
                         <button
                             onClick={handleSearch}
-                            className="p-3 bg-brand-primary/10 text-brand-primary border border-brand-primary/30 rounded-lg hover:bg-brand-primary/20 transition-colors"
+                            className={`p-3 rounded-lg transition-all duration-300 ${wiggleSearchButton
+                                ? 'bg-brand-accent/30 text-brand-accent border-2 border-brand-accent shadow-lg shadow-brand-accent/50 ring-4 ring-brand-accent/30 animate-pulse'
+                                : 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30 hover:bg-brand-primary/20'
+                                }`}
                         >
                             {isSearching ? <Icons.Zap className="animate-spin" size={20} /> : <Icons.Next size={20} />}
                         </button>
@@ -836,7 +846,8 @@ export const Home: React.FC = () => {
                     )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto">
+                {/* Scrollable Player List - with padding for fixed button */}
+                <div className="flex-1 overflow-y-auto pb-20">
                     <div className="flex border-b border-slate-800 px-4 mb-2">
                         {!searchQuery && (
                             <>
@@ -900,7 +911,8 @@ export const Home: React.FC = () => {
                     )}
                 </div>
 
-                <div className="p-4 bg-brand-dark border-t border-slate-800 pb-24">
+                {/* Fixed Button - outside scrollable area */}
+                <div className="fixed bottom-20 left-0 right-0 p-4 bg-brand-dark border-t border-slate-800 z-10 max-w-md mx-auto">
                     <Button fullWidth onClick={() => setView('customize')} className="bg-brand-accent hover:bg-brand-accent/80 text-black">
                         Confirm cardmates
                     </Button>
