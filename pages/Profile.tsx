@@ -425,7 +425,7 @@ export const Profile: React.FC = () => {
                 <div className="space-y-4 pb-24">
                     {/* Nostr Relays */}
                     <div>
-                        <SectionHeader id="relays" title="Nostr Relays" icon={<Icons.Zap size={18} className="text-brand-primary" />} />
+                        <SectionHeader id="relays" title="Nostr Relays" icon={<Icons.Share size={18} className="text-purple-400" />} />
                         {openSection === 'relays' && (
                             <div className="bg-slate-800/30 border border-t-0 border-slate-700 rounded-b-xl p-4 animate-in slide-in-from-top-2 duration-200">
                                 <p className="text-xs text-slate-400 mb-4">
@@ -475,7 +475,7 @@ export const Profile: React.FC = () => {
 
                     {/* Advanced Profile Settings */}
                     <div>
-                        <SectionHeader id="advanced" title="Advanced Profile Settings" icon={<Icons.Settings size={18} className="text-slate-400" />} />
+                        <SectionHeader id="advanced" title="Advanced Profile Settings" icon={<Icons.Key size={18} className="text-blue-400" />} />
                         {openSection === 'advanced' && (
                             <div className="bg-slate-800/30 border border-t-0 border-slate-700 rounded-b-xl p-4 animate-in slide-in-from-top-2 duration-200">
                                 <p className="text-xs text-slate-400 mb-4">
@@ -544,7 +544,7 @@ export const Profile: React.FC = () => {
 
                     {/* App Data */}
                     <div>
-                        <SectionHeader id="data" title="App Data" icon={<Icons.Trash size={18} className="text-slate-400" />} />
+                        <SectionHeader id="data" title="App Data" icon={<Icons.History size={18} className="text-amber-400" />} />
                         {openSection === 'data' && (
                             <div className="bg-slate-800/30 border border-t-0 border-slate-700 rounded-b-xl p-4 animate-in slide-in-from-top-2 duration-200">
                                 <button
@@ -563,7 +563,7 @@ export const Profile: React.FC = () => {
 
                     {/* About */}
                     <div>
-                        <SectionHeader id="about" title="About" icon={<Icons.Help size={18} className="text-slate-400" />} />
+                        <SectionHeader id="about" title="About" icon={<Icons.Help size={18} className="text-emerald-400" />} />
                         {openSection === 'about' && (
                             <div className="bg-slate-800/30 border border-t-0 border-slate-700 rounded-b-xl p-4 animate-in slide-in-from-top-2 duration-200">
                                 <div className="space-y-3 text-sm text-slate-400">
@@ -860,13 +860,20 @@ export const Profile: React.FC = () => {
 
                         <div>
                             <div className="flex items-center gap-2 mb-1.5">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">About Me (Bio)</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Verified Nostr ID</label>
+                                <button
+                                    onClick={() => openHelp('NIP-05 Identifier', 'A verified identifier like "yourname@domain.com" that proves you own this Nostr account. This is optional but helps others find and verify you.')}
+                                    className="text-slate-500 hover:text-brand-primary transition-colors"
+                                >
+                                    <Icons.Help size={14} />
+                                </button>
                             </div>
-                            <textarea
-                                placeholder="Tell us about yourself..."
-                                value={formData.about}
-                                onChange={e => setFormData({ ...formData, about: e.target.value })}
-                                className="w-full bg-slate-800 p-3 rounded-xl border border-slate-600 text-white text-sm focus:ring-1 focus:ring-brand-primary outline-none h-24 resize-none"
+                            <input
+                                type="text"
+                                placeholder="yourname@domain.com"
+                                value={formData.nip05}
+                                onChange={e => setFormData({ ...formData, nip05: e.target.value })}
+                                className="w-full bg-slate-800 p-3 rounded-xl border border-slate-600 text-white text-sm focus:ring-1 focus:ring-brand-primary outline-none"
                             />
                         </div>
 
@@ -879,7 +886,7 @@ export const Profile: React.FC = () => {
                     <>
                         <h1 className="text-2xl font-bold text-white">{userProfile.name}</h1>
 
-                        <div className="flex flex-col items-center space-y-1 mt-1">
+                        <div className="flex flex-col items-center space-y-1 mt-3">
                             {userProfile.nip05 && (
                                 <div className="flex items-center text-brand-secondary text-xs font-bold space-x-1 bg-brand-secondary/10 px-2 py-1 rounded-md">
                                     <Icons.CheckMark size={12} />
