@@ -53,6 +53,8 @@ export const Profile: React.FC = () => {
     const [helpModal, setHelpModal] = useState<{ isOpen: boolean, title: string, text: string } | null>(null);
     const [imgError, setImgError] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [copiedKeyType, setCopiedKeyType] = useState<'npub' | 'nsec' | null>(null);
+    const [copiedLud16, setCopiedLud16] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [formData, setFormData] = useState({
@@ -233,7 +235,8 @@ export const Profile: React.FC = () => {
         try {
             const npub = nip19.npubEncode(currentUserPubkey);
             navigator.clipboard.writeText(npub);
-            alert('Copied Public Key (npub)!');
+            setCopiedKeyType('npub');
+            setTimeout(() => setCopiedKeyType(null), 2000);
         } catch (e) { }
     };
 
@@ -249,7 +252,16 @@ export const Profile: React.FC = () => {
         const nsec = getPrivateString();
         if (nsec) {
             navigator.clipboard.writeText(nsec);
-            alert('Copied Private Key (nsec)! Keep it safe.');
+            setCopiedKeyType('nsec');
+            setTimeout(() => setCopiedKeyType(null), 2000);
+        }
+    };
+
+    const handleCopyLud16 = () => {
+        if (formData.lud16) {
+            navigator.clipboard.writeText(formData.lud16);
+            setCopiedLud16(true);
+            setTimeout(() => setCopiedLud16(false), 2000);
         }
     };
 
@@ -522,13 +534,24 @@ export const Profile: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        <input
-                                            type="text"
-                                            placeholder="user@domain.com"
-                                            value={formData.lud16}
-                                            onChange={e => setFormData({ ...formData, lud16: e.target.value })}
-                                            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white text-sm focus:ring-1 focus:ring-brand-primary outline-none"
-                                        />
+                                        <div className="flex items-center space-x-2">
+                                            <input
+                                                type="text"
+                                                placeholder="user@domain.com"
+                                                value={formData.lud16}
+                                                onChange={e => setFormData({ ...formData, lud16: e.target.value })}
+                                                className="flex-1 bg-slate-900 border border-slate-600 rounded-lg p-3 text-white text-sm focus:ring-1 focus:ring-brand-primary outline-none"
+                                            />
+                                            <button
+                                                onClick={handleCopyLud16}
+                                                className={`p-3 rounded-lg transition-colors shrink-0 ${copiedLud16
+                                                        ? 'bg-green-600 hover:bg-green-700 text-white'
+                                                        : 'bg-slate-700 hover:bg-slate-600 text-white'
+                                                    }`}
+                                            >
+                                                {copiedLud16 ? <Icons.CheckMark size={16} /> : <Icons.Copy size={16} />}
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div>
@@ -1067,8 +1090,14 @@ export const Profile: React.FC = () => {
                             <div className="flex-1 bg-slate-900/50 rounded p-2 text-xs text-slate-400 font-mono truncate">
                                 {(() => { try { return nip19.npubEncode(currentUserPubkey); } catch (e) { return '...'; } })()}
                             </div>
-                            <button onClick={handleCopyNpub} className="p-2 bg-slate-700 rounded hover:bg-slate-600 text-white">
-                                <Icons.Copy size={16} />
+                            <button
+                                onClick={handleCopyNpub}
+                                className={`p-2 rounded transition-colors ${copiedKeyType === 'npub'
+                                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                                    : 'bg-slate-700 hover:bg-slate-600 text-white'
+                                    }`}
+                            >
+                                {copiedKeyType === 'npub' ? <Icons.CheckMark size={16} /> : <Icons.Copy size={16} />}
                             </button>
                         </div>
                     </div>
@@ -1102,8 +1131,14 @@ export const Profile: React.FC = () => {
                                 >
                                     {showSecrets ? <Icons.EyeOff size={16} /> : <Icons.Eye size={16} />}
                                 </button>
-                                <button onClick={handleCopyNsec} className="p-2 bg-slate-700 rounded hover:bg-slate-600 text-white">
-                                    <Icons.Copy size={16} />
+                                <button
+                                    onClick={handleCopyNsec}
+                                    className={`p-2 rounded transition-colors ${copiedKeyType === 'nsec'
+                                        ? 'bg-green-600 hover:bg-green-700 text-white'
+                                        : 'bg-slate-700 hover:bg-slate-600 text-white'
+                                        }`}
+                                >
+                                    {copiedKeyType === 'nsec' ? <Icons.CheckMark size={16} /> : <Icons.Copy size={16} />}
                                 </button>
                             </div>
                             {showSecrets && <p className="text-[10px] text-red-400 mt-1">Warning: Never share your nsec with anyone.</p>}
