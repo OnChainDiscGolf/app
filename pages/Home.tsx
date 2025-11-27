@@ -699,6 +699,15 @@ export const Home: React.FC = () => {
             ...selectedCardmates
         ];
 
+        // Calculate dynamic totals based on player selections
+        let totalEntryPot = 0;
+        let totalAcePot = 0;
+        allPlayers.forEach(p => {
+            const payment = paymentSelections[p.pubkey] || { entry: true, ace: true };
+            if (payment.entry && entryFee > 0) totalEntryPot += entryFee;
+            if (payment.ace && acePot > 0) totalAcePot += acePot;
+        });
+
         return (
             <div className="flex flex-col h-full bg-brand-dark relative">
                 <div className="px-4 py-4 flex items-center justify-between bg-brand-dark">
@@ -706,7 +715,7 @@ export const Home: React.FC = () => {
                         <button onClick={() => setView('select_players')} className="text-slate-400 hover:text-white">
                             <Icons.Prev size={24} />
                         </button>
-                        <h2 className="text-xl font-bold">Round setup</h2>
+                        <h2 className="text-xl font-bold">Payment & Buy-ins</h2>
                     </div>
                     <div className="flex space-x-2">
                         <button
@@ -723,6 +732,37 @@ export const Home: React.FC = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Dynamic Pot Totals */}
+                {hasEntryFee && (entryFee > 0 || acePot > 0) && (
+                    <div className="px-4 pb-4">
+                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 border border-slate-700">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center">
+                                    <Icons.Zap size={14} className="text-brand-primary mr-1.5" />
+                                    Total Pot
+                                </h3>
+                                <div className="text-2xl font-bold text-white">
+                                    {(totalEntryPot + totalAcePot).toLocaleString()} <span className="text-sm text-slate-400">sats</span>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                {entryFee > 0 && (
+                                    <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Entry Fee</p>
+                                        <p className="text-lg font-bold text-brand-accent">{totalEntryPot.toLocaleString()} <span className="text-xs text-slate-400">sats</span></p>
+                                    </div>
+                                )}
+                                {acePot > 0 && (
+                                    <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ace Pot</p>
+                                        <p className="text-lg font-bold text-brand-secondary">{totalAcePot.toLocaleString()} <span className="text-xs text-slate-400">sats</span></p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
                     <div className="space-y-3">
@@ -754,45 +794,8 @@ export const Home: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        {/* Payment Selection & Status */}
+                                        {/* Payment Status */}
                                         <div className="flex items-center gap-2 shrink-0">
-                                            {/* Payment Options */}
-                                            {hasEntryFee && (
-                                                <div className="flex gap-1.5">
-                                                    {/* Entry Checkbox */}
-                                                    {entryFee > 0 && (
-                                                        <button
-                                                            onClick={() => setPaymentSelections(prev => ({
-                                                                ...prev,
-                                                                [p.pubkey]: { ...payment, entry: !payment.entry }
-                                                            }))}
-                                                            className={`px-1.5 py-1 rounded text-[9px] font-bold border transition-all ${payment.entry
-                                                                ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
-                                                                : 'bg-slate-700/50 text-slate-500 border-slate-600'
-                                                                }`}
-                                                        >
-                                                            Entry
-                                                        </button>
-                                                    )}
-
-                                                    {/* Ace Checkbox */}
-                                                    {acePot > 0 && (
-                                                        <button
-                                                            onClick={() => setPaymentSelections(prev => ({
-                                                                ...prev,
-                                                                [p.pubkey]: { ...payment, ace: !payment.ace }
-                                                            }))}
-                                                            className={`px-1.5 py-1 rounded text-[9px] font-bold border transition-all ${payment.ace
-                                                                ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
-                                                                : 'bg-slate-700/50 text-slate-500 border-slate-600'
-                                                                }`}
-                                                        >
-                                                            Ace
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
-
                                             {/* Payment Status Icon */}
                                             {hasEntryFee && owesAnything && (
                                                 <button
@@ -1027,36 +1030,122 @@ export const Home: React.FC = () => {
                         Current Card ({selectedCardmates.length + 1})
                     </h3>
                     <div className="space-y-2 max-h-[150px] overflow-y-auto no-scrollbar">
+                        {/* Host Player */}
                         <div className="flex items-center justify-between bg-slate-800 p-2 rounded-lg border border-slate-700">
-                            <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-3 min-w-0 flex-1">
                                 <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden shrink-0">
                                     {userProfile.picture ? <img src={userProfile.picture} className="w-full h-full object-cover" /> : <Icons.Users className="p-1" />}
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="font-bold text-sm">{userProfile.name} (You)</span>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="font-bold text-sm truncate">{userProfile.name} (You)</span>
+                                    <span className="text-[9px] font-bold bg-brand-primary/10 text-brand-primary px-1.5 py-0.5 rounded w-fit">HOST</span>
                                 </div>
                             </div>
-                            <span className="text-[10px] font-bold bg-brand-primary/10 text-brand-primary px-2 py-1 rounded">HOST</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                {/* Entry/Ace Buttons - Horizontal */}
+                                {hasEntryFee && (
+                                    <>
+                                        {/* Entry Button */}
+                                        {entryFee > 0 && (
+                                            <button
+                                                onClick={() => setPaymentSelections(prev => ({
+                                                    ...prev,
+                                                    [currentUserPubkey]: { ...(prev[currentUserPubkey] || { entry: true, ace: true }), entry: !(prev[currentUserPubkey]?.entry ?? true) }
+                                                }))}
+                                                className={`px-2 py-1 rounded text-[9px] font-bold border transition-all ${(paymentSelections[currentUserPubkey]?.entry ?? true)
+                                                    ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
+                                                    : 'bg-slate-700/50 text-slate-500 border-slate-600'
+                                                    }`}
+                                            >
+                                                Entry
+                                            </button>
+                                        )}
+
+                                        {/* Ace Button */}
+                                        {acePot > 0 && (
+                                            <button
+                                                onClick={() => setPaymentSelections(prev => ({
+                                                    ...prev,
+                                                    [currentUserPubkey]: { ...(prev[currentUserPubkey] || { entry: true, ace: true }), ace: !(prev[currentUserPubkey]?.ace ?? true) }
+                                                }))}
+                                                className={`px-2 py-1 rounded text-[9px] font-bold border transition-all ${(paymentSelections[currentUserPubkey]?.ace ?? true)
+                                                    ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
+                                                    : 'bg-slate-700/50 text-slate-500 border-slate-600'
+                                                    }`}
+                                            >
+                                                Ace
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                                {/* Host Indicator Icon */}
+                                <div className="w-8 h-8 flex items-center justify-center bg-brand-primary/10 border-2 border-brand-primary/30 rounded-full">
+                                    <Icons.Shield size={16} className="text-brand-primary" />
+                                </div>
+                            </div>
                         </div>
 
-                        {selectedCardmates.map(p => (
-                            <div key={p.pubkey} className="flex items-center justify-between bg-slate-800 p-2 rounded-lg border border-slate-700 animate-in slide-in-from-left-2 duration-300">
-                                <div className="flex items-center space-x-3">
-                                    <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden shrink-0">
-                                        {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <Icons.Users className="p-1 text-slate-500" />}
+                        {/* Cardmates */}
+                        {selectedCardmates.map(p => {
+                            const payment = paymentSelections[p.pubkey] || { entry: true, ace: true };
+                            return (
+                                <div key={p.pubkey} className="flex items-center justify-between bg-slate-800 p-2 rounded-lg border border-slate-700 animate-in slide-in-from-left-2 duration-300">
+                                    <div className="flex items-center space-x-3 min-w-0 flex-1">
+                                        <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden shrink-0">
+                                            {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <Icons.Users className="p-1 text-slate-500" />}
+                                        </div>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="font-bold text-sm truncate">{p.name}</span>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col">
-                                        <span className="font-bold text-sm">{p.name}</span>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        {/* Entry/Ace Buttons - Horizontal */}
+                                        {hasEntryFee && (
+                                            <>
+                                                {/* Entry Button */}
+                                                {entryFee > 0 && (
+                                                    <button
+                                                        onClick={() => setPaymentSelections(prev => ({
+                                                            ...prev,
+                                                            [p.pubkey]: { ...payment, entry: !payment.entry }
+                                                        }))}
+                                                        className={`px-2 py-1 rounded text-[9px] font-bold border transition-all ${payment.entry
+                                                            ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
+                                                            : 'bg-slate-700/50 text-slate-500 border-slate-600'
+                                                            }`}
+                                                    >
+                                                        Entry
+                                                    </button>
+                                                )}
+
+                                                {/* Ace Button */}
+                                                {acePot > 0 && (
+                                                    <button
+                                                        onClick={() => setPaymentSelections(prev => ({
+                                                            ...prev,
+                                                            [p.pubkey]: { ...payment, ace: !payment.ace }
+                                                        }))}
+                                                        className={`px-2 py-1 rounded text-[9px] font-bold border transition-all ${payment.ace
+                                                            ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
+                                                            : 'bg-slate-700/50 text-slate-500 border-slate-600'
+                                                            }`}
+                                                    >
+                                                        Ace
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+                                        {/* Remove Button */}
+                                        <button
+                                            onClick={() => removeCardmate(p.pubkey)}
+                                            className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-full transition-colors"
+                                        >
+                                            <Icons.Close size={16} />
+                                        </button>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => removeCardmate(p.pubkey)}
-                                    className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-full transition-colors shrink-0"
-                                >
-                                    <Icons.Close size={16} />
-                                </button>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
