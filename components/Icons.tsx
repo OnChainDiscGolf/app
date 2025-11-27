@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Wallet,
+  Plus,
   PlusCircle,
   QrCode,
   Users,
@@ -110,6 +111,7 @@ export const Icons = {
   Trophy: Basket, // Replaced Trophy with Basket
   Wallet,
   Plus: PlusCircle,
+  PlusIcon: Plus,
   QrCode,
   Users,
   Next: ChevronRight,

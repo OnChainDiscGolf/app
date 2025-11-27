@@ -1276,30 +1276,6 @@ export const Home: React.FC = () => {
                         </div>
 
                         <button
-                            onClick={() => setView('scan_player')}
-                            className="p-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
-                        >
-                            <Icons.QrCode size={20} />
-                        </button>
-
-                        <button
-                            onClick={handleInstantInvite}
-                            className="p-3 bg-slate-800 border border-slate-700 rounded-lg text-brand-primary hover:text-white hover:border-brand-primary/50 transition-colors relative group"
-                            disabled={isGeneratingInvite}
-                        >
-                            {isGeneratingInvite ? (
-                                <Icons.Zap className="animate-spin" size={20} />
-                            ) : (
-                                <>
-                                    <Icons.QrCode size={20} />
-                                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-brand-primary rounded-full flex items-center justify-center">
-                                        <Icons.Plus size={8} className="text-black font-bold" />
-                                    </div>
-                                </>
-                            )}
-                        </button>
-
-                        <button
                             onClick={handleSearch}
                             className={`p-3 rounded-lg transition-all duration-300 ${wiggleSearchButton
                                 ? 'bg-brand-accent/30 text-brand-accent border-2 border-brand-accent shadow-lg shadow-brand-accent/50 ring-4 ring-brand-accent/30 animate-pulse'
@@ -1307,6 +1283,32 @@ export const Home: React.FC = () => {
                                 }`}
                         >
                             {isSearching ? <Icons.Zap className="animate-spin" size={20} /> : <Icons.Next size={20} />}
+                        </button>
+
+                        <div className="w-px h-8 bg-slate-700 mx-1"></div>
+
+                        <button
+                            onClick={() => setView('scan_player')}
+                            className="p-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
+                            title="Scan Player QR"
+                        >
+                            <Icons.Camera size={20} />
+                        </button>
+
+                        <button
+                            onClick={handleInstantInvite}
+                            className="p-3 bg-slate-800 border border-slate-700 rounded-lg text-brand-primary hover:text-white hover:border-brand-primary/50 transition-colors relative group"
+                            disabled={isGeneratingInvite}
+                            title="Instant Invite (New Player)"
+                        >
+                            {isGeneratingInvite ? (
+                                <Icons.Zap className="animate-spin" size={20} />
+                            ) : (
+                                <>
+                                    <Icons.QrCode size={20} />
+                                    <Icons.PlusIcon size={12} className="absolute -top-1 -right-1 text-orange-500 stroke-[4]" />
+                                </>
+                            )}
                         </button>
                     </div>
 
