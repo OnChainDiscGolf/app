@@ -388,16 +388,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
               // Add proofs to state with mintUrl attached
               const proofsWithMint = newProofs.map(p => ({ ...p, mintUrl: quote.mintUrl }));
-              setProofs(prev => [...prev, ...proofsWithMint]);
+
+              // CRITICAL: Set localStorage flag ONLY after state updates complete
+              // This prevents the race condition where flag is set but proofs aren't persisted
+              setProofs(prev => {
+                const updated = [...prev, ...proofsWithMint];
+                // Use setTimeout to ensure state update is processed before setting flag
+                setTimeout(() => {
+                  localStorage.setItem(processedKey, Date.now().toString());
+                  console.log(`💾 [AppContext] Marked quote ${quoteId} as processed (after state persist)`);
+                }, 100);
+                return updated;
+              });
 
               // Add mint to state if not exists
               setMints(prev => {
                 if (prev.find(m => m.url === quote.mintUrl)) return prev;
                 return [...prev, { url: quote.mintUrl, nickname: 'npub.cash', isActive: true }];
               });
-
-              localStorage.setItem(processedKey, Date.now().toString());
-              console.log(`💾 [AppContext] Marked quote ${quoteId} as processed`);
 
               // Add transaction record
               const tx: WalletTransaction = {

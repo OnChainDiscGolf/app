@@ -8,11 +8,24 @@ import { Icons } from '../components/Icons';
 import { useNavigate } from 'react-router-dom';
 
 // Helper Component for Success Animation
-const SuccessOverlay: React.FC<{ message: string, subMessage?: string, onClose: () => void }> = ({ message, subMessage, onClose }) => {
+const SuccessOverlay: React.FC<{
+    message: string,
+    subMessage?: string,
+    onClose: () => void,
+    type?: 'sent' | 'received' | 'deposit'
+}> = ({ message, subMessage, onClose, type }) => {
     useEffect(() => {
-        const timer = setTimeout(onClose, 2500);
+        // For received payments, show longer (4s) and don't auto-navigate
+        // For sent/deposit, auto-close after 2.5s
+        const duration = type === 'received' ? 4000 : 2500;
+        const timer = setTimeout(() => {
+            // Only auto-close for sent/deposit, not for received
+            if (type !== 'received') {
+                onClose();
+            }
+        }, duration);
         return () => clearTimeout(timer);
-    }, [onClose]);
+    }, [onClose, type]);
 
     return (
         <div className="fixed inset-0 z-[100] bg-brand-dark flex flex-col items-center justify-center animate-in zoom-in duration-300">
@@ -21,6 +34,16 @@ const SuccessOverlay: React.FC<{ message: string, subMessage?: string, onClose: 
             </div>
             <h3 className="text-3xl font-bold text-white mb-2 animate-in slide-in-from-bottom-4 delay-200">{message}</h3>
             {subMessage && <p className="text-slate-400 text-lg animate-in slide-in-from-bottom-4 delay-300">{subMessage}</p>}
+
+            {/* For received payments, show close button after animation */}
+            {type === 'received' && (
+                <button
+                    onClick={onClose}
+                    className="mt-8 px-6 py-3 bg-brand-primary rounded-xl font-bold hover:bg-brand-primary/80 transition-all animate-in fade-in delay-500"
+                >
+                    Continue
+                </button>
+            )}
         </div>
     );
 };
@@ -507,6 +530,7 @@ export const Wallet: React.FC = () => {
                 <SuccessOverlay
                     message="Deposit Confirmed!"
                     subMessage="Tokens minted successfully."
+                    type="deposit"
                     onClose={() => setView('main')}
                 />
             </div>
@@ -518,6 +542,7 @@ export const Wallet: React.FC = () => {
             <div className="h-full p-6 relative">
                 <SuccessOverlay
                     message="Payment Sent!"
+                    type="sent"
                     onClose={() => setView('main')}
                 />
             </div>
@@ -528,7 +553,9 @@ export const Wallet: React.FC = () => {
         return (
             <div className="h-full p-6 relative">
                 <SuccessOverlay
-                    message="eCash Received!"
+                    message="Payment Received!"
+                    subMessage="Your balance has been updated"
+                    type="received"
                     onClose={() => setView('main')}
                 />
             </div>
