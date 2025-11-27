@@ -5,7 +5,8 @@ export interface Player {
   lightningAddress?: string; // lud16
   handicap: number;
   paid: boolean;
-  isBetting?: boolean; // Opt-out status
+  paysEntry: boolean; // Whether player pays entry fee
+  paysAce: boolean; // Whether player pays ace pot
   scores: Record<number, number>; // hole number -> score
   totalScore: number;
   isCurrentUser: boolean;
@@ -19,7 +20,8 @@ export interface DisplayProfile {
   nip05?: string;
   totalRoundsPlayed?: number;
   paid?: boolean;
-  isBetting?: boolean;
+  paysEntry?: boolean;
+  paysAce?: boolean;
 }
 
 export interface RoundSettings {

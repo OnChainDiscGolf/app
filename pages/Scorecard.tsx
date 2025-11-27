@@ -16,8 +16,12 @@ export const Scorecard: React.FC = () => {
     const [showFinalReview, setShowFinalReview] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
 
-    const payingPlayers = players.filter(p => p.isBetting);
-    const potSize = activeRound ? payingPlayers.length * (activeRound.entryFeeSats + activeRound.acePotFeeSats) : 0;
+    // Calculate pots based on granular payment selections
+    const entryPayers = players.filter(p => p.paysEntry);
+    const acePayers = players.filter(p => p.paysAce);
+    const entryPot = activeRound ? entryPayers.length * activeRound.entryFeeSats : 0;
+    const acePot = activeRound ? acePayers.length * activeRound.acePotFeeSats : 0;
+    const totalPot = entryPot + acePot;
 
     if (!activeRound) return <div className="p-6 text-center text-white">No active round.</div>;
 
@@ -333,10 +337,11 @@ export const Scorecard: React.FC = () => {
                     </div>
                 </div>
 
-                {potSize > 0 && (
+
+                {totalPot > 0 && (
                     <div className="flex flex-col items-end">
                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Total Pot</div>
-                        <div className="text-xl font-bold text-brand-accent">{potSize.toLocaleString()} <span className="text-xs text-brand-accent/70">sats</span></div>
+                        <div className="text-xl font-bold text-brand-accent">{totalPot.toLocaleString()} <span className="text-xs text-brand-accent/70">sats</span></div>
                     </div>
                 )}
             </div>
@@ -486,8 +491,8 @@ export const Scorecard: React.FC = () => {
                     <button
                         onClick={handleNext}
                         className={`w-12 h-12 rounded-full border flex items-center justify-center active:scale-95 transition-all ${viewHole === activeRound.holeCount
-                                ? 'bg-brand-primary border-brand-primary text-black shadow-lg hover:bg-emerald-400'
-                                : 'bg-slate-800 border-slate-600 text-white hover:bg-slate-700'
+                            ? 'bg-brand-primary border-brand-primary text-black shadow-lg hover:bg-emerald-400'
+                            : 'bg-slate-800 border-slate-600 text-white hover:bg-slate-700'
                             }`}
                     >
                         {viewHole === activeRound.holeCount ? <Icons.CheckMark size={24} /> : <Icons.Next size={24} />}

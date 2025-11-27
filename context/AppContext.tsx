@@ -14,7 +14,7 @@ interface AppContextType extends AppState {
   createRound: (
     settings: Omit<RoundSettings, 'id' | 'isFinalized' | 'pubkey' | 'players' | 'eventId'>,
     selectedPlayers: DisplayProfile[],
-    bettingMap?: Record<string, boolean>
+    paymentSelections?: Record<string, { entry: boolean; ace: boolean }>
   ) => Promise<void>;
   updateUserProfile: (profile: UserProfile) => Promise<void>;
   updateScore: (hole: number, score: number, playerId?: string) => void;
@@ -656,7 +656,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createRound = async (
     settings: Omit<RoundSettings, 'id' | 'isFinalized' | 'pubkey' | 'players' | 'eventId'>,
     selectedPlayers: DisplayProfile[],
-    bettingMap: Record<string, boolean> = {}
+    paymentSelections: Record<string, { entry: boolean; ace: boolean }> = {}
   ) => {
     const roundId = Math.random().toString(36).substring(7);
     const newRound: RoundSettings = {
@@ -673,14 +673,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setActiveRound(newRound);
 
-    // Add self as player (Host presumed paid)
-    const hostIsBetting = bettingMap[currentUserPubkey] ?? true;
+    // Add self as player (Host)
+    const hostPayment = paymentSelections[currentUserPubkey] ?? { entry: true, ace: true };
+    const hostOwesPayment = (settings.entryFeeSats > 0 && hostPayment.entry) || (settings.acePotFeeSats > 0 && hostPayment.ace);
     const initialPlayers: Player[] = [{
       id: currentUserPubkey,
       name: userProfile.name,
       handicap: 0,
-      paid: !hostIsBetting, // If opting out, marked as paid (nothing owed)
-      isBetting: hostIsBetting,
+      paid: !hostOwesPayment, // Marked paid if nothing is owed
+      paysEntry: hostPayment.entry,
+      paysAce: hostPayment.ace,
       scores: {},
       totalScore: 0,
       isCurrentUser: true,
@@ -691,13 +693,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Add other invited players
     selectedPlayers.forEach(p => {
       addRecentPlayer(p);
-      const isBetting = bettingMap[p.pubkey] ?? true;
+      const payment = paymentSelections[p.pubkey] ?? { entry: true, ace: true };
+      const owesPayment = (settings.entryFeeSats > 0 && payment.entry) || (settings.acePotFeeSats > 0 && payment.ace);
       initialPlayers.push({
         id: p.pubkey,
         name: p.name,
         handicap: 0,
-        paid: !isBetting ? true : (!!p.paid), // If opting out, marked as paid. Else use passed status.
-        isBetting: isBetting,
+        paid: owesPayment ? (!!p.paid) : true, // If owes payment, use passed status; else marked paid
+        paysEntry: payment.entry,
+        paysAce: payment.ace,
         scores: {},
         totalScore: 0,
         isCurrentUser: false,
