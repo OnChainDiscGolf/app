@@ -121,6 +121,50 @@ export const Home: React.FC = () => {
     const [wiggleLogin, setWiggleLogin] = useState(false);
     const [showLoginHint, setShowLoginHint] = useState(false);
 
+    // Shield Icon Easter Egg
+    const [showShieldModal, setShowShieldModal] = useState(false);
+    const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+    const [showScoldingModal, setShowScoldingModal] = useState(false);
+    const manifestoRef = useRef<HTMLDivElement>(null);
+
+    const handleShieldClick = () => {
+        setShowShieldModal(true);
+        setHasScrolledToBottom(false);
+    };
+
+    const handleManifestoScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.currentTarget;
+        const threshold = 10; // pixels from bottom
+        const isAtBottom = target.scrollHeight - target.scrollTop - target.clientHeight < threshold;
+        if (isAtBottom) {
+            setHasScrolledToBottom(true);
+        }
+    };
+
+    const handleCloseShieldModal = () => {
+        if (!hasScrolledToBottom) {
+            setShowScoldingModal(true);
+        } else {
+            setShowShieldModal(false);
+        }
+    };
+
+    const handleFinishReading = () => {
+        setShowScoldingModal(false);
+        // Scroll to top so they can read
+        if (manifestoRef.current) {
+            manifestoRef.current.scrollTop = 0;
+        }
+    };
+
+    const handlePayToSkip = () => {
+        // Open Lightning Address payment
+        window.location.href = 'lightning:Garrett@minibits.net?amount=1000000'; // 1000 sats in millisats
+        setShowScoldingModal(false);
+        setShowShieldModal(false);
+    };
+
+
     // Custom Entry Fee Presets
     interface CustomPreset {
         amount: number;
@@ -1079,9 +1123,12 @@ export const Home: React.FC = () => {
                                     </>
                                 )}
                                 {/* Host Indicator Icon */}
-                                <div className="w-8 h-8 flex items-center justify-center bg-brand-primary/10 border-2 border-brand-primary/30 rounded-full">
+                                <button
+                                    onClick={handleShieldClick}
+                                    className="w-8 h-8 flex items-center justify-center bg-brand-primary/10 border-2 border-brand-primary/30 rounded-full hover:bg-brand-primary/20 hover:border-brand-primary/50 transition-all"
+                                >
                                     <Icons.Shield size={16} className="text-brand-primary" />
-                                </div>
+                                </button>
                             </div>
                         </div>
 
@@ -1284,6 +1331,124 @@ export const Home: React.FC = () => {
                         Confirm cardmates
                     </Button>
                 </div>
+
+                {/* FREEDOM MANIFESTO MODAL */}
+                {showShieldModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+                        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-brand-primary/50 p-6 rounded-2xl shadow-2xl shadow-brand-primary/20 max-w-lg w-full max-h-[80vh] flex flex-col">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center space-x-2">
+                                    <Icons.Shield size={24} className="text-brand-primary" />
+                                    <h2 className="text-xl font-bold text-white">The Freedom Stack</h2>
+                                </div>
+                                <button
+                                    onClick={handleCloseShieldModal}
+                                    className="text-slate-400 hover:text-white transition-colors"
+                                >
+                                    <Icons.Close size={24} />
+                                </button>
+                            </div>
+
+                            <div
+                                ref={manifestoRef}
+                                onScroll={handleManifestoScroll}
+                                className="flex-1 overflow-y-auto space-y-4 text-slate-300 text-sm leading-relaxed pr-2"
+                            >
+                                <p className="text-brand-accent font-bold text-base">
+                                    The tools you're using right now aren't just for keeping score.
+                                </p>
+
+                                <p>
+                                    <span className="text-brand-primary font-bold">Bitcoin</span> is an unstoppable force that will systematically collapse every government and banking institution that refuses to embrace it. This isn't hyperbole—it's mathematics. Every fiat currency in history has eventually gone to zero, and the dollar is no exception. The difference now? There's an exit. A lifeboat. And it's programmed to be absolutely scarce.
+                                </p>
+
+                                <p>
+                                    <span className="text-brand-secondary font-bold">Cashu</span> takes this further. It's an <span className="italic">extremely private</span> and <span className="font-bold">unstoppable</span> way of transacting ecash over Bitcoin. When the dying empire inevitably implements capital controls, confiscatory taxes, and CBDCs with expiration dates, they won't be able to touch Cashu. They can't tax what they can't see. They can't stop what they can't control.
+                                </p>
+
+                                <p>
+                                    As the American empire continues its terminal decline, the regime will desperately try to maintain control through surveillance and censorship. Digital IDs to track every purchase. Debanking for wrongthink. ISPs blocking "dangerous" websites. This is where <span className="text-brand-primary font-bold">Nostr</span> comes in.
+                                </p>
+
+                                <p>
+                                    Nostr is a decentralized protocol that circumvents all of it. No single point of failure. No CEO to threaten. No server to shut down. It's one of the most powerful tools we have to preserve free speech and resist the coming censorship of the internet. Your identity, your social graph, your communications—all sovereign, all unstoppable.
+                                </p>
+
+                                <p className="text-white font-bold">
+                                    Together, Bitcoin, Cashu, and Nostr form the Freedom Stack™—the tools that make tyranny obsolete.
+                                </p>
+
+                                <p>
+                                    The future isn't dystopian control. It's parallel systems. It's individuals with unconfiscatable wealth, uncensorable speech, and unstoppable commerce. The old system is dying, and these tools ensure something better rises in its place.
+                                </p>
+
+                                <p className="text-brand-accent italic border-l-4 border-brand-accent pl-4">
+                                    Or maybe—just maybe—the real collapse will come from sweaty, single men in their 30s who've completely checked out of the workforce to throw frisbees in the park all day. The Fed can handle hyperinflation. They can handle bank runs. But can they handle an entire generation of dudes who'd rather disc golf than participate in the economy? The system needs worker bees, and we're out here… counting birdies. 🥏
+                                </p>
+
+                                <div className="h-4"></div>
+                            </div>
+
+                            {hasScrolledToBottom && (
+                                <div className="mt-4 pt-4 border-t border-slate-700">
+                                    <p className="text-xs text-center text-slate-500">
+                                        ⚡ You've been enlightened ⚡
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* SCOLDING MODAL */}
+                {showScoldingModal && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
+                        <div className="bg-gradient-to-br from-red-950 via-slate-900 to-slate-950 border-2 border-red-500/50 p-6 rounded-2xl shadow-2xl shadow-red-500/20 max-w-md w-full animate-in zoom-in-95 duration-200">
+                            <div className="flex items-center space-x-3 mb-4">
+                                <Icons.Close size={32} className="text-red-500" />
+                                <h2 className="text-xl font-bold text-white">Hold Up...</h2>
+                            </div>
+
+                            <div className="space-y-4 text-slate-300 text-sm">
+                                <p className="font-bold text-red-400">
+                                    Did you seriously just try to close that without reading it?
+                                </p>
+
+                                <p>
+                                    Of course you did. You can't read anymore because you've been staring at your phone scrolling pointless content all day. Your attention span is cooked.
+                                </p>
+
+                                <p>
+                                    But here's the thing: <span className="text-white font-bold">that essay actually matters.</span> It's about your freedom. Your financial sovereignty. Your ability to resist tyranny.
+                                </p>
+
+                                <p className="text-brand-accent font-bold">
+                                    So here's your choice:
+                                </p>
+
+                                <div className="space-y-3 mt-6">
+                                    <button
+                                        onClick={handleFinishReading}
+                                        className="w-full bg-brand-primary/20 border-2 border-brand-primary text-white font-bold py-3 rounded-lg hover:bg-brand-primary/30 transition-all"
+                                    >
+                                        Fine, I'll Read It (Scroll to Bottom)
+                                    </button>
+
+                                    <button
+                                        onClick={handlePayToSkip}
+                                        className="w-full bg-slate-800 border-2 border-brand-accent text-brand-accent font-bold py-3 rounded-lg hover:bg-slate-700 transition-all"
+                                    >
+                                        Pay 1,000 Sats to Skip ⚡
+                                    </button>
+                                </div>
+
+                                <p className="text-xs text-center text-slate-500 mt-4 italic">
+                                    (Yes, we're actually making you choose between reading or paying. This is for your own good.)
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
