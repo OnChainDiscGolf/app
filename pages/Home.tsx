@@ -35,6 +35,8 @@ interface RoundCreationState {
     customHoles: number;
     hasEntryFee: boolean;
     entryFee: number;
+
+    hasAcePot: boolean;
     acePot: number;
     selectedCardmates: DisplayProfile[];
     excludedPlayers: string[];
@@ -68,6 +70,8 @@ export const Home: React.FC = () => {
     const [customHoles, setCustomHoles] = useState(21);
     const [hasEntryFee, setHasEntryFee] = useState(true);
     const [entryFee, setEntryFee] = useState(1000);
+
+    const [hasAcePot, setHasAcePot] = useState(true);
     const [acePot, setAcePot] = useState(500);
 
     // Player Selection State
@@ -181,6 +185,8 @@ export const Home: React.FC = () => {
                 customHoles,
                 hasEntryFee,
                 entryFee,
+
+                hasAcePot,
                 acePot,
                 selectedCardmates,
                 excludedPlayers: Array.from(excludedPlayers),
@@ -195,7 +201,7 @@ export const Home: React.FC = () => {
             // Clear if user returns to menu without creating
             clearRoundCreationState();
         }
-    }, [view, courseName, layout, customHoles, hasEntryFee, entryFee, acePot,
+    }, [view, courseName, layout, customHoles, hasEntryFee, entryFee, hasAcePot, acePot,
         selectedCardmates, excludedPlayers, paidStatus, bettingStatus, startDate, startTime, trackPenalties]);
 
     // Restore round creation state on mount
@@ -301,7 +307,7 @@ export const Home: React.FC = () => {
             name: `${courseName} Round`,
             courseName,
             entryFeeSats: hasEntryFee ? entryFee : 0,
-            acePotFeeSats: hasEntryFee ? acePot : 0,
+            acePotFeeSats: hasAcePot ? acePot : 0,
             date: `${startDate}T${startTime}:00Z`,
             holeCount: holes,
             startingHole: startHole,
@@ -668,29 +674,34 @@ export const Home: React.FC = () => {
                             const isPaid = paidStatus[p.pubkey] || false; // No longer assume host is paid
                             const isBetting = bettingStatus[p.pubkey] ?? true;
                             const isHost = (p as any).isHost;
-                            const totalAmount = entryFee + acePot;
+                            const totalAmount = (hasEntryFee ? entryFee : 0) + (hasAcePot ? acePot : 0);
 
                             return (
-                                <div key={p.pubkey} className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-3 min-w-0 flex-1">
-                                            <span className="font-bold text-lg text-slate-500 w-6 text-center">{idx + 1}</span>
-                                            <div className="w-10 h-10 rounded-full bg-slate-700 overflow-hidden shrink-0">
-                                                {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <Icons.Users className="p-2 text-slate-500" />}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="font-bold truncate text-white">{p.name} {isHost && '(You)'}</p>
-                                                <p className="text-xs text-slate-400 truncate">
-                                                    {p.nip05 ? (p.nip05.length > 20 ? p.nip05.substring(0, 15) + '...' : p.nip05) : 'Nostr User'}
-                                                </p>
-                                            </div>
+                                <div key={p.pubkey} className="bg-slate-800 rounded-xl p-3 border border-slate-700 flex items-center justify-between">
+                                    {/* Left: Index + Info */}
+                                    <div className="flex items-center space-x-3 min-w-0 flex-1">
+                                        <span className="font-bold text-sm text-slate-500 w-5 text-center">{idx + 1}</span>
+                                        <div className="w-10 h-10 rounded-full bg-slate-700 overflow-hidden shrink-0 border border-slate-600">
+                                            {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <Icons.Users className="p-2 text-slate-500" />}
                                         </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center space-x-2">
+                                                <p className="font-bold truncate text-white text-sm">{p.name}</p>
+                                                {isHost && <span className="text-[10px] font-bold bg-brand-primary/20 text-brand-primary px-1.5 py-0.5 rounded">HOST</span>}
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 truncate">
+                                                {p.nip05 ? (p.nip05.length > 20 ? p.nip05.substring(0, 15) + '...' : p.nip05) : 'Nostr User'}
+                                            </p>
+                                        </div>
+                                    </div>
 
+                                    {/* Right: Actions */}
+                                    <div className="flex items-center space-x-3 shrink-0">
                                         {/* Betting Toggle */}
-                                        {hasEntryFee && (
+                                        {(hasEntryFee || hasAcePot) && (
                                             <button
                                                 onClick={() => setBettingStatus(prev => ({ ...prev, [p.pubkey]: !isBetting }))}
-                                                className={`mr-3 px-2 py-1 rounded text-[10px] font-bold border transition-colors ${isBetting
+                                                className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${isBetting
                                                     ? 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20'
                                                     : 'bg-slate-700 text-slate-400 border-slate-600 hover:bg-slate-600'
                                                     }`}
@@ -699,26 +710,18 @@ export const Home: React.FC = () => {
                                             </button>
                                         )}
 
-                                        {/* Payment Status & CTA */}
-                                        {hasEntryFee && isBetting && (
-                                            <div className="flex items-center space-x-2 shrink-0">
-                                                {isPaid ? (
-                                                    <div className="flex items-center space-x-2 bg-green-500/10 px-3 py-2 rounded-lg border border-green-500/30">
-                                                        <Icons.CheckMark size={18} className="text-green-500" strokeWidth={3} />
-                                                        <span className="text-xs font-bold text-green-500">Paid</span>
-                                                    </div>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => openPaymentModal(p)}
-                                                        className="flex items-center space-x-2 bg-brand-accent/20 hover:bg-brand-accent/30 px-3 py-2 rounded-lg border border-brand-accent/50 hover:border-brand-accent transition-all"
-                                                    >
-                                                        <Icons.Zap size={16} className="text-brand-accent" />
-                                                        <span className="text-xs font-bold text-brand-accent whitespace-nowrap">
-                                                            {isHost ? 'Pay Entry Fee' : 'Collect Payment'}
-                                                        </span>
-                                                    </button>
-                                                )}
-                                            </div>
+                                        {/* Payment Status Icon */}
+                                        {(hasEntryFee || hasAcePot) && isBetting && (
+                                            <button
+                                                onClick={() => !isPaid && openPaymentModal(p)}
+                                                disabled={isPaid}
+                                                className={`p-2 rounded-full transition-all ${isPaid
+                                                    ? 'bg-green-500/10 text-green-500'
+                                                    : 'bg-brand-accent/10 text-brand-accent hover:bg-brand-accent/20 animate-pulse'
+                                                    }`}
+                                            >
+                                                {isPaid ? <Icons.CheckMark size={20} strokeWidth={3} /> : <Icons.Zap size={20} fill="currentColor" />}
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -1201,43 +1204,40 @@ export const Home: React.FC = () => {
                     <hr className="border-slate-800" />
 
                     <div className="space-y-3">
-                        {/* Section Header with Zap Icon */}
-                        <div className="flex items-center text-slate-400 space-x-2">
-                            <Icons.Zap size={14} className="text-brand-primary" />
-                            <span className="text-xs font-bold uppercase tracking-wider">Entry Fee & Stakes</span>
-                        </div>
+                        {/* Entry Fee Section */}
+                        <div className="space-y-2">
+                            <div className="flex items-center text-slate-400 space-x-2">
+                                <Icons.Zap size={14} className="text-brand-primary" />
+                                <span className="text-xs font-bold uppercase tracking-wider">Entry Fee</span>
+                            </div>
 
-                        {/* Entry Fee Toggle */}
-                        <div className="bg-slate-800 rounded-lg p-1 border border-slate-700 flex">
-                            <button
-                                onClick={() => setHasEntryFee(true)}
-                                className={`flex-1 py-1.5 rounded-md text-sm font-bold transition-all ${hasEntryFee ? 'bg-brand-primary text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                Entry Fee
-                            </button>
-                            <button
-                                onClick={() => setHasEntryFee(false)}
-                                className={`flex-1 py-1.5 rounded-md text-sm font-bold transition-all ${!hasEntryFee ? 'bg-brand-primary text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                No Entry Fee
-                            </button>
-                        </div>
+                            <div className="bg-slate-800 rounded-lg p-1 border border-slate-700 flex">
+                                <button
+                                    onClick={() => setHasEntryFee(true)}
+                                    className={`flex-1 py-1.5 rounded-md text-sm font-bold transition-all ${hasEntryFee ? 'bg-brand-primary text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Entry Fee
+                                </button>
+                                <button
+                                    onClick={() => setHasEntryFee(false)}
+                                    className={`flex-1 py-1.5 rounded-md text-sm font-bold transition-all ${!hasEntryFee ? 'bg-brand-primary text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    None
+                                </button>
+                            </div>
 
-                        {hasEntryFee && (
-                            <>
-                                <div className="space-y-2">
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Entry Fee (Sats)</label>
+                            {hasEntryFee && (
+                                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                                     <input
                                         type="number"
                                         step="1000"
                                         value={entryFee}
                                         onChange={(e) => setEntryFee(Number(e.target.value))}
-                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-brand-primary outline-none"
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-brand-primary outline-none font-bold"
                                     />
 
                                     {/* Preset Entry Fee Buttons */}
                                     <div className="flex flex-wrap gap-2">
-                                        {/* Default Presets */}
                                         {[1000, 5000, 10000].map(amount => (
                                             <button
                                                 key={amount}
@@ -1250,8 +1250,6 @@ export const Home: React.FC = () => {
                                                 {amount / 1000}k
                                             </button>
                                         ))}
-
-                                        {/* Custom Presets */}
                                         {customPresets.map(preset => (
                                             <div key={preset.id} className="relative group">
                                                 <button
@@ -1272,8 +1270,6 @@ export const Home: React.FC = () => {
                                                 </button>
                                             </div>
                                         ))}
-
-                                        {/* Add Custom Button */}
                                         {customPresets.length < 3 && !showCustomInput && (
                                             <button
                                                 onClick={() => setShowCustomInput(true)}
@@ -1283,8 +1279,6 @@ export const Home: React.FC = () => {
                                             </button>
                                         )}
                                     </div>
-
-                                    {/* Custom Input UI */}
                                     {showCustomInput && (
                                         <div className="flex items-center gap-2 bg-slate-800/50 p-2.5 rounded-lg border border-brand-primary/30 animate-in fade-in slide-in-from-top-2">
                                             <input
@@ -1306,42 +1300,66 @@ export const Home: React.FC = () => {
                                                     setShowCustomInput(false);
                                                     setCustomAmount('');
                                                 }}
-                                                className="px-3 py-1.5 bg-slate-700 text-white font-bold text-xs rounded hover:bg-slate-600 transition-colors"
+                                                className="p-1.5 text-slate-400 hover:text-white"
                                             >
-                                                Cancel
+                                                <Icons.Close size={16} />
                                             </button>
                                         </div>
                                     )}
                                 </div>
+                            )}
+                        </div>
 
-                                <div className="space-y-2">
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ace Pot (Sats)</label>
+                        <hr className="border-slate-800" />
+
+                        {/* Ace Pot Section */}
+                        <div className="space-y-2">
+                            <div className="flex items-center text-slate-400 space-x-2">
+                                <Icons.Trophy size={14} className="text-brand-secondary" />
+                                <span className="text-xs font-bold uppercase tracking-wider">Ace Pot</span>
+                            </div>
+
+                            <div className="bg-slate-800 rounded-lg p-1 border border-slate-700 flex">
+                                <button
+                                    onClick={() => setHasAcePot(true)}
+                                    className={`flex-1 py-1.5 rounded-md text-sm font-bold transition-all ${hasAcePot ? 'bg-brand-secondary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Ace Pot
+                                </button>
+                                <button
+                                    onClick={() => setHasAcePot(false)}
+                                    className={`flex-1 py-1.5 rounded-md text-sm font-bold transition-all ${!hasAcePot ? 'bg-brand-secondary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    None
+                                </button>
+                            </div>
+
+                            {hasAcePot && (
+                                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                                     <input
                                         type="number"
-                                        step="500"
+                                        step="100"
                                         value={acePot}
                                         onChange={(e) => setAcePot(Number(e.target.value))}
-                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-brand-primary outline-none"
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-brand-secondary outline-none font-bold"
                                     />
-
-                                    {/* Ace Pot Quick Select */}
                                     <div className="flex flex-wrap gap-2">
-                                        {[1000, 2000, 5000, 10000].map(amount => (
+                                        {[100, 500, 1000].map(amount => (
                                             <button
                                                 key={amount}
                                                 onClick={() => setAcePot(amount)}
                                                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${acePot === amount
-                                                    ? 'bg-brand-primary text-black shadow-lg shadow-brand-primary/20'
-                                                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-brand-primary/30'
+                                                    ? 'bg-brand-secondary text-white shadow-lg shadow-brand-secondary/20'
+                                                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-brand-secondary/30'
                                                     }`}
                                             >
-                                                {amount / 1000}k
+                                                {amount}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
-                            </>
-                        )}
+                            )}
+                        </div>
                     </div>
 
                 </div>
@@ -1357,74 +1375,76 @@ export const Home: React.FC = () => {
                 </div>
 
                 {/* Setup Help Modal */}
-                {showSetupHelp && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                        <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full max-h-[80vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 relative">
-                            <button
-                                onClick={() => setShowSetupHelp(false)}
-                                className="absolute top-4 right-4 text-slate-400 hover:text-white z-10"
-                            >
-                                <Icons.Close size={24} />
-                            </button>
+                {
+                    showSetupHelp && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                            <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full max-h-[80vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 relative">
+                                <button
+                                    onClick={() => setShowSetupHelp(false)}
+                                    className="absolute top-4 right-4 text-slate-400 hover:text-white z-10"
+                                >
+                                    <Icons.Close size={24} />
+                                </button>
 
-                            <div className="flex items-center space-x-3 mb-6">
-                                <Icons.Help size={28} className="text-brand-primary" />
-                                <h2 className="text-xl font-bold text-white">Round Setup Help</h2>
-                            </div>
+                                <div className="flex items-center space-x-3 mb-6">
+                                    <Icons.Help size={28} className="text-brand-primary" />
+                                    <h2 className="text-xl font-bold text-white">Round Setup Help</h2>
+                                </div>
 
-                            <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-                                <div className="space-y-3">
-                                    <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <Icons.Zap size={16} className="text-brand-primary" />
-                                            <h3 className="font-bold text-white text-sm">Entry Fee</h3>
+                                <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+                                    <div className="space-y-3">
+                                        <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                                            <div className="flex items-center space-x-2 mb-2">
+                                                <Icons.Zap size={16} className="text-brand-primary" />
+                                                <h3 className="font-bold text-white text-sm">Entry Fee</h3>
+                                            </div>
+                                            <p className="text-xs text-slate-400 leading-relaxed">
+                                                The entry fee is the amount each player pays to join the round. This creates the prize pool that gets distributed to winners at the end.
+                                            </p>
                                         </div>
-                                        <p className="text-xs text-slate-400 leading-relaxed">
-                                            The entry fee is the amount each player pays to join the round. This creates the prize pool that gets distributed to winners at the end.
-                                        </p>
-                                    </div>
 
-                                    <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <Icons.Trophy size={16} className="text-brand-secondary" />
-                                            <h3 className="font-bold text-white text-sm">Ace Pot</h3>
+                                        <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                                            <div className="flex items-center space-x-2 mb-2">
+                                                <Icons.Trophy size={16} className="text-brand-secondary" />
+                                                <h3 className="font-bold text-white text-sm">Ace Pot</h3>
+                                            </div>
+                                            <p className="text-xs text-slate-400 leading-relaxed">
+                                                Optional bonus pool for hole-in-ones. Each player contributes this amount, and whoever gets an ace wins the entire pot!
+                                            </p>
                                         </div>
-                                        <p className="text-xs text-slate-400 leading-relaxed">
-                                            Optional bonus pool for hole-in-ones. Each player contributes this amount, and whoever gets an ace wins the entire pot!
-                                        </p>
-                                    </div>
 
-                                    <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <Icons.Settings size={16} className="text-brand-primary" />
-                                            <h3 className="font-bold text-white text-sm">Custom Presets</h3>
+                                        <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                                            <div className="flex items-center space-x-2 mb-2">
+                                                <Icons.Settings size={16} className="text-brand-primary" />
+                                                <h3 className="font-bold text-white text-sm">Custom Presets</h3>
+                                            </div>
+                                            <p className="text-xs text-slate-400 leading-relaxed">
+                                                Save your frequently used entry fees for quick access. You can create up to 3 custom presets. Hover over a custom preset to delete it.
+                                            </p>
                                         </div>
-                                        <p className="text-xs text-slate-400 leading-relaxed">
-                                            Save your frequently used entry fees for quick access. You can create up to 3 custom presets. Hover over a custom preset to delete it.
-                                        </p>
-                                    </div>
 
-                                    <div className="bg-brand-primary/10 rounded-lg p-3 border border-brand-primary/30">
-                                        <p className="text-xs text-brand-primary leading-relaxed">
-                                            <strong>💡 Tip:</strong> All payments are handled automatically using Bitcoin Lightning and eCash for instant, low-fee transactions.
-                                        </p>
+                                        <div className="bg-brand-primary/10 rounded-lg p-3 border border-brand-primary/30">
+                                            <p className="text-xs text-brand-primary leading-relaxed">
+                                                <strong>💡 Tip:</strong> All payments are handled automatically using Bitcoin Lightning and eCash for instant, low-fee transactions.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="pt-4">
-                                <Button
-                                    fullWidth
-                                    variant="secondary"
-                                    onClick={() => setShowSetupHelp(false)}
-                                >
-                                    Got it!
-                                </Button>
+                                <div className="pt-4">
+                                    <Button
+                                        fullWidth
+                                        variant="secondary"
+                                        onClick={() => setShowSetupHelp(false)}
+                                    >
+                                        Got it!
+                                    </Button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
-            </div>
+                    )
+                }
+            </div >
         );
     }
 
