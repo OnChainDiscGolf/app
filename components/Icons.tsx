@@ -30,7 +30,9 @@ import {
   Share2,
   RefreshCw,
   MapPin,
-  DollarSign
+  DollarSign,
+  UserPlus,
+  Search
 } from 'lucide-react';
 
 // Custom Disc Golf Basket Icon matching Lucide style
@@ -140,5 +142,7 @@ export const Icons = {
   Refresh: RefreshCw,
   Android,
   Location: MapPin,
-  DollarSign
+  DollarSign,
+  UserPlus,
+  Search
 };

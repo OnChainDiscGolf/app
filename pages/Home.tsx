@@ -373,6 +373,36 @@ export const Home: React.FC = () => {
         return () => window.removeEventListener('popToRoot', handlePopToRoot as EventListener);
     }, []);
 
+    // Monitor Invoice Payments - Poll for payment status
+    useEffect(() => {
+        if (view !== 'customize' || playerInvoices.size === 0) return;
+
+        const monitorPayments = async () => {
+            for (const [pubkey, invoiceData] of playerInvoices.entries()) {
+                // Skip if already marked as paid
+                if (paidStatus[pubkey]) continue;
+
+                try {
+                    const isPaid = await checkDepositStatus(invoiceData.paymentHash);
+                    if (isPaid) {
+                        console.log(`Payment detected for ${pubkey.slice(0, 8)}...`);
+                        setPaidStatus(prev => ({ ...prev, [pubkey]: true }));
+                    }
+                } catch (error) {
+                    console.error(`Failed to check payment status for ${pubkey.slice(0, 8)}:`, error);
+                }
+            }
+        };
+
+        // Poll immediately
+        monitorPayments();
+
+        // Then poll every 5 seconds
+        const intervalId = setInterval(monitorPayments, 5000);
+
+        return () => clearInterval(intervalId);
+    }, [view, playerInvoices, paidStatus, checkDepositStatus]);
+
     // Scanner Logic for Adding Players
     const { isCameraLoading, logs, restart } = useQrScanner({
         videoRef,
@@ -618,6 +648,112 @@ export const Home: React.FC = () => {
                 setPaymentError("Payment failed: " + (e instanceof Error ? e.message : "Unknown error"));
                 setIsPayingWallet(false);
             }
+        }
+    };
+
+    // INVOICE DISTRIBUTION: Generate invoices and send via Gift Wrap
+    const handleConfirmCardmates = async () => {
+        // Check if host has NWC configured
+        const walletMode = localStorage.getItem('wallet_mode');
+        const nwcString = localStorage.getItem('nwc_connection');
+
+        if (walletMode !== 'nwc' || !nwcString) {
+            // Fallback to manual flow
+            console.log('NWC not configured, using manual payment flow');
+            setView('customize');
+            return;
+        }
+
+        // Only generate invoices if there are entry fees configured
+        if (!hasEntryFee || (entryFee === 0 && acePot === 0)) {
+            // No payment required, proceed to customize
+            setView('customize');
+            return;
+        }
+
+        setIsGeneratingInvoices(true);
+        setInvoiceError(null);
+
+        try {
+            // Get user's secret key for signing gift wraps
+            const userSkHex = localStorage.getItem('nostr_sk');
+            if (!userSkHex) {
+                throw new Error('Cannot send invoices: No secret key found');
+            }
+            const userSk = hexToBytes(userSkHex);
+
+            const invoiceMap = new Map<string, PlayerInvoice>();
+            const relays = getRelays();
+
+            // Generate invoice for each cardmate (not the host)
+            for (const player of selectedCardmates) {
+                const payment = paymentSelections[player.pubkey] || { entry: true, ace: true };
+
+                // Calculate amount owed
+                let amount = 0;
+                if (payment.entry && entryFee > 0) amount += entryFee;
+                if (payment.ace && acePot > 0) amount += acePot;
+
+                if (amount === 0) continue; // Skip if player owes nothing
+
+                // Generate invoice via NWC
+                const { invoice, paymentHash } = await depositFunds(amount);
+
+                // Create gift wrap message content
+                const messageContent = JSON.stringify({
+                    type: 'payment_request',
+                    round: {
+                        course: courseName || 'Disc Golf Round',
+                        host: userProfile.name,
+                        date: `${startDate} ${startTime}`
+                    },
+                    invoice,
+                    amount,
+                    breakdown: {
+                        entryFee: payment.entry ? entryFee : 0,
+                        acePot: payment.ace ? acePot : 0
+                    },
+                    message: `${userProfile.name} invited you to play at ${courseName || 'disc golf'}. Please pay to confirm your spot!`
+                });
+
+                // Send via Gift Wrap
+                await sendGiftWrap(
+                    messageContent,
+                    userSk,
+                    player.pubkey,
+                    relays,
+                    14 // kind 14 = chat message
+                );
+
+                // Store invoice data
+                invoiceMap.set(player.pubkey, {
+                    invoice,
+                    paymentHash,
+                    amount,
+                    timestamp: Date.now()
+                });
+
+                console.log(`Invoice sent to ${player.name} (${amount} sats)`);
+            }
+
+            // Update state with invoices
+            setPlayerInvoices(invoiceMap);
+
+            // Navigate to payment screen
+            setView('customize');
+
+            console.log(`Successfully sent ${invoiceMap.size} invoices via Nostr DMs`);
+
+        } catch (error) {
+            console.error('Invoice generation failed:', error);
+            setInvoiceError(error instanceof Error ? error.message : 'Failed to generate invoices');
+
+            // Fallback: still navigate but show error
+            setTimeout(() => {
+                setView('customize');
+            }, 2000);
+        } finally {
+            setIsGeneratingInvoices(false);
         }
     };
 
@@ -1155,7 +1291,7 @@ export const Home: React.FC = () => {
                                                     ...prev,
                                                     [currentUserPubkey]: { ...(prev[currentUserPubkey] || { entry: true, ace: true }), entry: !(prev[currentUserPubkey]?.entry ?? true) }
                                                 }))}
-                                                className={`px-2 py-1 rounded text-[9px] font-bold border transition-all ${(paymentSelections[currentUserPubkey]?.entry ?? true)
+                                                className={`px-3 py-2 rounded text-xs font-bold border transition-all ${(paymentSelections[currentUserPubkey]?.entry ?? true)
                                                     ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
                                                     : 'bg-slate-700/50 text-slate-500 border-slate-600'
                                                     }`}
@@ -1171,7 +1307,7 @@ export const Home: React.FC = () => {
                                                     ...prev,
                                                     [currentUserPubkey]: { ...(prev[currentUserPubkey] || { entry: true, ace: true }), ace: !(prev[currentUserPubkey]?.ace ?? true) }
                                                 }))}
-                                                className={`px-2 py-1 rounded text-[9px] font-bold border transition-all ${(paymentSelections[currentUserPubkey]?.ace ?? true)
+                                                className={`px-3 py-2 rounded text-xs font-bold border transition-all ${(paymentSelections[currentUserPubkey]?.ace ?? true)
                                                     ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
                                                     : 'bg-slate-700/50 text-slate-500 border-slate-600'
                                                     }`}
@@ -1215,7 +1351,7 @@ export const Home: React.FC = () => {
                                                             ...prev,
                                                             [p.pubkey]: { ...payment, entry: !payment.entry }
                                                         }))}
-                                                        className={`px-2 py-1 rounded text-[9px] font-bold border transition-all ${payment.entry
+                                                        className={`px-3 py-2 rounded text-xs font-bold border transition-all ${payment.entry
                                                             ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
                                                             : 'bg-slate-700/50 text-slate-500 border-slate-600'
                                                             }`}
@@ -1231,7 +1367,7 @@ export const Home: React.FC = () => {
                                                             ...prev,
                                                             [p.pubkey]: { ...payment, ace: !payment.ace }
                                                         }))}
-                                                        className={`px-2 py-1 rounded text-[9px] font-bold border transition-all ${payment.ace
+                                                        className={`px-3 py-2 rounded text-xs font-bold border transition-all ${payment.ace
                                                             ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
                                                             : 'bg-slate-700/50 text-slate-500 border-slate-600'
                                                             }`}
@@ -1282,7 +1418,7 @@ export const Home: React.FC = () => {
                                 : 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30 hover:bg-brand-primary/20'
                                 }`}
                         >
-                            {isSearching ? <Icons.Zap className="animate-spin" size={20} /> : <Icons.Next size={20} />}
+                            {isSearching ? <Icons.Zap className="animate-spin" size={20} /> : <Icons.Search size={20} />}
                         </button>
 
                         <div className="w-px h-8 bg-slate-700 mx-1"></div>
@@ -1297,17 +1433,14 @@ export const Home: React.FC = () => {
 
                         <button
                             onClick={handleInstantInvite}
-                            className="p-3 bg-slate-800 border border-slate-700 rounded-lg text-brand-primary hover:text-white hover:border-brand-primary/50 transition-colors relative group"
+                            className="p-3 bg-blue-500/10 border-2 border-blue-500/40 rounded-lg text-blue-400 hover:text-blue-300 hover:border-blue-400/60 hover:bg-blue-500/20 transition-all relative group"
                             disabled={isGeneratingInvite}
                             title="Instant Invite (New Player)"
                         >
                             {isGeneratingInvite ? (
                                 <Icons.Zap className="animate-spin" size={24} />
                             ) : (
-                                <>
-                                    <Icons.QrCode size={24} />
-                                    <Icons.PlusIcon size={16} className="absolute -top-2 -right-2 text-orange-500 stroke-[4]" />
-                                </>
+                                <Icons.UserPlus size={24} strokeWidth={2.5} />
                             )}
                         </button>
                     </div>
@@ -1405,8 +1538,25 @@ export const Home: React.FC = () => {
 
                 {/* Fixed Button - outside scrollable area */}
                 <div className="fixed bottom-20 left-0 right-0 bg-brand-dark border-t border-slate-800 p-4 max-w-md mx-auto z-20">
-                    <Button fullWidth onClick={() => setView('customize')} className="bg-brand-accent text-black font-bold py-4 rounded-full shadow-lg shadow-brand-accent/20">
-                        Confirm cardmates
+                    {invoiceError && (
+                        <div className="mb-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+                            <p className="text-sm text-red-400">{invoiceError}</p>
+                        </div>
+                    )}
+                    <Button
+                        fullWidth
+                        onClick={handleConfirmCardmates}
+                        disabled={isGeneratingInvoices}
+                        className="bg-brand-accent text-black font-bold py-4 rounded-full shadow-lg shadow-brand-accent/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isGeneratingInvoices ? (
+                            <span className="flex items-center justify-center gap-2">
+                                <Icons.Zap className="animate-spin" size={20} />
+                                Sending invoices...
+                            </span>
+                        ) : (
+                            'Confirm cardmates'
+                        )}
                     </Button>
                 </div>
 
