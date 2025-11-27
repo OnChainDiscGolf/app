@@ -69,48 +69,10 @@ export const Wallet: React.FC = () => {
     const [sendInput, setSendInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // Check for payments when Wallet tab is opened
-    useEffect(() => {
-        checkForPayments();
-    }, []);
+    // Removed: Initial checkForPayments() call - now handled by subscription in AppContext
 
-    // Poll for payments when in Receive view
-    useEffect(() => {
-        if (view !== 'receive') return;
-
-        let timeoutId: NodeJS.Timeout;
-        const startTime = Date.now();
-        const THIRTY_SECONDS = 30 * 1000;
-        const TWO_MINUTES = 2 * 60 * 1000;
-
-        const poll = async () => {
-            const count = await checkForPayments();
-
-            if (count > 0) {
-                setSuccessMode('received');
-                return;
-            }
-
-            const elapsed = Date.now() - startTime;
-
-            // Tiered polling: 2s → 3s → 5s
-            let delay;
-            if (elapsed < THIRTY_SECONDS) {
-                delay = 2000; // First 30s: Very aggressive (2s)
-            } else if (elapsed < TWO_MINUTES) {
-                delay = 3000; // 30s-2min: Moderate (3s)
-            } else {
-                delay = 5000; // After 2min: Lighter (5s)
-            }
-
-            timeoutId = setTimeout(poll, delay);
-        };
-
-        // Start polling immediately
-        poll();
-
-        return () => clearTimeout(timeoutId);
-    }, [view]);
+    // Removed: Aggressive tiered polling (2s → 3s → 5s)
+    // Payment detection now handled by background subscription in AppContext (30s interval)
 
     // Pull-to-refresh state
     const [pullDistance, setPullDistance] = useState(0);
@@ -276,6 +238,27 @@ export const Wallet: React.FC = () => {
         window.addEventListener('popToRoot', handlePopToRoot as EventListener);
         return () => window.removeEventListener('popToRoot', handlePopToRoot as EventListener);
     }, []);
+
+    // Listen for payment received events from background subscription
+    useEffect(() => {
+        const handlePaymentReceived = (e: CustomEvent) => {
+            console.log(`📥 [Wallet] Received 'npubcash-payment-received' event:`, e.detail);
+            console.log(`📍 [Wallet] Current view: ${view}`);
+            if (view === 'receive') {
+                console.log(`🎉 [Wallet] Triggering success overlay!`);
+                setSuccessMode('received');
+            } else {
+                console.log(`ℹ️  [Wallet] Not on receive view, skipping success overlay`);
+            }
+        };
+
+        console.log(`👂 [Wallet] Setting up payment event listener (view: ${view})`);
+        window.addEventListener('npubcash-payment-received', handlePaymentReceived as EventListener);
+        return () => {
+            console.log(`🔇 [Wallet] Removing payment event listener`);
+            window.removeEventListener('npubcash-payment-received', handlePaymentReceived as EventListener);
+        };
+    }, [view]);
 
 
     // Camera & Scanning Logic

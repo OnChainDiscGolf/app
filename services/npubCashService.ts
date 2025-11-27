@@ -65,3 +65,62 @@ export const checkPendingPayments = async (): Promise<NpubCashQuote[]> => {
         return [];
     }
 };
+
+/**
+ * Subscribe to npub.cash quote updates with a lightweight background polling mechanism.
+ * This drastically reduces API calls compared to aggressive polling (30s vs 2-5s intervals).
+ * 
+ * @param onQuoteUpdate Callback fired when new PAID quotes are detected
+ * @returns Subscription object with .close() method for cleanup
+ */
+export const subscribeToQuoteUpdates = (
+    onQuoteUpdate: (quotes: NpubCashQuote[]) => void
+): { close: () => void } => {
+    let intervalId: NodeJS.Timeout | null = null;
+    let isActive = true;
+    let isFirstPoll = true;
+
+    const poll = async () => {
+        if (!isActive) return;
+
+        try {
+            const paidQuotes = await checkPendingPayments();
+
+            // On first poll, process ALL existing PAID quotes (not just new ones)
+            // This ensures payments received while app was closed get processed
+            // The callback will handle deduplication via localStorage
+            if (isFirstPoll) {
+                isFirstPoll = false;
+                if (paidQuotes.length > 0) {
+                    console.log(`[npub.cash subscription] Initial poll found ${paidQuotes.length} PAID quotes, processing all...`);
+                    onQuoteUpdate(paidQuotes);
+                }
+            } else {
+                // On subsequent polls, only process if we found any PAID quotes
+                // The callback handles deduplication, so we don't filter here
+                if (paidQuotes.length > 0) {
+                    console.log(`[npub.cash subscription] Found ${paidQuotes.length} PAID quotes`);
+                    onQuoteUpdate(paidQuotes);
+                }
+            }
+        } catch (e) {
+            console.error("[npub.cash subscription] Poll failed:", e);
+        }
+    };
+
+    // Start polling every 30 seconds (balanced for responsiveness vs API load)
+    console.log("[npub.cash subscription] Starting subscription with 30s interval");
+    poll(); // Initial check
+    intervalId = setInterval(poll, 30 * 1000);
+
+    return {
+        close: () => {
+            console.log("[npub.cash subscription] Closing subscription");
+            isActive = false;
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        }
+    };
+};
