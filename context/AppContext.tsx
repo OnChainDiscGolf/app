@@ -72,7 +72,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletBalance, setWalletBalance] = useState<number>(() => {
+    const saved = localStorage.getItem('cdg_proofs');
+    if (saved) {
+      try {
+        const proofs = JSON.parse(saved);
+        return WalletService.calculateBalance(proofs);
+      } catch (e) {
+        console.warn("Failed to calculate initial balance from localStorage", e);
+        return 0;
+      }
+    }
+    return 0;
+  });
 
   const [transactions, setTransactions] = useState<WalletTransaction[]>(() => {
     const saved = localStorage.getItem('cdg_txs');
@@ -164,6 +176,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => localStorage.setItem('cdg_mints', JSON.stringify(mints)), [mints]);
   useEffect(() => localStorage.setItem('cdg_recent_players', JSON.stringify(recentPlayers)), [recentPlayers]);
 
+  // Auto-sync wallet to Nostr when proofs/mints/transactions change (Debounced)
+  useEffect(() => {
+    if (isAuthenticated && !isGuest && proofs.length > 0) {
+      const timer = setTimeout(() => {
+        console.log("🔄 [Backup] Auto-syncing wallet to Nostr...");
+        syncWallet(proofs, mints, transactions).catch(e => console.error("Auto-sync failed:", e));
+      }, 2000); // Debounce 2s to prevent spam
+      return () => clearTimeout(timer);
+    }
+  }, [proofs, mints, transactions, isAuthenticated, isGuest, syncWallet]);
+
   // Sync Recent Players to Nostr when changed (Debounced)
   useEffect(() => {
     if (isAuthenticated && !isGuest && !isProfileLoading && recentPlayers.length > 0) {
@@ -200,7 +223,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Auto-refresh balance when wallet mode changes
   useEffect(() => {
-    setWalletBalance(0); // Clear balance to prevent stale data during switch
+    // Only clear balance if switching TO NWC (not on initial mount for Cashu)
+    if (walletMode === 'nwc') {
+      setWalletBalance(0); // Clear balance before fetching NWC balance
+    }
     refreshWalletBalance();
   }, [walletMode, nwcString]);
 

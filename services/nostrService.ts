@@ -10,8 +10,6 @@ const DEFAULT_RELAYS = [
     'wss://relay.snort.social',
     'wss://relay.nostr.net',
     'wss://relay.primal.net',
-    'wss://relay.mutinywallet.com',  // Bitcoin/Lightning optimized
-    'wss://relay.current.fyi',        // Payment infrastructure focused
     'wss://relay.npub.bar'            // Quality relay for payment services
 ];
 
@@ -795,10 +793,14 @@ export const publishWalletBackup = async (proofs: Proof[], mints: Mint[], transa
     const session = getSession();
     if (!session) throw new Error("Not authenticated");
 
+    console.log(`📦 [Backup] Publishing wallet backup for pubkey: ${session.pk.substring(0, 8)}...`);
+    console.log(`📦 [Backup] Backup contains: ${proofs.length} proofs, ${mints.length} mints, ${transactions.length} transactions`);
+
     const rawData = JSON.stringify({ proofs, mints, transactions, timestamp: Date.now() });
 
     // Encrypt content using NIP-44 (self-encryption)
     const encryptedContent = await encryptInternal(session.pk, rawData);
+    console.log(`📦 [Backup] Content encrypted with NIP-44`);
 
     const event = await signEventWrapper({
         kind: NOSTR_KIND_WALLET_BACKUP,
@@ -810,12 +812,23 @@ export const publishWalletBackup = async (proofs: Proof[], mints: Mint[], transa
         content: encryptedContent,
     });
 
-    await promiseAny(pool.publish(getRelays(), event));
-    console.log("Wallet backup published.");
-    return event;
+    console.log(`📦 [Backup] Event signed: ${event.id}`);
+    console.log(`📦 [Backup] Publishing to ${getRelays().length} relays...`);
+
+    try {
+        await promiseAny(pool.publish(getRelays(), event));
+        console.log("✅ [Backup] Wallet backup published successfully!");
+        return event;
+    } catch (e) {
+        console.error("❌ [Backup] Failed to publish wallet backup:", e);
+        throw e;
+    }
 };
 
 export const fetchWalletBackup = async (pubkey: string): Promise<{ proofs: Proof[], mints: Mint[], transactions: WalletTransaction[] } | null> => {
+    console.log(`🔍 [Backup] Fetching wallet backup for pubkey: ${pubkey.substring(0, 8)}...`);
+    console.log(`🔍 [Backup] Querying ${getRelays().length} relays for kind ${NOSTR_KIND_WALLET_BACKUP} events...`);
+
     try {
         const events = await listEvents(getRelays(), [{
             kinds: [NOSTR_KIND_WALLET_BACKUP],
@@ -823,14 +836,24 @@ export const fetchWalletBackup = async (pubkey: string): Promise<{ proofs: Proof
             '#d': ['cashu_wallet_backup']
         }]);
 
-        if (events.length === 0) return null;
+        console.log(`🔍 [Backup] Found ${events.length} backup events`);
+
+        if (events.length === 0) {
+            console.warn("⚠️ [Backup] No wallet backup found on relays");
+            return null;
+        }
 
         // Get the latest one
         const latestBackup = events.sort((a, b) => b.created_at - a.created_at)[0];
+        console.log(`🔍 [Backup] Using latest backup event: ${latestBackup.id} (created ${new Date(latestBackup.created_at * 1000).toISOString()})`);
 
         // Decrypt
+        console.log(`🔓 [Backup] Decrypting backup content with NIP-44...`);
         const decryptedContent = await decryptInternal(latestBackup.pubkey, latestBackup.content);
         const data = JSON.parse(decryptedContent);
+
+        console.log(`✅ [Backup] Backup decrypted successfully!`);
+        console.log(`✅ [Backup] Restored: ${data.proofs?.length || 0} proofs, ${data.mints?.length || 0} mints, ${data.transactions?.length || 0} transactions`);
 
         return {
             proofs: data.proofs || [],
@@ -838,7 +861,7 @@ export const fetchWalletBackup = async (pubkey: string): Promise<{ proofs: Proof
             transactions: data.transactions || []
         };
     } catch (e) {
-        console.error("Failed to fetch or decrypt wallet backup", e);
+        console.error("❌ [Backup] Failed to fetch or decrypt wallet backup:", e);
         return null;
     }
 };

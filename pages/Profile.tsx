@@ -317,13 +317,19 @@ export const Profile: React.FC = () => {
 
                 <div className="flex bg-slate-800 p-1 rounded-xl mb-6">
                     <button
-                        onClick={() => setAuthView('create')}
+                        onClick={() => {
+                            setAuthView('create');
+                            setAuthError(''); // Clear error when switching
+                        }}
                         className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors ${authView === 'create' ? 'bg-brand-primary text-black' : 'text-slate-400 hover:text-white'}`}
                     >
                         Create Profile
                     </button>
                     <button
-                        onClick={() => setAuthView('login')}
+                        onClick={() => {
+                            setAuthView('login');
+                            setAuthError(''); // Clear error when switching
+                        }}
                         className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors ${authView === 'login' ? 'bg-brand-primary text-black' : 'text-slate-400 hover:text-white'}`}
                     >
                         Login
@@ -365,6 +371,13 @@ export const Profile: React.FC = () => {
                                 <Button fullWidth onClick={handleLogin} disabled={!nsecInput || isLoading}>
                                     {isLoading ? 'Verifying...' : 'Login with Key'}
                                 </Button>
+
+                                {/* Error message right after login button */}
+                                {authError && (
+                                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-center text-sm animate-in fade-in slide-in-from-top-2">
+                                        {authError}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="relative flex items-center py-2">
@@ -425,12 +438,6 @@ export const Profile: React.FC = () => {
                                     Use a NIP-46 provider like nsec.app or other remote signers.
                                 </p>
                             </div>
-                        </div>
-                    )}
-
-                    {authError && (
-                        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-center text-sm">
-                            {authError}
                         </div>
                     )}
                 </div>
@@ -545,8 +552,8 @@ export const Profile: React.FC = () => {
                                             <button
                                                 onClick={handleCopyLud16}
                                                 className={`p-3 rounded-lg transition-colors shrink-0 ${copiedLud16
-                                                        ? 'bg-green-600 hover:bg-green-700 text-white'
-                                                        : 'bg-slate-700 hover:bg-slate-600 text-white'
+                                                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                                                    : 'bg-slate-700 hover:bg-slate-600 text-white'
                                                     }`}
                                             >
                                                 {copiedLud16 ? <Icons.CheckMark size={16} /> : <Icons.Copy size={16} />}
