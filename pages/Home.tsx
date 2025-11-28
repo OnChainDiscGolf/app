@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useApp, getTopHeavyDistribution } from '../context/AppContext';
+import { useApp, getTopHeavyDistribution, getLinearDistribution } from '../context/AppContext';
 import { Button } from '../components/Button';
 import { Icons } from '../components/Icons';
 import { InfoModal } from '../components/InfoModal';
@@ -1033,7 +1033,7 @@ export const Home: React.FC = () => {
 
                 {/* Dynamic Pot Totals */}
                 {hasEntryFee && (entryFee > 0 || acePot > 0) && (
-                    <div className="px-4 pb-4">
+                    <div className="px-4 pb-1">
                         <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 border border-slate-700">
                             <div className="flex items-center justify-between mb-3">
                                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center">
@@ -1062,89 +1062,12 @@ export const Home: React.FC = () => {
                     </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
-                    <div className="space-y-3">
-                        {allPlayers.map((p, idx) => {
-                            const isPaid = paidStatus[p.pubkey] || false;
-                            const payment = paymentSelections[p.pubkey] || { entry: true, ace: true };
-                            const isHost = (p as any).isHost;
-                            const totalAmount = entryFee + acePot;
-
-                            // Determine what the player owes
-                            const owesEntry = hasEntryFee && entryFee > 0 && payment.entry;
-                            const owesAce = hasEntryFee && acePot > 0 && payment.ace;
-                            const owesAnything = owesEntry || owesAce;
-
-                            return (
-                                <div key={p.pubkey} className="bg-slate-800 rounded-xl p-3 border border-slate-700">
-                                    <div className="flex items-start justify-between gap-3">
-                                        {/* Player Info */}
-                                        <div className="flex items-center space-x-2 min-w-0 flex-1">
-                                            <span className="font-bold text-sm text-slate-500 w-5">{idx + 1}</span>
-                                            <div className="w-9 h-9 rounded-full bg-slate-700 overflow-hidden shrink-0">
-                                                {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <Icons.Users className="p-2 text-slate-500" />}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="font-bold text-sm truncate text-white leading-tight">{p.name} {isHost && '(You)'}</p>
-                                                <p className="text-[10px] text-slate-400 truncate leading-tight">
-                                                    {p.nip05 ? (p.nip05.length > 18 ? p.nip05.substring(0, 15) + '...' : p.nip05) : 'Nostr User'}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        {/* Handicap Controls - shown only when enabled */}
-                                        {handicapEnabled && (
-                                            <div className="flex items-center space-x-1 mr-1 shrink-0">
-                                                <button
-                                                    onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.max(-3, (prev[p.pubkey] || 0) - 1) }))}
-                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
-                                                >
-                                                    -
-                                                </button>
-                                                <div className="w-8 h-6 flex items-center justify-center bg-slate-900 border border-slate-600 rounded text-xs font-bold text-white">
-                                                    {playerHandicaps[p.pubkey] || 0}
-                                                </div>
-                                                <button
-                                                    onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.min(3, (prev[p.pubkey] || 0) + 1) }))}
-                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
-                                                >
-                                                    +
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* Payment Status */}
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            {/* Payment Status Icon */}
-                                            {hasEntryFee && owesAnything && (
-                                                <button
-                                                    onClick={() => openPaymentModal(p)}
-                                                    className="relative shrink-0"
-                                                >
-                                                    {isPaid ? (
-                                                        // Green checkmark - static
-                                                        <div className="w-8 h-8 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
-                                                            <Icons.CheckMark size={16} className="text-green-500" strokeWidth={3} />
-                                                        </div>
-                                                    ) : (
-                                                        // Red glowing dollar sign - payment due
-                                                        <div className="w-8 h-8 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center animate-pulse">
-                                                            <Icons.DollarSign size={14} className="text-red-500" strokeWidth={3} />
-                                                        </div>
-                                                    )}
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-32">
+                    {/* Customize your round - moved above player tiles */}
                     <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
                         <button
                             onClick={() => setIsCustomExpanded(!isCustomExpanded)}
-                            className="w-full flex items-center justify-between p-4 bg-slate-800 hover:bg-slate-700/50 transition-colors"
+                            className="w-full flex items-center justify-between p-2 bg-slate-800 hover:bg-slate-700/50 transition-colors"
                         >
                             <h3 className="font-bold text-white">Customize your round</h3>
                             <Icons.Next size={20} className={`transition-transform duration-300 ${isCustomExpanded ? '-rotate-90' : 'rotate-90'}`} />
@@ -1256,8 +1179,15 @@ export const Home: React.FC = () => {
                                                             : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
                                                             }`}
                                                     >
-                                                        <div>Linear</div>
-                                                        <div className="text-[9px] text-slate-500 mt-1">Equal Split</div>
+                                                        <div>Flat</div>
+                                                        <div className="text-[9px] text-slate-500 mt-1">
+                                                            {(() => {
+                                                                const numPlayers = selectedCardmates.length + 1;
+                                                                const numWinners = Math.max(1, Math.ceil(numPlayers * (payoutPercentage / 100)));
+                                                                const dist = getLinearDistribution(numWinners);
+                                                                return dist.map(p => `${Math.round(p * 100)}%`).join(' / ');
+                                                            })()}
+                                                        </div>
                                                     </button>
                                                 </div>
                                             </>
@@ -1310,7 +1240,7 @@ export const Home: React.FC = () => {
                                 </div>
 
                                 {/* Custom Starting Hole */}
-                                <div className="space-y-3 pb-32">
+                                <div className="space-y-3">
                                     <div className="flex items-center justify-between">
                                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Custom Starting Hole</h4>
                                         <button
@@ -1344,6 +1274,86 @@ export const Home: React.FC = () => {
                             </div>
                         )}
                     </div>
+
+                    <div className="space-y-3">
+                        {allPlayers.map((p, idx) => {
+                            const isPaid = paidStatus[p.pubkey] || false;
+                            const payment = paymentSelections[p.pubkey] || { entry: true, ace: true };
+                            const isHost = (p as any).isHost;
+                            const totalAmount = entryFee + acePot;
+
+                            // Determine what the player owes
+                            const owesEntry = hasEntryFee && entryFee > 0 && payment.entry;
+                            const owesAce = hasEntryFee && acePot > 0 && payment.ace;
+                            const owesAnything = owesEntry || owesAce;
+
+                            return (
+                                <div key={p.pubkey} className="bg-slate-800 rounded-xl p-3 border border-slate-700">
+                                    <div className="flex items-start justify-between gap-3">
+                                        {/* Player Info */}
+                                        <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                            <span className="font-bold text-sm text-slate-500 w-5">{idx + 1}</span>
+                                            <div className="w-9 h-9 rounded-full bg-slate-700 overflow-hidden shrink-0">
+                                                {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <Icons.Users className="p-2 text-slate-500" />}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-bold text-sm truncate text-white leading-tight">{p.name} {isHost && '(You)'}</p>
+                                                <p className="text-[10px] text-slate-400 truncate leading-tight">
+                                                    {p.nip05 ? (p.nip05.length > 18 ? p.nip05.substring(0, 15) + '...' : p.nip05) : 'Nostr User'}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Handicap Controls - shown only when enabled */}
+                                        {handicapEnabled && (
+                                            <div className="flex items-center space-x-1 mr-1 shrink-0">
+                                                <button
+                                                    onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.max(-3, (prev[p.pubkey] || 0) - 1) }))}
+                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
+                                                >
+                                                    -
+                                                </button>
+                                                <div className="w-8 h-6 flex items-center justify-center bg-slate-900 border border-slate-600 rounded text-xs font-bold text-white">
+                                                    {playerHandicaps[p.pubkey] || 0}
+                                                </div>
+                                                <button
+                                                    onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.min(3, (prev[p.pubkey] || 0) + 1) }))}
+                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Payment Status */}
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {/* Payment Status Icon */}
+                                            {hasEntryFee && owesAnything && (
+                                                <button
+                                                    onClick={() => openPaymentModal(p)}
+                                                    className="relative shrink-0"
+                                                >
+                                                    {isPaid ? (
+                                                        // Green checkmark - static
+                                                        <div className="w-8 h-8 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
+                                                            <Icons.CheckMark size={16} className="text-green-500" strokeWidth={3} />
+                                                        </div>
+                                                    ) : (
+                                                        // Red glowing dollar sign - payment due
+                                                        <div className="w-8 h-8 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center animate-pulse">
+                                                            <Icons.DollarSign size={14} className="text-red-500" strokeWidth={3} />
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+
                 </div>
 
                 <div className="fixed bottom-20 left-0 right-0 bg-brand-dark border-t border-slate-800 p-4 max-w-md mx-auto z-20">
@@ -1367,8 +1377,8 @@ export const Home: React.FC = () => {
                                 onClick={handleStartRound}
                                 disabled={!allPaid}
                                 className={`font-bold py-4 rounded-full shadow-lg transition-all ${allPaid
-                                        ? 'bg-brand-accent text-black shadow-brand-accent/20'
-                                        : 'bg-slate-700 text-slate-400 cursor-not-allowed shadow-[0_0_20px_rgba(251,191,36,0.3)] animate-pulse'
+                                    ? 'bg-brand-accent text-black shadow-brand-accent/20'
+                                    : 'bg-slate-700 text-slate-400 cursor-not-allowed shadow-[0_0_30px_rgba(251,191,36,0.5)] animate-pulse'
                                     }`}
                             >
                                 {allPaid ? 'Start my round' : `Waiting for Payments (${unpaidCount})`}

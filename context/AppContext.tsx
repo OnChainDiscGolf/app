@@ -1521,6 +1521,29 @@ export function getTopHeavyDistribution(numWinners: number): number[] {
   return weights.map(w => w / totalWeight);
 }
 
+// Helper to generate linear (flat but steep) distribution percentages
+// This creates a LINEAR gradient rather than exponential, but still favors top positions
+export function getLinearDistribution(numWinners: number): number[] {
+  if (numWinners <= 1) return [1.0];
+
+  // Linear distribution with steep gradient
+  // Each position gets incrementally less, but the decrease is constant (linear)
+  // Example for 3 winners: if we use weights [3, 2, 1] then percentages are [50%, 33%, 17%]
+
+  let weights = [];
+  let totalWeight = 0;
+
+  for (let i = 0; i < numWinners; i++) {
+    // Linear decay: start high and decrease by a constant amount
+    // Weight = (numWinners - rank)
+    const weight = numWinners - i;
+    weights.push(weight);
+    totalWeight += weight;
+  }
+
+  return weights.map(w => w / totalWeight);
+}
+
 // Helper function to calculate payout distribution based on configuration
 export function calculatePayouts(
   players: Player[],
