@@ -472,6 +472,13 @@ export const Home: React.FC = () => {
     });
 
     const handleStartRound = async () => {
+        // Confirm before starting the round
+        const confirmed = window.confirm(
+            "⚠️ Once you start the round, you won't be able to edit any round details (players, fees, settings, etc.). Make sure everything is correct before proceeding.\n\nReady to start?"
+        );
+
+        if (!confirmed) return;
+
         const holes = layout === '9' ? 9 : layout === '18' ? 18 : customHoles;
 
         if (courseName && !recentCourses.includes(courseName)) {
@@ -1340,13 +1347,34 @@ export const Home: React.FC = () => {
                 </div>
 
                 <div className="fixed bottom-20 left-0 right-0 bg-brand-dark border-t border-slate-800 p-4 max-w-md mx-auto z-20">
-                    <Button
-                        fullWidth
-                        onClick={handleStartRound}
-                        className="bg-brand-accent text-black font-bold py-4 rounded-full shadow-lg shadow-brand-accent/20"
-                    >
-                        Start my round
-                    </Button>
+                    {(() => {
+                        // Calculate unpaid players count
+                        const playersNeedingPayment = allPlayers.filter(p => {
+                            const payment = paymentSelections[p.pubkey] || { entry: true, ace: true };
+                            const owesEntry = hasEntryFee && entryFee > 0 && payment.entry;
+                            const owesAce = hasEntryFee && acePot > 0 && payment.ace;
+                            const owesAnything = owesEntry || owesAce;
+                            const isPaid = paidStatus[p.pubkey] || false;
+                            return owesAnything && !isPaid;
+                        });
+
+                        const unpaidCount = playersNeedingPayment.length;
+                        const allPaid = unpaidCount === 0;
+
+                        return (
+                            <Button
+                                fullWidth
+                                onClick={handleStartRound}
+                                disabled={!allPaid}
+                                className={`font-bold py-4 rounded-full shadow-lg transition-all ${allPaid
+                                        ? 'bg-brand-accent text-black shadow-brand-accent/20'
+                                        : 'bg-slate-700 text-slate-400 cursor-not-allowed shadow-[0_0_20px_rgba(251,191,36,0.3)] animate-pulse'
+                                    }`}
+                            >
+                                {allPaid ? 'Start my round' : `Waiting for Payments (${unpaidCount})`}
+                            </Button>
+                        );
+                    })()}
                 </div>
 
                 {/* PAYMENT MODAL */}
