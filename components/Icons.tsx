@@ -111,8 +111,8 @@ const Android = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number
   </svg>
 );
 
-// Custom Bitcoin Icon - matching Lucide outlined style
-const Bitcoin = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
+// Custom iOS Share Icon - Arrow pointing up from box
+const IOSShare = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width={size}
@@ -123,19 +123,49 @@ const Bitcoin = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number
     strokeWidth={strokeWidth}
     strokeLinecap="round"
     strokeLinejoin="round"
-    className={`lucide lucide-bitcoin ${className}`}
+    className={`lucide lucide-ios-share ${className}`}
   >
-    {/* Outer circle */}
-    <circle cx="12" cy="12" r="10" />
-    {/* Bitcoin B symbol */}
-    <path d="M9.5 8.5h3a2 2 0 0 1 0 4h-3" />
-    <path d="M9.5 12.5h3.5a2 2 0 0 1 0 4h-3.5" />
-    <path d="M9.5 8.5v8" />
-    {/* Top and bottom ticks */}
-    <path d="M11 6v2.5" />
-    <path d="M13 6v2.5" />
-    <path d="M11 15.5v2.5" />
-    <path d="M13 15.5v2.5" />
+    {/* Box/tray at bottom */}
+    <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+
+    {/* Arrow shaft */}
+    <line x1="12" y1="3" x2="12" y2="15" />
+
+    {/* Arrow head */}
+    <polyline points="7 8 12 3 17 8" />
+  </svg>
+);
+
+// Custom Bitcoin Icon - Accurate ₿ symbol matching standard Bitcoin glyph
+const Bitcoin = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={`${className}`}
+  >
+    {/* Bitcoin ₿ symbol - larger and more centered */}
+    {/* Left vertical stroke */}
+    <path d="M7.5 1.5C7.22 1.5 7 1.72 7 2v2.5C7 4.78 7.22 5 7.5 5S8 4.78 8 4.5V2C8 1.72 7.78 1.5 7.5 1.5z" />
+    <rect x="7" y="5" width="1" height="14" />
+    <path d="M7.5 19C7.22 19 7 19.22 7 19.5v2.5c0 .28.22.5.5.5s.5-.22.5-.5v-2.5c0-.28-.22-.5-.5-.5z" />
+
+    {/* Right vertical stroke */}
+    <path d="M9.5 1.5c-.28 0-.5.22-.5.5v2.5c0 .28.22.5.5.5s.5-.22.5-.5V2c0-.28-.22-.5-.5-.5z" />
+    <rect x="9" y="5" width="1" height="14" />
+    <path d="M9.5 19c-.28 0-.5.22-.5.5v2.5c0 .28.22.5.5.5s.5-.22.5-.5v-2.5c0-.28-.22-.5-.5-.5z" />
+
+    {/* B shape - Larger and more centered */}
+    {/* Vertical bar of B */}
+    <path d="M8 5h1.5v14H8z" />
+
+    {/* Upper hump of B - bigger */}
+    <path d="M9.5 5h4.5c1.93 0 3.5 1.57 3.5 3.5S16.43 12 14.5 12H9.5V5z" />
+
+    {/* Lower hump of B - bigger */}
+    <path d="M9.5 12h5.5c2.21 0 4 1.79 4 4s-1.79 4-4 4h-5.5v-8z" />
   </svg>
 );
 
@@ -177,5 +207,6 @@ export const Icons = {
   Search,
   User,
   ChevronDown,
-  Bitcoin
+  Bitcoin,
+  IOSShare
 };

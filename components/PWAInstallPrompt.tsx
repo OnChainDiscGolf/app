@@ -43,9 +43,6 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ onDismiss })
                         <p className="text-brand-primary font-semibold">
                             Get the best experience!
                         </p>
-                        <p>
-                            Install <strong className="text-white">On-Chain Disc Golf</strong> as a Progressive Web App for:
-                        </p>
                         <ul className="list-disc pl-5 space-y-2">
                             <li>⚡ <strong>Faster loading</strong> times</li>
                             <li>📱 <strong>Full-screen</strong> mobile experience</li>
@@ -62,8 +59,10 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ onDismiss })
                             <div className="space-y-3 text-sm">
                                 <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
                                     <p className="font-bold text-white mb-1">iOS (Safari):</p>
-                                    <p className="text-slate-300">
-                                        Tap the <strong className="text-blue-400">Share</strong> icon → <strong className="text-brand-primary">"Add to Home Screen"</strong>
+                                    <p className="text-slate-300 flex items-center">
+                                        Tap the <strong className="text-blue-400 flex items-center mx-1">
+                                            <Icons.IOSShare size={14} className="mx-1" /> Share
+                                        </strong> icon → <strong className="text-brand-primary ml-1">"Add to Home Screen"</strong>
                                     </p>
                                 </div>
                                 <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
@@ -76,7 +75,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ onDismiss })
                         </div>
 
                         {dismissCount === 1 && (
-                            <p className="text-center text-brand-primary text-xs font-medium animate-in fade-in slide-in-from-top-2 duration-300">
+                            <p className="text-center text-brand-primary text-xs font-medium animate-in fade-in slide-in-from-top-2 duration-300 golden-shimmer">
                                 We really recommend installing! Click X again to continue.
                             </p>
                         )}
