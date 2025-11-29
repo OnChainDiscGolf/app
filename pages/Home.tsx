@@ -1010,7 +1010,13 @@ export const Home: React.FC = () => {
     // --- STEP 3: CUSTOMIZE ROUND ---
     if (view === 'customize') {
         const allPlayers = [
-            { pubkey: currentUserPubkey || 'me', name: userProfile.name, image: userProfile.picture, nip05: userProfile.lud16, isHost: true },
+            {
+                pubkey: currentUserPubkey || 'me',
+                name: userProfile.name,
+                image: userProfile.picture,
+                nip05: String(userProfile.lud16 || userProfile.nip05 || ''),
+                isHost: true
+            },
             ...selectedCardmates
         ];
 
@@ -1316,7 +1322,10 @@ export const Home: React.FC = () => {
                                             <div className="min-w-0 flex-1">
                                                 <p className="font-bold text-sm truncate text-white leading-tight">{p.name} {isHost && '(You)'}</p>
                                                 <p className="text-[10px] text-slate-400 truncate leading-tight">
-                                                    {p.nip05 ? (p.nip05.length > 18 ? p.nip05.substring(0, 15) + '...' : p.nip05) : 'Nostr User'}
+                                                    {(() => {
+                                                        const nip05Value = p.nip05 ? String(p.nip05) : '';
+                                                        return nip05Value ? (nip05Value.length > 18 ? nip05Value.substring(0, 15) + '...' : nip05Value) : 'Nostr User';
+                                                    })()}
                                                 </p>
                                             </div>
                                         </div>
@@ -1358,7 +1367,7 @@ export const Home: React.FC = () => {
                                                     ) : (
                                                         // Red glowing dollar sign - payment due
                                                         <div className="w-8 h-8 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center animate-pulse">
-                                                            <Icons.DollarSign size={14} className="text-red-500" strokeWidth={3} />
+                                                            <Icons.Dollar size={14} className="text-red-500" strokeWidth={3} />
                                                         </div>
                                                     )}
                                                 </button>
