@@ -142,7 +142,18 @@ export const Home: React.FC = () => {
     const [inviteQrData, setInviteQrData] = useState('');
     const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
 
-    const handleInstantInvite = async () => {
+    // Instant Invite State
+    const [showInstantInviteModal, setShowInstantInviteModal] = useState(false);
+    const [instantInviteName, setInstantInviteName] = useState('');
+
+    const handleInstantInvite = () => {
+        setInstantInviteName('');
+        setShowInstantInviteModal(true);
+    };
+
+    const confirmInstantInvite = async () => {
+        if (!instantInviteName.trim()) return;
+
         setIsGeneratingInvite(true);
         try {
             // 1. Generate Ephemeral Keypair
@@ -155,19 +166,18 @@ export const Home: React.FC = () => {
             setInviteQrData(inviteLink);
 
             // 3. Add Player to Card immediately
-            const guestName = searchQuery.trim() || 'Guest Golfer';
+            const guestName = instantInviteName.trim();
             const magicLUD16 = getMagicLightningAddress(pk);
 
             const newPlayer: DisplayProfile = {
                 pubkey: pk,
                 name: guestName,
                 image: '',
-                nip05: magicLUD16 // Display LUD16 as NIP05 for UI consistency if needed, or just rely on internal logic
+                nip05: magicLUD16
             };
             addCardmate(newPlayer);
 
             // 4. Publish Profile to Relays (Async)
-            // We do this so when they scan, their profile is already waiting for them
             publishProfileWithKey({
                 name: guestName,
                 about: 'On-Chain Disc Golf Player',
@@ -177,6 +187,7 @@ export const Home: React.FC = () => {
             }, sk).catch(err => console.error("Failed to sync guest profile:", err));
 
             // 5. Show QR Code
+            setShowInstantInviteModal(false);
             setShowPlayerQr(true);
         } catch (e) {
             console.error("Failed to generate invite:", e);
@@ -839,6 +850,7 @@ export const Home: React.FC = () => {
     };
 
     const getPlayerQrData = () => {
+        if (inviteQrData) return inviteQrData;
         if (userProfile.nip05) return userProfile.nip05;
         try {
             return nip19.npubEncode(currentUserPubkey);
@@ -1898,7 +1910,7 @@ export const Home: React.FC = () => {
                                 </div>
 
                                 <p className="text-xs text-slate-500">
-                                    This creates a temporary keypair on their device.
+                                    This creates a new account for them.
                                 </p>
 
                                 <Button
@@ -1908,6 +1920,50 @@ export const Home: React.FC = () => {
                                 >
                                     Done
                                 </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* INSTANT INVITE INPUT MODAL */}
+                {showInstantInviteModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                        <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-200 relative">
+                            <button
+                                onClick={() => setShowInstantInviteModal(false)}
+                                className="absolute top-4 right-4 text-slate-400 hover:text-white"
+                            >
+                                <Icons.Close size={24} />
+                            </button>
+
+                            <div className="text-center space-y-6 pt-2">
+                                <div className="flex flex-col items-center space-y-2">
+                                    <div className="w-12 h-12 bg-brand-primary/20 rounded-full flex items-center justify-center">
+                                        <Icons.UserPlus size={24} className="text-brand-primary" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white">New Player</h3>
+                                    <p className="text-sm text-slate-400">Enter a name to generate an instant invite.</p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <input
+                                        type="text"
+                                        value={instantInviteName}
+                                        onChange={(e) => setInstantInviteName(e.target.value)}
+                                        placeholder="Player Name"
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-lg text-center text-white placeholder-slate-500 focus:ring-2 focus:ring-brand-primary outline-none"
+                                        autoFocus
+                                    />
+
+                                    <Button
+                                        fullWidth
+                                        onClick={confirmInstantInvite}
+                                        disabled={!instantInviteName.trim() || isGeneratingInvite}
+                                        className="bg-brand-primary text-black font-bold py-3 rounded-xl shadow-lg shadow-brand-primary/20"
+                                    >
+                                        {isGeneratingInvite ? 'Creating...' : 'Create Invite'}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2730,7 +2786,10 @@ export const Home: React.FC = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                     <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-200 relative">
                         <button
-                            onClick={() => setShowPlayerQr(false)}
+                            onClick={() => {
+                                setShowPlayerQr(false);
+                                setInviteQrData('');
+                            }}
                             className="absolute top-4 right-4 text-slate-400 hover:text-white"
                         >
                             <Icons.Close size={24} />
@@ -2755,9 +2814,56 @@ export const Home: React.FC = () => {
                                 <p className="text-xs text-slate-400">Scan to add me</p>
                             </div>
 
-                            <Button fullWidth variant="secondary" onClick={() => setShowPlayerQr(false)}>
+                            <Button fullWidth variant="secondary" onClick={() => {
+                                setShowPlayerQr(false);
+                                setInviteQrData('');
+                            }}>
                                 Close
                             </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Instant Invite Input Modal */}
+            {showInstantInviteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-200 relative">
+                        <button
+                            onClick={() => setShowInstantInviteModal(false)}
+                            className="absolute top-4 right-4 text-slate-400 hover:text-white"
+                        >
+                            <Icons.Close size={24} />
+                        </button>
+
+                        <div className="text-center space-y-6 pt-2">
+                            <div className="flex flex-col items-center space-y-2">
+                                <div className="w-12 h-12 bg-brand-primary/20 rounded-full flex items-center justify-center">
+                                    <Icons.UserPlus size={24} className="text-brand-primary" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white">New Player</h3>
+                                <p className="text-sm text-slate-400">Enter a name to generate an instant invite.</p>
+                            </div>
+
+                            <div className="space-y-4">
+                                <input
+                                    type="text"
+                                    value={instantInviteName}
+                                    onChange={(e) => setInstantInviteName(e.target.value)}
+                                    placeholder="Player Name"
+                                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-lg text-center text-white placeholder-slate-500 focus:ring-2 focus:ring-brand-primary outline-none"
+                                    autoFocus
+                                />
+
+                                <Button
+                                    fullWidth
+                                    onClick={confirmInstantInvite}
+                                    disabled={!instantInviteName.trim() || isGeneratingInvite}
+                                    className="bg-brand-primary text-black font-bold py-3 rounded-xl shadow-lg shadow-brand-primary/20"
+                                >
+                                    {isGeneratingInvite ? 'Creating...' : 'Create Invite'}
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </div>

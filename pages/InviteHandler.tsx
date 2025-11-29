@@ -25,7 +25,7 @@ export const InviteHandler: React.FC = () => {
                 setStatus('success');
                 // Short delay to show success state before redirecting
                 setTimeout(() => {
-                    window.location.href = '/';
+                    window.location.href = '/play';
                 }, 2500); // Increased delay to give time to read instructions
             } catch (e) {
                 console.error("Invite login failed:", e);
