@@ -648,14 +648,23 @@ export const publishRound = async (round: RoundSettings) => {
         isFinalized: round.isFinalized
     });
 
+    const tags = [
+        ['d', round.id],
+        ['t', 'discgolf'],
+        ['client', 'ChainLinks']
+    ];
+
+    // Tag all players so they can be notified
+    if (round.players && round.players.length > 0) {
+        round.players.forEach(pubkey => {
+            tags.push(['p', pubkey]);
+        });
+    }
+
     const event = await signEventWrapper({
         kind: NOSTR_KIND_ROUND,
         created_at: Math.floor(Date.now() / 1000),
-        tags: [
-            ['d', round.id],
-            ['t', 'discgolf'],
-            ['client', 'ChainLinks']
-        ],
+        tags: tags,
         content: content,
     });
 
@@ -924,6 +933,24 @@ export const subscribeToRound = (roundId: string, callback: (event: any) => void
     const filters: Filter[] = [{
         kinds: [NOSTR_KIND_SCORE],
         '#e': [roundId],
+    }];
+
+    return pool.subscribeMany(
+        getRelays(),
+        filters as any,
+        {
+            onevent(event) {
+                callback(event);
+            },
+        }
+    );
+};
+
+export const subscribeToPlayerRounds = (userPubkey: string, callback: (event: Event) => void) => {
+    const filters: Filter[] = [{
+        kinds: [NOSTR_KIND_ROUND],
+        '#p': [userPubkey],
+        since: Math.floor(Date.now() / 1000) - (60 * 60 * 24) // Look back 24 hours for active rounds
     }];
 
     return pool.subscribeMany(

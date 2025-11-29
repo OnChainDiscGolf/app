@@ -3,7 +3,7 @@ import { CashuMint, CashuWallet, getDecodedToken } from '@cashu/cashu-ts';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, Player, RoundSettings, WalletTransaction, UserProfile, UserStats, NOSTR_KIND_SCORE, Mint, DisplayProfile, Proof, PayoutConfig } from '../types';
 import { DEFAULT_HOLE_COUNT } from '../constants';
-import { publishProfile, publishRound, publishScore, subscribeToRound, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, loginWithAmber, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages, subscribeToGiftWraps, fetchHistoricalGiftWraps, getMagicLightningAddress } from '../services/nostrService';
+import { publishProfile, publishRound, publishScore, subscribeToRound, subscribeToPlayerRounds, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, loginWithAmber, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages, subscribeToGiftWraps, fetchHistoricalGiftWraps, getMagicLightningAddress } from '../services/nostrService';
 import { checkPendingPayments, NpubCashQuote, subscribeToQuoteUpdates, unsubscribeFromQuoteUpdates, getQuoteById } from '../services/npubCashService';
 import { WalletService } from '../services/walletService';
 import { NWCService } from '../services/nwcService';
@@ -526,6 +526,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return () => sub.close();
     }
   }, [isAuthenticated, isGuest]);
+
+  // Listen for Rounds where I am tagged (Remote Round Notification)
+  useEffect(() => {
+    if (isAuthenticated && currentUserPubkey) {
+      const sub = subscribeToPlayerRounds(currentUserPubkey, async (event) => {
+        console.log("🔔 Found a round I am tagged in!", event);
+        try {
+          const content = JSON.parse(event.content);
+          const roundId = event.tags.find(t => t[0] === 'd')?.[1];
+
+          if (!roundId) return;
+
+          // If we are already in this round, do nothing
+          if (activeRound && activeRound.id === roundId) return;
+
+          // If we are the host, we probably already have this state, but just in case
+          if (event.pubkey === currentUserPubkey) return;
+
+          console.log("✨ Auto-joining remote round:", content.name);
+
+          const joinedRound: RoundSettings = {
+            id: roundId,
+            name: content.name || 'Joined Round',
+            courseName: content.courseName || 'Unknown Course',
+            entryFeeSats: content.entryFeeSats || 0,
+            acePotFeeSats: content.acePotFeeSats || 0,
+            date: content.date || new Date().toISOString(),
+            isFinalized: content.isFinalized || false,
+            holeCount: content.holeCount || 18,
+            players: [], // Will be populated by subscribeToRound
+            pubkey: event.pubkey, // Host pubkey
+            eventId: event.id,
+            startingHole: 1,
+            trackPenalties: false,
+            hideOverallScore: false
+          };
+
+          setActiveRound(joinedRound);
+
+          // We don't need to setPlayers here because the existing 'Active Round Syncing' effect 
+          // (lines 407+) will trigger when activeRound changes, subscribe to scores, 
+          // and populate the player list.
+
+        } catch (e) {
+          console.warn("Failed to parse remote round:", e);
+        }
+      });
+
+      return () => sub.close();
+    }
+  }, [isAuthenticated, currentUserPubkey, activeRound]);
 
   // Real-time npub.cash payment detection via WebSocket
   useEffect(() => {

@@ -7,8 +7,10 @@ import { DEFAULT_PAR, DEFAULT_HOLE_COUNT } from '../constants';
 import { useNavigate } from 'react-router-dom';
 
 export const Scorecard: React.FC = () => {
-    const { activeRound, players, updateScore, finalizeRound, isAuthenticated, userProfile } = useApp();
+    const { activeRound, players, updateScore, finalizeRound, isAuthenticated, userProfile, currentUserPubkey } = useApp();
     const navigate = useNavigate();
+
+    const isHost = activeRound?.pubkey === currentUserPubkey;
 
     // Initialize view hole to startingHole if available, else 1
     const [viewHole, setViewHole] = useState(activeRound?.startingHole || 1);
@@ -370,14 +372,20 @@ export const Scorecard: React.FC = () => {
                     ) : (
                         /* Final Review Action */
                         <div className="max-w-md mx-auto flex flex-col space-y-3">
-                            <Button
-                                fullWidth
-                                onClick={handleFinish}
-                                disabled={!isComplete}
-                                className={`${!isComplete ? 'opacity-50 cursor-not-allowed bg-slate-600 text-slate-300' : 'bg-brand-accent text-black shadow-lg shadow-brand-accent/20'}`}
-                            >
-                                Confirm Score and Send Payout
-                            </Button>
+                            {isHost ? (
+                                <Button
+                                    fullWidth
+                                    onClick={handleFinish}
+                                    disabled={!isComplete}
+                                    className={`${!isComplete ? 'opacity-50 cursor-not-allowed bg-slate-600 text-slate-300' : 'bg-brand-accent text-black shadow-lg shadow-brand-accent/20'}`}
+                                >
+                                    Confirm Score and Send Payout
+                                </Button>
+                            ) : (
+                                <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+                                    <p className="text-slate-400 text-sm font-medium animate-pulse">Waiting for host to finalize round...</p>
+                                </div>
+                            )}
                             <button
                                 onClick={handlePrev}
                                 className="text-slate-400 text-sm font-bold hover:text-white py-2"
@@ -461,31 +469,42 @@ export const Scorecard: React.FC = () => {
 
                             {/* Right: Scoring Controls */}
                             <div className="flex items-center space-x-4 shrink-0">
-                                {/* Minus */}
-                                <button
-                                    onClick={() => handleScoreChange(p.id, -1, currentHoleScore)}
-                                    className="w-12 h-12 rounded-full bg-brand-accent flex items-center justify-center shadow-lg shadow-orange-900/20 active:scale-95 transition-transform"
-                                >
-                                    <div className="w-4 h-1 bg-black rounded-full"></div>
-                                </button>
+                                {isHost ? (
+                                    <>
+                                        {/* Minus */}
+                                        <button
+                                            onClick={() => handleScoreChange(p.id, -1, currentHoleScore)}
+                                            className="w-12 h-12 rounded-full bg-brand-accent flex items-center justify-center shadow-lg shadow-orange-900/20 active:scale-95 transition-transform"
+                                        >
+                                            <div className="w-4 h-1 bg-black rounded-full"></div>
+                                        </button>
 
-                                {/* Score Display */}
-                                <div className="w-8 text-center">
-                                    <span className={`text-2xl font-bold ${currentHoleScore ? 'text-white' : 'text-slate-600'}`}>
-                                        {currentHoleScore || '-'}
-                                    </span>
-                                </div>
+                                        {/* Score Display */}
+                                        <div className="w-8 text-center">
+                                            <span className={`text-2xl font-bold ${currentHoleScore ? 'text-white' : 'text-slate-600'}`}>
+                                                {currentHoleScore || '-'}
+                                            </span>
+                                        </div>
 
-                                {/* Plus */}
-                                <button
-                                    onClick={() => handleScoreChange(p.id, 1, currentHoleScore)}
-                                    className="w-12 h-12 rounded-full bg-brand-accent flex items-center justify-center shadow-lg shadow-orange-900/20 active:scale-95 transition-transform"
-                                >
-                                    <div className="relative w-4 h-4">
-                                        <div className="absolute top-1/2 left-0 w-4 h-1 bg-black rounded-full -translate-y-1/2"></div>
-                                        <div className="absolute top-0 left-1/2 w-1 h-4 bg-black rounded-full -translate-x-1/2"></div>
+                                        {/* Plus */}
+                                        <button
+                                            onClick={() => handleScoreChange(p.id, 1, currentHoleScore)}
+                                            className="w-12 h-12 rounded-full bg-brand-accent flex items-center justify-center shadow-lg shadow-orange-900/20 active:scale-95 transition-transform"
+                                        >
+                                            <div className="relative w-4 h-4">
+                                                <div className="absolute top-1/2 left-0 w-4 h-1 bg-black rounded-full -translate-y-1/2"></div>
+                                                <div className="absolute top-0 left-1/2 w-1 h-4 bg-black rounded-full -translate-x-1/2"></div>
+                                            </div>
+                                        </button>
+                                    </>
+                                ) : (
+                                    /* Read-Only Score Display */
+                                    <div className="w-16 text-center">
+                                        <span className={`text-2xl font-bold ${currentHoleScore ? 'text-white' : 'text-slate-600'}`}>
+                                            {currentHoleScore || '-'}
+                                        </span>
                                     </div>
-                                </button>
+                                )}
                             </div>
                         </div>
                     );
