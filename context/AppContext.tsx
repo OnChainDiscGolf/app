@@ -53,6 +53,13 @@ interface AppContextType extends AppState {
   setWalletMode: (mode: 'cashu' | 'nwc') => void;
   setNwcConnection: (uri: string) => void;
   checkForPayments: () => Promise<number>;
+
+  // Payment Notification
+  paymentNotification: {
+    amount: number;
+    context?: 'wallet_receive' | 'buyin_qr';
+  } | null;
+  setPaymentNotification: (notification: { amount: number; context?: 'wallet_receive' | 'buyin_qr' } | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -149,6 +156,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const subRef = useRef<any>(null);
   const walletServiceRef = useRef<WalletService | null>(null);
   const nwcServiceRef = useRef<NWCService | null>(null);
+
+  // Payment Notification State
+  const [paymentNotification, setPaymentNotification] = useState<{
+    amount: number;
+    context?: 'wallet_receive' | 'buyin_qr';
+  } | null>(null);
 
   // --- Effects ---
 
@@ -516,7 +529,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-time npub.cash payment detection via WebSocket
   useEffect(() => {
-    if (isAuthenticated && !isGuest && currentUserPubkey) {
+    if (isAuthenticated && currentUserPubkey) {
       console.log("🔌 [npub.cash] Setting up WebSocket subscription for payment detection...");
 
       const handleQuoteUpdate = async (quoteId: string) => {
@@ -574,9 +587,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             console.log(`✅ [npub.cash] Successfully received ${quote.amount} sats!`);
 
-            // Dispatch event for UI (Wallet.tsx will show success overlay if on receive view)
+            // Dispatch event for UI with context metadata
+            const context = window.location.pathname.includes('/wallet') ? 'wallet_receive' : undefined;
             window.dispatchEvent(new CustomEvent('npubcash-payment-received', {
-              detail: { quoteId, amount: quote.amount }
+              detail: { quoteId, amount: quote.amount, context }
             }));
           }
         } catch (e) {
@@ -1476,7 +1490,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createToken,
       setWalletMode: setWalletModeAction,
       setNwcConnection,
-      checkForPayments
+      checkForPayments,
+      paymentNotification,
+      setPaymentNotification
     }}>
       {children}
     </AppContext.Provider>

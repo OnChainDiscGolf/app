@@ -262,26 +262,7 @@ export const Wallet: React.FC = () => {
         return () => window.removeEventListener('popToRoot', handlePopToRoot as EventListener);
     }, []);
 
-    // Listen for payment received events from background subscription
-    useEffect(() => {
-        const handlePaymentReceived = (e: CustomEvent) => {
-            console.log(`📥 [Wallet] Received 'npubcash-payment-received' event:`, e.detail);
-            console.log(`📍 [Wallet] Current view: ${view}`);
-            if (view === 'receive') {
-                console.log(`🎉 [Wallet] Triggering success overlay!`);
-                setSuccessMode('received');
-            } else {
-                console.log(`ℹ️  [Wallet] Not on receive view, skipping success overlay`);
-            }
-        };
-
-        console.log(`👂 [Wallet] Setting up payment event listener (view: ${view})`);
-        window.addEventListener('npubcash-payment-received', handlePaymentReceived as EventListener);
-        return () => {
-            console.log(`🔇 [Wallet] Removing payment event listener`);
-            window.removeEventListener('npubcash-payment-received', handlePaymentReceived as EventListener);
-        };
-    }, [view]);
+    // Removed: Old payment event listener - now handled globally by App.tsx with LightningStrike
 
 
     // Camera & Scanning Logic

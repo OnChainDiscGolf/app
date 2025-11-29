@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AppProvider } from './context/AppContext';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { AppProvider, useApp } from './context/AppContext';
 import { BottomNav } from './components/BottomNav';
 import { SplashScreen } from './components/SplashScreen';
+import { LightningStrikeNotification } from './components/LightningStrike';
 import { Home } from './pages/Home';
 import { Scorecard } from './pages/Scorecard';
 import { Wallet } from './pages/Wallet';
@@ -12,6 +13,21 @@ import { useSwipeBack } from './hooks/useSwipeBack';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useSwipeBack(); // Enable global swipe-to-back
+  const navigate = useNavigate();
+  const { paymentNotification, setPaymentNotification } = useApp();
+
+  // Listen for payment events
+  useEffect(() => {
+    const handlePayment = (e: CustomEvent) => {
+      setPaymentNotification({
+        amount: e.detail.amount,
+        context: e.detail.context
+      });
+    };
+
+    window.addEventListener('npubcash-payment-received', handlePayment as EventListener);
+    return () => window.removeEventListener('npubcash-payment-received', handlePayment as EventListener);
+  }, [setPaymentNotification]);
 
   return (
     <div className="min-h-screen bg-brand-dark text-white font-sans antialiased selection:bg-brand-primary selection:text-black pb-safe">
@@ -20,6 +36,22 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           {children}
         </div>
         <BottomNav />
+
+        {/* Global Lightning Strike Notification */}
+        {paymentNotification && (
+          <LightningStrikeNotification
+            amount={paymentNotification.amount}
+            onComplete={() => {
+              // Context-aware navigation
+              if (paymentNotification.context === 'wallet_receive') {
+                navigate('/wallet'); // Return to main wallet view
+              }
+              // For 'buyin_qr', navigation is handled by Home.tsx state
+              setPaymentNotification(null);
+            }}
+            extendedDuration={paymentNotification.context === 'wallet_receive'}
+          />
+        )}
       </div>
     </div>
   );
