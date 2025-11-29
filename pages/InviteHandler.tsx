@@ -6,9 +6,11 @@ import { Icons } from '../components/Icons';
 export const InviteHandler: React.FC = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    const { loginNsec, isAuthenticated } = useApp();
+    const { loginNsec } = useApp();
     const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
     const [errorMessage, setErrorMessage] = useState('');
+    const [inviteNsec, setInviteNsec] = useState('');
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         const handleInvite = async () => {
@@ -22,11 +24,9 @@ export const InviteHandler: React.FC = () => {
 
             try {
                 await loginNsec(nsec);
+                setInviteNsec(nsec);
                 setStatus('success');
-                // Short delay to show success state before redirecting
-                setTimeout(() => {
-                    window.location.href = '/play';
-                }, 2500); // Increased delay to give time to read instructions
+                // No auto-redirect anymore
             } catch (e) {
                 console.error("Invite login failed:", e);
                 setStatus('error');
@@ -34,15 +34,17 @@ export const InviteHandler: React.FC = () => {
             }
         };
 
-        // If already authenticated, we might want to warn or just redirect.
-        // For now, let's assume if they scanned a code, they want to switch to that user
-        // OR if they are just opening the app and happen to be logged in, maybe we should ask?
-        // The requirement says "Instant Invite", implying a fresh session usually.
-        // But if I'm already logged in as someone else, switching might be annoying if accidental.
-        // However, the user explicitly scanned a QR code to get here.
         handleInvite();
 
-    }, [searchParams, loginNsec, navigate]);
+    }, [searchParams, loginNsec]);
+
+    const copyToClipboard = () => {
+        if (inviteNsec) {
+            navigator.clipboard.writeText(inviteNsec);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-6 text-center">
@@ -56,19 +58,46 @@ export const InviteHandler: React.FC = () => {
                 )}
 
                 {status === 'success' && (
-                    <div className="flex flex-col items-center space-y-4 animate-in zoom-in duration-300">
+                    <div className="flex flex-col items-center space-y-6 animate-in zoom-in duration-300">
                         <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center border-2 border-green-500">
                             <Icons.CheckMark className="text-green-500" size={32} strokeWidth={3} />
                         </div>
-                        <h2 className="text-xl font-bold text-white">Welcome!</h2>
-                        <p className="text-slate-400 text-sm px-4">
-                            To save your account, tap your browser menu and select <strong>"Add to Home Screen"</strong> or Bookmark this page.
-                        </p>
+
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-bold text-white">Welcome!</h2>
+                            <p className="text-brand-primary font-medium">Disc Golf + Bitcoin</p>
+                            <p className="text-slate-400 text-sm">
+                                You are now ready to play.
+                            </p>
+                        </div>
+
+                        <div className="w-full bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-left">
+                            <p className="text-xs text-slate-400 mb-2 font-semibold uppercase tracking-wider">
+                                Your Secret Key (Save This!)
+                            </p>
+                            <div className="flex items-center space-x-2 bg-slate-950 rounded-lg p-3 border border-slate-800">
+                                <code className="flex-1 text-xs text-slate-300 font-mono truncate select-all">
+                                    {inviteNsec}
+                                </code>
+                                <button
+                                    onClick={copyToClipboard}
+                                    className="p-2 hover:bg-slate-800 rounded-md transition-colors text-brand-primary"
+                                    title="Copy Key"
+                                >
+                                    {copied ? <Icons.Check size={16} /> : <Icons.Copy size={16} />}
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
+                                This key is your identity and wallet. If you lose it, you lose access to your funds and history. Save it in a password manager or safe place.
+                            </p>
+                        </div>
+
                         <button
-                            onClick={() => window.location.href = '/'}
-                            className="mt-6 px-8 py-3 bg-brand-primary text-black font-bold rounded-full hover:bg-brand-accent transition-colors shadow-lg shadow-brand-primary/20"
+                            onClick={() => navigate('/play')}
+                            className="w-full py-4 bg-brand-primary text-black font-bold rounded-xl hover:bg-brand-accent transition-all transform hover:scale-[1.02] shadow-lg shadow-brand-primary/20 flex items-center justify-center space-x-2"
                         >
-                            Start Playing
+                            <span>Start Playing</span>
+                            <Icons.Play size={20} fill="currentColor" />
                         </button>
                     </div>
                 )}
