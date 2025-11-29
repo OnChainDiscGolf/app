@@ -1,17 +1,18 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import { Icons } from '../components/Icons';
 import { PWAInstallPrompt } from '../components/PWAInstallPrompt';
+import { nip19, generateSecretKey, getPublicKey } from 'nostr-tools';
+import { hexToBytes } from '@noble/hashes/utils';
 
-export const InviteHandler: React.FC = () => {
-    const [searchParams] = useSearchParams();
+export const Onboarding: React.FC = () => {
     const navigate = useNavigate();
     const { loginNsec } = useApp();
-    const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
+    const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [errorMessage, setErrorMessage] = useState('');
-    const [inviteNsec, setInviteNsec] = useState('');
+    const [generatedNsec, setGeneratedNsec] = useState('');
     const [copied, setCopied] = useState(false);
 
     // Animation State
@@ -21,51 +22,48 @@ export const InviteHandler: React.FC = () => {
     const [showNewWorldModal, setShowNewWorldModal] = useState(false);
     const [showWhyKeyModal, setShowWhyKeyModal] = useState(false);
     const [showPWAPrompt, setShowPWAPrompt] = useState(false);
+    const [showExistingNsecModal, setShowExistingNsecModal] = useState(false);
+    const [existingNsecInput, setExistingNsecInput] = useState('');
+    const [isLoggingInExisting, setIsLoggingInExisting] = useState(false);
 
     // Guard to prevent infinite loop
-    const hasAttemptedLogin = useRef(false);
+    const hasLoadedSession = useRef(false);
 
     useEffect(() => {
         // Prevent re-execution
-        if (hasAttemptedLogin.current) return;
+        if (hasLoadedSession.current) return;
 
-        const handleInvite = async () => {
-            const nsec = searchParams.get('nsec');
-
-            if (!nsec) {
-                setStatus('error');
-                setErrorMessage('Invalid invite link: Missing key.');
-                return;
-            }
-
+        const loadExistingSession = () => {
             try {
-                await loginNsec(nsec);
-                setInviteNsec(nsec);
-                setStatus('success');
+                // Get the existing guest session's nsec from localStorage
+                const existingSk = localStorage.getItem('nostr_sk');
+
+                if (existingSk) {
+                    // User already has a session (guest or otherwise)
+                    // Display their existing nsec
+                    const nsec = nip19.nsecEncode(hexToBytes(existingSk));
+                    setGeneratedNsec(nsec);
+                    setStatus('success');
+                } else {
+                    // Fallback: generate new keypair if somehow no session exists
+                    console.warn('[Onboarding] No existing session found, generating new keypair');
+                    const sk = generateSecretKey();
+                    const nsec = nip19.nsecEncode(sk);
+                    loginNsec(nsec); // This will save to localStorage
+                    setGeneratedNsec(nsec);
+                    setStatus('success');
+                }
             } catch (e) {
-                console.error("Invite login failed:", e);
+                console.error("Session load failed:", e);
                 setStatus('error');
-                setErrorMessage('Failed to log in with invite key.');
+                setErrorMessage('Failed to load session. Please refresh the page.');
             }
         };
 
-        hasAttemptedLogin.current = true;
-        handleInvite();
+        hasLoadedSession.current = true;
+        loadExistingSession();
 
-    }, [searchParams]); // Removed loginNsec - it's from context and causes infinite loop
-
-    // Timeout protection - prevent stuck processing state
-    useEffect(() => {
-        if (status === 'processing') {
-            const timeout = setTimeout(() => {
-                console.error('[InviteHandler] Login timeout after 10 seconds');
-                setStatus('error');
-                setErrorMessage('Connection timeout. Please try scanning the QR code again.');
-            }, 10000);
-
-            return () => clearTimeout(timeout);
-        }
-    }, [status]);
+    }, [loginNsec]);
 
     // Icon Crossfade Loop
     useEffect(() => {
@@ -78,10 +76,26 @@ export const InviteHandler: React.FC = () => {
     }, [status]);
 
     const copyToClipboard = () => {
-        if (inviteNsec) {
-            navigator.clipboard.writeText(inviteNsec);
+        if (generatedNsec) {
+            navigator.clipboard.writeText(generatedNsec);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    const handleExistingNsecSubmit = async () => {
+        if (!existingNsecInput.trim()) return;
+
+        setIsLoggingInExisting(true);
+        try {
+            await loginNsec(existingNsecInput.trim());
+            setShowExistingNsecModal(false);
+            setShowPWAPrompt(true);
+        } catch (e) {
+            console.error("Login with existing nsec failed:", e);
+            alert('Invalid nsec. Please check and try again.');
+        } finally {
+            setIsLoggingInExisting(false);
         }
     };
 
@@ -90,7 +104,6 @@ export const InviteHandler: React.FC = () => {
             {/* Header - matching Play tab exactly */}
             <div className="bg-slate-900/80 backdrop-blur-md border-b border-white/5 p-4 sticky top-0 z-10">
                 <div className="max-w-md mx-auto text-center">
-                    <p className="golden-shimmer text-base mb-2 font-semibold">You've been added to the card on..</p>
                     <h1 className="font-extrabold tracking-tight leading-tight">
                         <div className="text-7xl mb-1">
                             <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">On-Chain</span>
@@ -104,11 +117,11 @@ export const InviteHandler: React.FC = () => {
 
             <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
                 <div className="max-w-md w-full">
-                    {status === 'processing' && (
+                    {status === 'loading' && (
                         <div className="flex flex-col items-center space-y-4">
                             <Icons.Zap className="text-brand-primary animate-bounce" size={48} />
-                            <h2 className="text-xl font-bold text-white">Accepting Invite...</h2>
-                            <p className="text-slate-400">Setting up your secure player profile.</p>
+                            <h2 className="text-xl font-bold text-white">Loading...</h2>
+                            <p className="text-slate-400">Preparing your account.</p>
                         </div>
                     )}
 
@@ -165,7 +178,7 @@ export const InviteHandler: React.FC = () => {
                                 </p>
                                 <button
                                     onClick={() => {
-                                        console.log('[InviteHandler] Learn why clicked');
+                                        console.log('[Onboarding] Learn why clicked');
                                         setShowNewWorldModal(true);
                                     }}
                                     className="text-slate-400 text-xs hover:text-white transition-colors border-b border-dashed border-slate-600 hover:border-white pb-0.5"
@@ -181,7 +194,7 @@ export const InviteHandler: React.FC = () => {
                                     </p>
                                     <button
                                         onClick={() => {
-                                            console.log('[InviteHandler] Why key clicked');
+                                            console.log('[Onboarding] Why key clicked');
                                             setShowWhyKeyModal(true);
                                         }}
                                         className="text-xs text-brand-primary hover:text-brand-accent flex items-center space-x-1"
@@ -193,7 +206,7 @@ export const InviteHandler: React.FC = () => {
 
                                 <div className="flex items-center space-x-2 bg-black/50 rounded-lg p-2 border border-slate-800">
                                     <code className="flex-1 text-xs text-slate-300 font-mono truncate select-all">
-                                        {inviteNsec}
+                                        {generatedNsec}
                                     </code>
                                     <button
                                         onClick={copyToClipboard}
@@ -203,11 +216,21 @@ export const InviteHandler: React.FC = () => {
                                         {copied ? <Icons.Check size={14} /> : <Icons.Copy size={14} />}
                                     </button>
                                 </div>
+
+                                {/* "I already have a nsec" option */}
+                                <div className="mt-3 text-center">
+                                    <button
+                                        onClick={() => setShowExistingNsecModal(true)}
+                                        className="text-xs text-slate-500 hover:text-slate-300 transition-colors border-b border-dashed border-slate-700 hover:border-slate-500"
+                                    >
+                                        I already have a nsec
+                                    </button>
+                                </div>
                             </div>
 
                             <button
                                 onClick={() => {
-                                    console.log('[InviteHandler] Show PWA prompt before profile setup');
+                                    console.log('[Onboarding] Navigate to profile setup via PWA prompt');
                                     setShowPWAPrompt(true);
                                 }}
                                 className="w-full py-3 bg-brand-primary text-black font-bold rounded-xl hover:bg-brand-accent transition-all transform hover:scale-[1.02] shadow-lg shadow-brand-primary/20 flex items-center justify-center space-x-2"
@@ -215,10 +238,6 @@ export const InviteHandler: React.FC = () => {
                                 <span>Go to Profile</span>
                                 <Icons.Next size={18} />
                             </button>
-
-                            <p className="text-xs text-slate-500 font-medium">
-                                You have been added to the round.
-                            </p>
                         </div>
                     )}
 
@@ -227,13 +246,13 @@ export const InviteHandler: React.FC = () => {
                             <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center border-2 border-red-500">
                                 <Icons.Close className="text-red-500" size={32} />
                             </div>
-                            <h2 className="text-xl font-bold text-white">Invite Failed</h2>
+                            <h2 className="text-xl font-bold text-white">Setup Failed</h2>
                             <p className="text-red-300 text-center px-4">{errorMessage}</p>
                             <button
-                                onClick={() => navigate('/')}
+                                onClick={() => window.location.reload()}
                                 className="mt-4 px-6 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-bold transition-colors"
                             >
-                                Go Home
+                                Refresh Page
                             </button>
                         </div>
                     )}
@@ -243,6 +262,56 @@ export const InviteHandler: React.FC = () => {
             {/* PWA Install Prompt */}
             {showPWAPrompt && (
                 <PWAInstallPrompt onDismiss={() => navigate('/profile-setup')} />
+            )}
+
+            {/* Existing Nsec Input Modal */}
+            {showExistingNsecModal && createPortal(
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="p-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xl font-bold text-white">Enter Your Secret Key</h3>
+                                <button onClick={() => setShowExistingNsecModal(false)} className="text-slate-400 hover:text-white">
+                                    <Icons.Close size={24} />
+                                </button>
+                            </div>
+                            <div className="space-y-3 text-slate-300 text-sm">
+                                <p>
+                                    If you already have a Nostr account, paste your <strong className="text-purple-400">private key (nsec)</strong> below.
+                                </p>
+                                <div className="space-y-2">
+                                    <input
+                                        type="password"
+                                        value={existingNsecInput}
+                                        onChange={(e) => setExistingNsecInput(e.target.value)}
+                                        placeholder="nsec1..."
+                                        className="w-full px-4 py-3 bg-black/50 border border-slate-800 rounded-lg text-white font-mono text-sm focus:border-purple-500 focus:outline-none"
+                                        autoFocus
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleExistingNsecSubmit();
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex space-x-2">
+                                <button
+                                    onClick={() => setShowExistingNsecModal(false)}
+                                    className="flex-1 py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleExistingNsecSubmit}
+                                    disabled={!existingNsecInput.trim() || isLoggingInExisting}
+                                    className="flex-1 py-3 bg-purple-500 text-white font-bold rounded-xl hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isLoggingInExisting ? 'Logging in...' : 'Login'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
 
             {/* Modals rendered via Portal to document.body */}
@@ -338,7 +407,7 @@ export const InviteHandler: React.FC = () => {
                                     <p className="text-xs text-slate-400 mb-2 uppercase tracking-wide font-bold">Your Key:</p>
                                     <div className="flex items-center space-x-2 bg-black/50 rounded-lg p-2 border border-slate-800">
                                         <code className="flex-1 text-xs text-slate-300 font-mono truncate select-all">
-                                            {inviteNsec}
+                                            {generatedNsec}
                                         </code>
                                         <button
                                             onClick={copyToClipboard}

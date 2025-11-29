@@ -128,9 +128,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     lud16: '',
     nip05: ''
   });
-  const [activeRound, setActiveRound] = useState<RoundSettings | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [currentHole, setCurrentHole] = useState<number>(1);
+  const [activeRound, setActiveRound] = useState<RoundSettings | null>(() => {
+    const saved = localStorage.getItem('cdg_active_round');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [players, setPlayers] = useState<Player[]>(() => {
+    const saved = localStorage.getItem('cdg_players');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [currentHole, setCurrentHole] = useState<number>(() => {
+    const saved = localStorage.getItem('cdg_current_hole');
+    return saved ? parseInt(saved) : 1;
+  });
 
   // Stats
   const [userStats, setUserStats] = useState<UserStats>({
@@ -188,6 +197,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => localStorage.setItem('cdg_txs', JSON.stringify(transactions)), [transactions]);
   useEffect(() => localStorage.setItem('cdg_mints', JSON.stringify(mints)), [mints]);
   useEffect(() => localStorage.setItem('cdg_recent_players', JSON.stringify(recentPlayers)), [recentPlayers]);
+
+  // Persist active round state
+  useEffect(() => {
+    if (activeRound) {
+      localStorage.setItem('cdg_active_round', JSON.stringify(activeRound));
+    } else {
+      localStorage.removeItem('cdg_active_round');
+    }
+  }, [activeRound]);
+
+  // Persist players state
+  useEffect(() => {
+    localStorage.setItem('cdg_players', JSON.stringify(players));
+  }, [players]);
+
+  // Persist current hole
+  useEffect(() => {
+    localStorage.setItem('cdg_current_hole', currentHole.toString());
+  }, [currentHole]);
 
   // Auto-sync wallet to Nostr when proofs/mints/transactions change (Debounced)
   useEffect(() => {
@@ -1020,6 +1048,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setActiveRound(prev => prev ? { ...prev, isFinalized: true } : null);
+
+    // Clear persisted game state from localStorage
+    localStorage.removeItem('cdg_active_round');
+    localStorage.removeItem('cdg_players');
+    localStorage.removeItem('cdg_current_hole');
     refreshStats();
   };
 
@@ -1469,6 +1502,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveRound(null);
     setPlayers([]);
     setCurrentHole(1);
+
+    // Clear persisted game state from localStorage
+    localStorage.removeItem('cdg_active_round');
+    localStorage.removeItem('cdg_players');
+    localStorage.removeItem('cdg_current_hole');
   };
 
   const addMint = (url: string, nickname: string) => {

@@ -11,6 +11,7 @@ import { Profile } from './pages/Profile';
 import { InviteHandler } from './pages/InviteHandler';
 import { ProfileSetup } from './pages/ProfileSetup';
 import { RoundDetails } from './pages/RoundDetails';
+import { Onboarding } from './pages/Onboarding';
 import { useSwipeBack } from './hooks/useSwipeBack';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -59,6 +60,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
+// Conditional Route Component for / route
+// Show Onboarding for guests, Home for authenticated users
+const HomeOrOnboarding: React.FC = () => {
+  const { isGuest } = useApp();
+  return isGuest ? <Onboarding /> : <Home />;
+};
+
 const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -88,7 +96,7 @@ const App: React.FC = () => {
         <div className={`transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
           <Layout>
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<HomeOrOnboarding />} />
               <Route path="/play" element={<Scorecard />} />
               <Route path="/wallet" element={<Wallet />} />
               <Route path="/profile" element={<Profile />} />
