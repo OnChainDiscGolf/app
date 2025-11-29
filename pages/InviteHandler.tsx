@@ -67,12 +67,12 @@ export const InviteHandler: React.FC = () => {
             {/* Header - matching Play tab exactly */}
             <div className="bg-slate-900/80 backdrop-blur-md border-b border-white/5 p-6 sticky top-0 z-10">
                 <div className="max-w-md mx-auto text-center">
-                    <p className="text-slate-400 text-sm mb-2 font-medium">Welcome to..</p>
+                    <p className="text-slate-400 text-xs mb-3 font-medium">You've been added to the card on..</p>
                     <h1 className="font-extrabold tracking-tight leading-tight">
-                        <div className="text-4xl mb-0.5">
+                        <div className="text-5xl mb-1">
                             <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">On-Chain</span>
                         </div>
-                        <div className="text-3xl">
+                        <div className="text-4xl">
                             <span className="text-white">Disc Golf</span>
                         </div>
                     </h1>
@@ -117,7 +117,7 @@ export const InviteHandler: React.FC = () => {
                             </div>
 
                             <div className="space-y-3">
-                                <h2 className="text-4xl font-black text-white tracking-tight">Hello!</h2>
+                                <p className="text-slate-300 text-base font-medium">This app uses</p>
                                 <p className="text-lg font-bold">
                                     <span
                                         className={`text-brand-primary transition-all duration-500 ${activeIcon === 0 ? 'drop-shadow-[0_0_12px_rgba(45,212,191,0.8)] scale-110 inline-block' : ''
