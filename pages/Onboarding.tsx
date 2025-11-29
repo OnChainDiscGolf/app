@@ -104,6 +104,7 @@ export const Onboarding: React.FC = () => {
             {/* Header - matching Play tab exactly */}
             <div className="bg-slate-900/80 backdrop-blur-md border-b border-white/5 p-4">
                 <div className="max-w-md mx-auto text-center">
+                    <p className="golden-shimmer text-base mb-2 font-semibold">Welcome to..</p>
                     <h1 className="font-extrabold tracking-tight leading-tight">
                         <div className="text-7xl mb-1">
                             <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">On-Chain</span>
@@ -187,35 +188,48 @@ export const Onboarding: React.FC = () => {
                                 </button>
                             </div>
 
-                            <div className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-left shadow-xl">
-                                <div className="flex items-center justify-between mb-2">
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                            <div className="w-full bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl p-4 text-left shadow-lg transition-colors">
+                                {/* Clickable title to open Why modal */}
+                                <button
+                                    onClick={() => {
+                                        console.log('[Onboarding] Why key clicked');
+                                        setShowWhyKeyModal(true);
+                                    }}
+                                    className="w-full text-left mb-3 group"
+                                >
+                                    <p className="text-xs text-slate-400 group-hover:text-slate-300 font-bold uppercase tracking-wider border-b border-dashed border-slate-600 group-hover:border-slate-400 pb-1 inline-block transition-colors">
                                         Save your secret Key
                                     </p>
-                                    <button
-                                        onClick={() => {
-                                            console.log('[Onboarding] Why key clicked');
-                                            setShowWhyKeyModal(true);
-                                        }}
-                                        className="text-xs text-brand-primary hover:text-brand-accent flex items-center space-x-1"
-                                    >
-                                        <Icons.Help size={12} />
-                                        <span>Why?</span>
-                                    </button>
-                                </div>
+                                </button>
 
-                                <div className="flex items-center space-x-2 bg-black/50 rounded-lg p-2 border border-slate-800">
-                                    <code className="flex-1 text-xs text-slate-300 font-mono truncate select-all">
-                                        {generatedNsec}
+                                {/* nsec field and copy button on same line */}
+                                <div className="flex items-center justify-between space-x-3 bg-slate-900/50 rounded-lg p-3 border border-slate-800 mb-2">
+                                    <code className="text-sm text-slate-300 font-mono flex-1">
+                                        {generatedNsec.substring(0, 5)}...{generatedNsec.substring(generatedNsec.length - 4)}
                                     </code>
                                     <button
                                         onClick={copyToClipboard}
-                                        className="p-2 hover:bg-slate-800 rounded-md transition-colors text-brand-primary"
-                                        title="Copy Key"
+                                        className="flex items-center space-x-2 bg-brand-primary hover:bg-brand-accent text-black font-bold px-4 py-2 rounded-lg transition-all active:scale-95 shrink-0"
+                                        title="Copy your secret key"
                                     >
-                                        {copied ? <Icons.Check size={14} /> : <Icons.Copy size={14} />}
+                                        {copied ? (
+                                            <>
+                                                <Icons.Check size={16} />
+                                                <span className="text-xs">Copied!</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Icons.Copy size={16} />
+                                                <span className="text-xs">Copy Key</span>
+                                            </>
+                                        )}
                                     </button>
                                 </div>
+
+                                {/* Helper text */}
+                                <p className="text-xs text-slate-500 text-center">
+                                    Tap to copy • Keep this safe
+                                </p>
 
                                 {/* "I already have a nsec" option */}
                                 <div className="mt-3 text-center">
