@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
@@ -20,7 +20,13 @@ export const InviteHandler: React.FC = () => {
     const [showNewWorldModal, setShowNewWorldModal] = useState(false);
     const [showWhyKeyModal, setShowWhyKeyModal] = useState(false);
 
+    // Guard to prevent infinite loop
+    const hasAttemptedLogin = useRef(false);
+
     useEffect(() => {
+        // Prevent re-execution
+        if (hasAttemptedLogin.current) return;
+
         const handleInvite = async () => {
             const nsec = searchParams.get('nsec');
 
@@ -41,9 +47,10 @@ export const InviteHandler: React.FC = () => {
             }
         };
 
+        hasAttemptedLogin.current = true;
         handleInvite();
 
-    }, [searchParams, loginNsec]);
+    }, [searchParams]); // Removed loginNsec - it's from context and causes infinite loop
 
     // Timeout protection - prevent stuck processing state
     useEffect(() => {
