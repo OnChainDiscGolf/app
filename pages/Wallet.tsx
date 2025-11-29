@@ -87,10 +87,15 @@ export const Wallet: React.FC = () => {
     const { walletBalance, transactions, userProfile, currentUserPubkey, mints, setActiveMint, addMint, removeMint, sendFunds, receiveEcash, depositFunds, checkDepositStatus, confirmDeposit, getLightningQuote, isAuthenticated, refreshWalletBalance, walletMode, nwcString, setWalletMode, setNwcConnection, checkForPayments } = useApp();
     const navigate = useNavigate();
 
-    const [view, setView] = useState<'main' | 'receive' | 'deposit' | 'send-scan' | 'send-details' | 'settings'>('main');
+    const [view, setView] = useState<'main' | 'receive' | 'deposit' | 'send-input' | 'send-contacts' | 'send-details' | 'settings'>('main');
     const [sendAmount, setSendAmount] = useState('');
     const [sendInput, setSendInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+
+    // Contacts state
+    const [contacts, setContacts] = useState<Array<{ pubkey: string; name?: string; image?: string; lud16?: string }>>([]);
+    const [isLoadingContacts, setIsLoadingContacts] = useState(false);
+    const [contactsError, setContactsError] = useState<string | null>(null);
 
     // Removed: Initial checkForPayments() call - now handled by subscription in AppContext
 
@@ -886,121 +891,203 @@ export const Wallet: React.FC = () => {
         );
     }
 
-    if (view === 'send-scan') {
+    if (view === 'send-input') {
         const fileInput = (
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
         );
 
-        if (cameraError) {
-            return (
-                <div className="h-full bg-brand-dark flex flex-col p-6 relative">
-                    <button
-                        onClick={() => setView('main')}
-                        className="absolute top-6 left-6 p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                    >
-                        <Icons.Close size={24} />
-                    </button>
-
-                    <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8 animate-in fade-in zoom-in-95 duration-300">
-                        <div className="relative">
-                            <div className="w-24 h-24 bg-slate-800 rounded-3xl flex items-center justify-center shadow-xl border border-slate-700">
-                                <Icons.Camera size={48} className="text-slate-600" />
-                            </div>
-                            <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-red-500 rounded-full flex items-center justify-center border-4 border-brand-dark shadow-lg">
-                                <Icons.Close size={20} className="text-white" strokeWidth={3} />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <h2 className="text-2xl font-bold text-white">Scanner Unavailable</h2>
-                            <p className="text-slate-400 text-sm max-w-xs mx-auto leading-relaxed">
-                                We couldn't access your camera. Please check your browser permissions or try an alternative method.
-                            </p>
-                        </div>
-                        <div className="w-full max-w-sm space-y-3 pt-4">
-                            <Button fullWidth onClick={() => { setView('main'); setTimeout(() => setView('send-scan'), 100); }} className="bg-brand-primary text-white hover:bg-brand-primary/90">
-                                <Icons.Refresh className="mr-2" size={20} />
-                                <span>Retry Camera</span>
-                            </Button>
-                            <Button fullWidth onClick={() => fileInputRef.current?.click()} className="bg-brand-surface border border-slate-600 hover:bg-slate-700 text-white">
-                                <Icons.QrCode className="mr-2 text-brand-primary" size={20} />
-                                <span>Upload QR Image</span>
-                            </Button>
-                            <Button fullWidth onClick={() => setView('send-details')} className="bg-brand-surface border border-slate-600 hover:bg-slate-700 text-white">
-                                <Icons.Plus className="mr-2 text-brand-secondary" size={20} />
-                                <span>Paste Address / Invoice</span>
-                            </Button>
-                        </div>
-                    </div>
-                    {fileInput}
-                </div>
-            );
-        }
-
         return (
-            <div className="relative h-full bg-black flex flex-col">
-                <div className="flex-1 relative overflow-hidden">
-                    <video
-                        ref={videoRef}
-                        className="absolute inset-0 w-full h-full object-cover z-10 border-2 border-red-500"
-                        muted={true}
-                        autoPlay={true}
-                        playsInline={true}
-                    />
-                    <canvas ref={canvasRef} className="hidden" />
+            <div className="p-6 h-full flex flex-col">
+                <div className="flex items-center mb-6">
+                    <button onClick={() => setView('main')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors">
+                        <Icons.Prev />
+                    </button>
+                    <h2 className="text-xl font-bold">Choose Payment Method</h2>
+                </div>
 
-                    {/* Debug Logs */}
-                    <div className="absolute top-20 left-4 right-4 z-50 pointer-events-none">
-                        <div className="bg-black/70 p-2 rounded text-[10px] text-green-400 font-mono border border-green-900/50 shadow-lg backdrop-blur-sm">
-                            {logs.map((l, i) => <div key={i}>{l}</div>)}
+                <p className="text-slate-400 text-sm mb-6">Select how you'd like to send your payment</p>
+
+                <div className="grid grid-cols-2 gap-4 flex-1">
+                    {/* Nostr Contacts */}
+                    <button
+                        onClick={async () => {
+                            setView('send-contacts');
+                            setIsLoadingContacts(true);
+                            setContactsError(null);
+                            try {
+                                const { fetchContactList, lookupUser } = await import('../services/nostrService');
+                                const pubkeys = await fetchContactList(currentUserPubkey);
+
+                                // Fetch profile data for each contact
+                                const contactProfiles = await Promise.all(
+                                    pubkeys.slice(0, 50).map(async (pk) => {
+                                        try {
+                                            const profile = await lookupUser(pk);
+                                            if (!profile) return { pubkey: pk };
+
+                                            // lookupUser returns DisplayProfile which has nip05, not lud16
+                                            // We'll store the lightning address separately
+                                            const lightningAddr = profile.nip05 || undefined;
+
+                                            return {
+                                                pubkey: pk,
+                                                name: profile.name,
+                                                image: profile.image,
+                                                lud16: lightningAddr
+                                            };
+                                        } catch {
+                                            return { pubkey: pk };
+                                        }
+                                    })
+                                );
+                                setContacts(contactProfiles.filter(c => c !== null));
+                            } catch (e) {
+                                console.error('Failed to load contacts:', e);
+                                setContactsError('Failed to load contacts. Please try again.');
+                            } finally {
+                                setIsLoadingContacts(false);
+                            }
+                        }}
+                        className="flex flex-col items-center justify-center bg-brand-primary/10 hover:bg-brand-primary/20 border-2 border-brand-primary/40 rounded-2xl p-6 transition-all active:scale-95 group"
+                    >
+                        <div className="bg-brand-primary/20 p-4 rounded-full mb-3 group-hover:scale-110 transition-transform">
+                            <Icons.Users size={32} className="text-brand-primary" />
                         </div>
-                    </div>
+                        <span className="text-white font-bold text-sm mb-1">Nostr Contacts</span>
+                        <span className="text-slate-400 text-xs text-center">Send to your followers</span>
+                    </button>
 
-                    {isCameraLoading && (
-                        <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/50 backdrop-blur-sm">
-                            <div className="flex flex-col items-center bg-slate-900/90 p-6 rounded-2xl border border-slate-700">
-                                <Icons.QrCode className="animate-pulse text-brand-primary mb-3" size={40} />
-                                <p className="text-white text-sm font-bold">Starting Camera...</p>
-                            </div>
+                    {/* Paste Invoice/Address */}
+                    <button
+                        onClick={() => {
+                            setSendInput('');
+                            setView('send-details');
+                        }}
+                        className="flex flex-col items-center justify-center bg-slate-800 hover:bg-slate-700 border-2 border-slate-600 hover:border-slate-500 rounded-2xl p-6 transition-all active:scale-95 group"
+                    >
+                        <div className="bg-slate-700/50 p-4 rounded-full mb-3 group-hover:scale-110 transition-transform">
+                            <Icons.Copy size={32} className="text-slate-300" />
                         </div>
-                    )}
-                    <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                        <div className="w-64 h-64 border-2 border-brand-primary rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-                            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-brand-primary -mt-1 -ml-1"></div>
-                            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-brand-primary -mt-1 -mr-1"></div>
-                            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-brand-primary -mb-1 -ml-1"></div>
-                            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-brand-primary -mb-1 -mr-1"></div>
-                            {!isCameraLoading && (
-                                <div className="absolute top-1/2 left-2 right-2 h-0.5 bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.8)]"></div>
-                            )}
+                        <span className="text-white font-bold text-sm mb-1">Paste Manually</span>
+                        <span className="text-slate-400 text-xs text-center">Invoice or address</span>
+                    </button>
+
+                    {/* Upload QR Image */}
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex flex-col items-center justify-center bg-gradient-to-br from-purple-500/10 to-blue-500/10 hover:from-purple-500/20 hover:to-blue-500/20 border-2 border-purple-500/40 hover:border-purple-500/60 rounded-2xl p-6 transition-all active:scale-95 group"
+                    >
+                        <div className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 p-4 rounded-full mb-3 group-hover:scale-110 transition-transform">
+                            <Icons.QrCode size={32} className="text-purple-400" />
                         </div>
-                    </div>
-                    <div className="absolute top-8 left-0 right-0 z-20 text-center pointer-events-none">
-                        <h2 className="text-white font-bold text-lg drop-shadow-md bg-black/30 inline-block px-4 py-1 rounded-full backdrop-blur-sm">Scan Invoice or Token</h2>
-                    </div>
+                        <span className="text-white font-bold text-sm mb-1">Upload QR Code</span>
+                        <span className="text-slate-400 text-xs text-center">From your device</span>
+                    </button>
 
-                    {/* Manual Start Button */}
-                    <div className="absolute bottom-40 left-0 right-0 z-50 flex justify-center pointer-events-auto">
-                        <button
-                            onClick={() => restart()}
-                            className="bg-brand-primary/80 hover:bg-brand-primary text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-sm transition-all"
-                        >
-                            Force Restart Camera
-                        </button>
-                    </div>
-
-                    <button onClick={() => setView('main')} className="absolute top-6 left-6 z-30 p-3 bg-black/40 rounded-full text-white hover:bg-black/60 backdrop-blur-md transition-all">
-                        <Icons.Close size={24} />
+                    {/* Scan with Camera (Placeholder) */}
+                    <button
+                        disabled
+                        className="flex flex-col items-center justify-center bg-slate-900/50 border-2 border-slate-700/50 rounded-2xl p-6 opacity-50 cursor-not-allowed relative"
+                    >
+                        <div className="absolute top-2 right-2 px-2 py-0.5 bg-brand-accent/20 border border-brand-accent/40 rounded-full">
+                            <span className="text-[10px] font-bold text-brand-accent">Soon</span>
+                        </div>
+                        <div className="bg-slate-800/50 p-4 rounded-full mb-3">
+                            <Icons.Camera size={32} className="text-slate-600" />
+                        </div>
+                        <span className="text-slate-500 font-bold text-sm mb-1">Scan QR Code</span>
+                        <span className="text-slate-600 text-xs text-center">Coming soon</span>
                     </button>
                 </div>
-                <div className="bg-brand-dark p-6 pb-24 z-20 border-t border-slate-800 flex space-x-3 bottom-20 fixed left-0 right-0">
-                    <Button fullWidth variant="secondary" onClick={() => fileInputRef.current?.click()} className="text-white">
-                        <Icons.QrCode className="mr-2" size={18} /> Upload Image
-                    </Button>
-                    <Button fullWidth variant="secondary" onClick={() => setView('send-details')} className="text-white">
-                        <Icons.Plus className="mr-2" size={18} /> Paste Address
-                    </Button>
-                </div>
+
                 {fileInput}
+            </div>
+        );
+    }
+
+    if (view === 'send-contacts') {
+        return (
+            <div className="p-6 h-full flex flex-col">
+                <div className="flex items-center mb-6">
+                    <button onClick={() => setView('send-input')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors">
+                        <Icons.Prev />
+                    </button>
+                    <h2 className="text-xl font-bold">Select Contact</h2>
+                </div>
+
+                {isLoadingContacts ? (
+                    <div className="flex-1 flex flex-col items-center justify-center">
+                        <div className="w-12 h-12 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p className="text-slate-400">Loading your contacts...</p>
+                    </div>
+                ) : contactsError ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
+                            <Icons.Close size={32} className="text-red-500" />
+                        </div>
+                        <h3 className="text-white font-bold mb-2">Error Loading Contacts</h3>
+                        <p className="text-slate-400 text-sm mb-6 max-w-xs">{contactsError}</p>
+                        <Button onClick={() => setView('send-input')}>Go Back</Button>
+                    </div>
+                ) : contacts.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                            <Icons.Users size={32} className="text-slate-600" />
+                        </div>
+                        <h3 className="text-white font-bold mb-2">No Contacts Yet</h3>
+                        <p className="text-slate-400 text-sm mb-6 max-w-xs">
+                            Follow some people on Nostr to see them here!
+                        </p>
+                        <Button onClick={() => setView('send-input')}>Go Back</Button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex-1 overflow-y-auto space-y-3 -mx-2 px-2 no-scrollbar">
+                            {contacts.map((contact) => (
+                                <button
+                                    key={contact.pubkey}
+                                    onClick={() => {
+                                        // Pre-fill send input with lightning address if available
+                                        if (contact.lud16) {
+                                            setSendInput(contact.lud16);
+                                        } else {
+                                            // Use magic lightning address
+                                            const { getMagicLightningAddress } = require('../services/nostrService');
+                                            setSendInput(getMagicLightningAddress(contact.pubkey));
+                                        }
+                                        setView('send-details');
+                                    }}
+                                    className="w-full flex items-center space-x-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-brand-primary/50 rounded-xl p-4 transition-all group"
+                                >
+                                    {contact.image ? (
+                                        <img
+                                            src={contact.image}
+                                            alt={contact.name || 'Contact'}
+                                            className="w-12 h-12 rounded-full object-cover border-2 border-slate-700 group-hover:border-brand-primary/50 transition-colors"
+                                        />
+                                    ) : (
+                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-primary to-brand-accent flex items-center justify-center text-white font-bold text-lg border-2 border-slate-700 group-hover:border-brand-primary/50 transition-colors">
+                                            {contact.name ? contact.name[0].toUpperCase() : '?'}
+                                        </div>
+                                    )}
+                                    <div className="flex-1 text-left overflow-hidden">
+                                        <p className="text-white font-bold truncate">
+                                            {contact.name || 'Nostr User'}
+                                        </p>
+                                        {contact.lud16 ? (
+                                            <p className="text-slate-400 text-sm truncate">{contact.lud16}</p>
+                                        ) : (
+                                            <p className="text-slate-500 text-xs">
+                                                {contact.pubkey.substring(0, 16)}...
+                                            </p>
+                                        )}
+                                    </div>
+                                    <Icons.Send size={20} className="text-slate-600 group-hover:text-brand-primary transition-colors" />
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
             </div>
         );
     }
@@ -1089,7 +1176,7 @@ export const Wallet: React.FC = () => {
                             <div className="relative h-full max-h-48">
                                 <textarea
                                     className="w-full h-full bg-slate-900/50 border border-slate-600 rounded-xl p-4 text-sm font-mono text-slate-300 focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none resize-none transition-all"
-                                    placeholder="lnbc... or user@domain.com or cashuA..."
+                                    placeholder="Lightning invoice, Lightning address, LNURL, or Cashu token..."
                                     value={sendInput}
                                     onChange={e => setSendInput(e.target.value)}
                                 />
@@ -1211,7 +1298,7 @@ export const Wallet: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <button onClick={() => setView('send-scan')} className="flex flex-col items-center justify-center bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl py-3 transition-all active:scale-95">
+                        <button onClick={() => setView('send-input')} className="flex flex-col items-center justify-center bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl py-3 transition-all active:scale-95">
                             <div className="bg-brand-accent/20 p-2 rounded-full mb-1">
                                 <Icons.Send size={20} className="text-brand-accent" />
                             </div>
