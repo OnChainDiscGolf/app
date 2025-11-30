@@ -686,7 +686,6 @@ export const publishScore = async (roundId: string, scores: Record<number, numbe
         created_at: Math.floor(Date.now() / 1000),
         tags: [
             ['d', roundId],
-            ['e', roundId],
             ['t', 'scorecard']
         ],
         content: content,
@@ -952,7 +951,7 @@ export const fetchWalletBackup = async (pubkey: string): Promise<{ proofs: Proof
 export const subscribeToRound = (roundId: string, callback: (event: any) => void) => {
     const filters: Filter[] = [{
         kinds: [NOSTR_KIND_SCORE],
-        '#e': [roundId],
+        '#d': [roundId],
     }];
 
     return pool.subscribeMany(

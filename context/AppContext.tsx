@@ -1166,7 +1166,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPlayers(initialPlayers);
 
     try {
-      await publishRound(newRound);
+      const roundEvent = await publishRound(newRound);
+      // Update the active round with the event ID
+      setActiveRound(prev => prev ? { ...prev, eventId: roundEvent.id } : null);
     } catch (e) {
       console.warn("Failed to publish round:", e);
     }
