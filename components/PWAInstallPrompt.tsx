@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Icons } from './Icons';
-import { prepareTransferData } from '../services/storageTransfer';
 
 interface PWAInstallPromptProps {
     onDismiss: () => void;
@@ -10,8 +9,6 @@ interface PWAInstallPromptProps {
 export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ onDismiss }) => {
     const [dismissCount, setDismissCount] = useState(0);
     const [isWiggling, setIsWiggling] = useState(false);
-    const [transferUrl, setTransferUrl] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
 
     const handleDismiss = () => {
         if (dismissCount === 0) {
@@ -20,37 +17,23 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ onDismiss })
             setDismissCount(1);
             setTimeout(() => setIsWiggling(false), 400); // Match wiggle animation duration
         } else {
-            // Second click: actually dismiss
+            // Second click: Transfer keypair and dismiss
+            try {
+                const sk = localStorage.getItem('nostr_sk');
+                if (sk) {
+                    console.log('[🔄 PWA] Transferring keypair via URL hash...');
+                    // Set keypair in URL hash (not sent to server)
+                    window.location.hash = `keypair=${sk}`;
+                    console.log('[✅ PWA] Keypair added to URL hash for PWA import');
+                } else {
+                    console.warn('[⚠️ PWA] No keypair found in localStorage to transfer');
+                }
+            } catch (e) {
+                console.error('[❌ PWA] Failed to transfer keypair:', e);
+            }
+
+            // Continue with normal dismiss
             onDismiss();
-        }
-    };
-
-    const handleInstallNow = () => {
-        try {
-            // Prepare transfer data
-            const transferData = prepareTransferData();
-            const url = `${window.location.origin}/#transfer=${transferData}`;
-            setTransferUrl(url);
-
-            console.log('[PWA] Transfer URL generated:', url.substring(0, 100) + '...');
-        } catch (e) {
-            console.error('[PWA] Failed to prepare transfer:', e);
-            alert('Failed to prepare installation. Please try again.');
-        }
-    };
-
-    const copyTransferUrl = () => {
-        if (transferUrl) {
-            navigator.clipboard.writeText(transferUrl);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        }
-    };
-
-    const openTransferUrl = () => {
-        if (transferUrl) {
-            // Open in same window - this will allow PWA installation from the new URL
-            window.location.href = transferUrl;
         }
     };
 
@@ -71,87 +54,47 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ onDismiss })
                     </div>
 
                     {/* Content */}
-                    {!transferUrl ? (
-                        <>
-                            <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-                                <p className="text-brand-primary font-semibold">
-                                    Get the best experience!
-                                </p>
-                                <ul className="list-disc pl-5 space-y-2">
-                                    <li>⚡ <strong>Faster loading</strong> times</li>
-                                    <li>📱 <strong>Full-screen</strong> mobile experience</li>
-                                    <li>🏠 <strong>Home screen icon</strong> like a native app</li>
-                                    <li>🔔 <strong>In-app notifications</strong> for round updates</li>
-                                </ul>
+                    <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
+                        <p className="text-brand-primary font-semibold">
+                            Get the best experience!
+                        </p>
+                        <ul className="list-disc pl-5 space-y-2">
+                            <li>⚡ <strong>Faster loading</strong> times</li>
+                            <li>📱 <strong>Full-screen</strong> mobile experience</li>
+                            <li>🏠 <strong>Home screen icon</strong> like a native app</li>
+                            <li>🔔 <strong>In-app notifications</strong> for round updates</li>
+                        </ul>
 
-                                {dismissCount === 1 && (
-                                    <p className="text-center text-brand-primary text-xs font-medium animate-in fade-in slide-in-from-top-2 duration-300 golden-shimmer">
-                                        We really recommend installing! Click X again to continue.
+                        {/* Installation Instructions - More Prominent */}
+                        <div className="bg-gradient-to-br from-brand-primary/20 to-brand-accent/20 border-2 border-brand-primary/40 rounded-xl p-4 space-y-3 shadow-lg">
+                            <p className="text-brand-primary text-sm font-bold uppercase tracking-wide flex items-center">
+                                <Icons.Zap size={16} className="mr-2" />
+                                How to Install:
+                            </p>
+                            <div className="space-y-3 text-sm">
+                                <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+                                    <p className="font-bold text-white mb-1">iOS (Safari):</p>
+                                    <p className="text-slate-300 flex items-center">
+                                        Tap the <strong className="text-blue-400 flex items-center mx-1">
+                                            <Icons.IOSShare size={14} className="mx-1" /> Share
+                                        </strong> icon → <strong className="text-brand-primary ml-1">"Add to Home Screen"</strong>
                                     </p>
-                                )}
-                            </div>
-
-                            {/* Install Now Button */}
-                            <button
-                                onClick={handleInstallNow}
-                                className="w-full py-3 bg-brand-primary hover:bg-brand-accent text-black font-bold rounded-xl transition-all transform hover:scale-[1.02] shadow-lg shadow-brand-primary/20 flex items-center justify-center space-x-2"
-                            >
-                                <Icons.Zap size={18} />
-                                <span>Install Now</span>
-                            </button>
-                        </>
-                    ) : (
-                        <div className="space-y-4">
-                            {/* Installation Instructions - More Prominent */}
-                            <div className="bg-gradient-to-br from-brand-primary/20 to-brand-accent/20 border-2 border-brand-primary/40 rounded-xl p-4 space-y-3 shadow-lg">
-                                <p className="text-brand-primary text-sm font-bold uppercase tracking-wide flex items-center">
-                                    <Icons.Zap size={16} className="mr-2" />
-                                    How to Install:
-                                </p>
-                                <div className="space-y-3 text-sm">
-                                    <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
-                                        <p className="font-bold text-white mb-1">iOS (Safari):</p>
-                                        <p className="text-slate-300 flex items-center">
-                                            Tap the <strong className="text-blue-400 flex items-center mx-1">
-                                                <Icons.IOSShare size={14} className="mx-1" /> Share
-                                            </strong> icon → <strong className="text-brand-primary ml-1">"Add to Home Screen"</strong>
-                                        </p>
-                                    </div>
-                                    <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
-                                        <p className="font-bold text-white mb-1">Android (Chrome):</p>
-                                        <p className="text-slate-300">
-                                            Tap the <strong className="text-blue-400">menu</strong> (⋮) → <strong className="text-brand-primary">"Add to Home screen"</strong>
-                                        </p>
-                                    </div>
                                 </div>
-                            </div>
-
-                            {/* Open Button */}
-                            <button
-                                onClick={openTransferUrl}
-                                className="w-full py-3 bg-brand-primary hover:bg-brand-accent text-black font-bold rounded-xl transition-all transform hover:scale-[1.02] shadow-lg shadow-brand-primary/20"
-                            >
-                                Ready! Open Install Page
-                            </button>
-
-                            {/* URL Display (for advanced users) */}
-                            <div className="text-xs text-slate-500 text-center">
-                                <p className="mb-1">Advanced: Copy URL manually</p>
-                                <div className="flex items-center space-x-2 bg-black/50 rounded-lg p-2 border border-slate-800">
-                                    <code className="flex-1 text-xs text-slate-400 font-mono truncate select-all">
-                                        {transferUrl.substring(0, 40)}...
-                                    </code>
-                                    <button
-                                        onClick={copyTransferUrl}
-                                        className="p-1.5 hover:bg-slate-800 rounded transition-colors text-brand-primary"
-                                        title="Copy URL"
-                                    >
-                                        {copied ? <Icons.Check size={14} /> : <Icons.Copy size={14} />}
-                                    </button>
+                                <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+                                    <p className="font-bold text-white mb-1">Android (Chrome):</p>
+                                    <p className="text-slate-300">
+                                        Tap the <strong className="text-blue-400">menu</strong> (⋮) → <strong className="text-brand-primary">"Add to Home screen"</strong>
+                                    </p>
                                 </div>
                             </div>
                         </div>
-                    )}
+
+                        {dismissCount === 1 && (
+                            <p className="text-center text-brand-primary text-xs font-medium animate-in fade-in slide-in-from-top-2 duration-300 golden-shimmer">
+                                We really recommend installing! Click X again to continue.
+                            </p>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>,

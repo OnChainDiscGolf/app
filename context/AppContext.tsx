@@ -7,7 +7,8 @@ import { publishProfile, publishRound, publishScore, subscribeToRound, subscribe
 import { checkPendingPayments, NpubCashQuote, subscribeToQuoteUpdates, unsubscribeFromQuoteUpdates, getQuoteById } from '../services/npubCashService';
 import { WalletService } from '../services/walletService';
 import { NWCService } from '../services/nwcService';
-import { bytesToHex } from '@noble/hashes/utils';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+import { getPublicKey } from 'nostr-tools';
 
 interface AppContextType extends AppState {
   // Actions
@@ -280,29 +281,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Init Auth
   useEffect(() => {
     const initSession = async () => {
-      // CRITICAL: Check for transfer data BEFORE initializing session
-      // This handles PWA first launch after installation from browser
-      const { checkForTransfer, receiveTransferData, clearTransferData } = await import('../services/storageTransfer');
-      const transferData = checkForTransfer();
+      console.log('[🔐 Auth] Initializing session...', {
+        isPWA: window.matchMedia('(display-mode: standalone)').matches,
+        hasHash: window.location.hash.length > 0
+      });
 
-      if (transferData) {
-        console.log('[App] Detected transfer data, importing...');
-        const success = receiveTransferData(transferData);
+      // STEP 1: Check for keypair transfer via URL hash (PWA installation flow)
+      if (window.location.hash.startsWith('#keypair=')) {
+        try {
+          const transferredSk = window.location.hash.substring('#keypair='.length);
+          console.log('[🔄 Transfer] Found keypair in URL hash, importing...');
 
-        if (success) {
-          console.log('[App] ✅ Successfully imported transferred data');
-          clearTransferData(); // Remove from URL immediately
-        } else {
-          console.error('[App] ❌ Failed to import transfer data');
-          // Continue with normal flow - user will need to manually import
+          // Import the keypair
+          const skBytes = hexToBytes(transferredSk);
+          const pk = getPublicKey(skBytes);
+
+          localStorage.setItem('nostr_sk', transferredSk);
+          localStorage.setItem('nostr_pk', pk);
+          localStorage.setItem('auth_method', 'local');
+
+          // Verify
+          const verified = localStorage.getItem('nostr_sk') === transferredSk;
+          console.log('[✅ Transfer] Keypair imported to PWA localStorage:', verified ? 'SUCCESS' : 'FAILED');
+
+          // Clear the hash for security
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        } catch (e) {
+          console.error('[❌ Transfer] Failed to import keypair from URL hash:', e);
         }
       }
 
+      // STEP 2: Try to load existing session
       let session = getSession();
       let guestMode = localStorage.getItem('is_guest_mode') === 'true';
 
-      // Auto-create Guest Account if no session exists
+      console.log('[🔐 Auth] Session check:', {
+        hasSession: !!session,
+        isGuest: guestMode,
+        pk_preview: session?.pk?.substring(0, 8) + '...' || 'none'
+      });
+
+      // STEP 3: Auto-create Guest Account if no session exists
       if (!session) {
+        console.log('[👤 Auth] No existing session found, generating new guest keypair...');
         const newIdentity = generateNewProfile();
         session = { method: 'local', pk: newIdentity.pk, sk: newIdentity.sk };
         guestMode = true;

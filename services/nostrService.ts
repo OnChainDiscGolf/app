@@ -144,9 +144,28 @@ export const generateNewProfile = () => {
     const pk = getPublicKey(secret);
     const skHex = bytesToHex(secret);
 
+    console.log('[🔑 KeyGen] Generating new keypair...', {
+        pk_preview: pk.substring(0, 8) + '...',
+        timestamp: new Date().toISOString(),
+        isPWA: window.matchMedia('(display-mode: standalone)').matches
+    });
+
     localStorage.setItem('nostr_sk', skHex);
     localStorage.setItem('nostr_pk', pk);
     localStorage.setItem('auth_method', 'local');
+
+    // Verify write succeeded
+    const verified_sk = localStorage.getItem('nostr_sk');
+    const verified_pk = localStorage.getItem('nostr_pk');
+
+    if (verified_sk === skHex && verified_pk === pk) {
+        console.log('[✅ KeyGen] Keypair successfully saved to localStorage');
+    } else {
+        console.error('[❌ KeyGen] localStorage write verification FAILED!', {
+            sk_match: verified_sk === skHex,
+            pk_match: verified_pk === pk
+        });
+    }
 
     return { pk, sk: secret };
 };

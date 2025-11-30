@@ -33,25 +33,20 @@ export const Onboarding: React.FC = () => {
         // Prevent re-execution
         if (hasLoadedSession.current) return;
 
-        const loadExistingSession = async () => {
+        const loadExistingSession = () => {
             try {
-                // Check if this is a PWA transfer
-                const { wasTransferred, clearTransferStatus } = await import('../services/storageTransfer');
-                const isTransferred = wasTransferred();
-
-                if (isTransferred) {
-                    console.log('[Onboarding] 🎉 Detected successful PWA transfer!');
-                    // Clear the transfer flag
-                    clearTransferStatus();
-                    // Auto-navigate to profile setup after a brief moment
-                    setTimeout(() => {
-                        navigate('/profile-setup');
-                    }, 1500);
-                    return;
-                }
+                console.log('[📱 Onboarding] Loading existing session...', {
+                    isPWA: window.matchMedia('(display-mode: standalone)').matches,
+                    hasHash: window.location.hash.length > 0
+                });
 
                 // Get the existing guest session's nsec from localStorage
                 const existingSk = localStorage.getItem('nostr_sk');
+
+                console.log('[📱 Onboarding] localStorage check:', {
+                    hasKey: !!existingSk,
+                    keyPreview: existingSk ? existingSk.substring(0, 8) + '...' : 'none'
+                });
 
                 if (existingSk) {
                     // User already has a session (guest or otherwise)
@@ -59,9 +54,10 @@ export const Onboarding: React.FC = () => {
                     const nsec = nip19.nsecEncode(hexToBytes(existingSk));
                     setGeneratedNsec(nsec);
                     setStatus('success');
+                    console.log('[✅ Onboarding] Successfully loaded existing keypair');
                 } else {
                     // Fallback: generate new keypair if somehow no session exists
-                    console.warn('[Onboarding] No existing session found, generating new keypair');
+                    console.warn('[⚠️ Onboarding] No existing session found, generating new keypair');
                     const sk = generateSecretKey();
                     const nsec = nip19.nsecEncode(sk);
                     loginNsec(nsec); // This will save to localStorage
@@ -69,7 +65,7 @@ export const Onboarding: React.FC = () => {
                     setStatus('success');
                 }
             } catch (e) {
-                console.error("Session load failed:", e);
+                console.error("[❌ Onboarding] Session load failed:", e);
                 setStatus('error');
                 setErrorMessage('Failed to load session. Please refresh the page.');
             }
@@ -78,7 +74,7 @@ export const Onboarding: React.FC = () => {
         hasLoadedSession.current = true;
         loadExistingSession();
 
-    }, [loginNsec, navigate]);
+    }, [loginNsec]);
 
     // Icon Crossfade Loop
     useEffect(() => {
