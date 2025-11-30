@@ -716,7 +716,7 @@ export const Profile: React.FC = () => {
                                     </div>
                                     <div className="flex justify-between">
                                         <span>Source Code</span>
-                                        <a href="https://github.com/GarrettGlass/On-Chain-Disc-Golf" target="_blank" rel="noreferrer" className="text-brand-primary hover:underline">GitHub</a>
+                                        <a href="https://github.com/OnChainDiscGolf/app" target="_blank" rel="noreferrer" className="text-brand-primary hover:underline">GitHub</a>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>Developer</span>

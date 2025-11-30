@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: 💬 Discussions
-    url: https://github.com/GarrettGlass/On-Chain-Disc-Golf/discussions
+    url: https://github.com/OnChainDiscGolf/app/discussions
     about: Ask questions and discuss ideas with the community
   - name: 📚 Documentation
     url: https://help.onchaindiscgolf.com

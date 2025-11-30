@@ -10,7 +10,7 @@ The On-Chain Disc Golf team takes security seriously. We appreciate your efforts
 
 Instead, please report them via one of these methods:
 
-1. **GitHub Security Advisories**: Use [GitHub's private vulnerability reporting](https://github.com/GarrettGlass/On-Chain-Disc-Golf/security/advisories/new)
+1. **GitHub Security Advisories**: Use [GitHub's private vulnerability reporting](https://github.com/OnChainDiscGolf/app/security/advisories/new)
 2. **Nostr DM**: Send an encrypted DM to the project maintainer
 
 ### What to Include
