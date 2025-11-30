@@ -436,7 +436,7 @@ export const registerWithNpubCash = async (): Promise<GatewayRegistration> => {
         return { gateway: 'npub.cash', pubkey, success: true };
 
     } catch (e: any) {
-        console.error('❌ Failed to register with npub.cash:', e);
+        console.log('ℹ️ npub.cash gateway registration unavailable:', e.message);
         return { gateway: 'npub.cash', pubkey: '', success: false, error: e.message };
     }
 };
@@ -481,7 +481,7 @@ export const registerWithMinibits = async (): Promise<GatewayRegistration> => {
         return { gateway: 'minibits.cash', pubkey, success: true };
 
     } catch (e: any) {
-        console.error('❌ Failed to register with Minibits:', e);
+        console.log('ℹ️ Minibits gateway registration unavailable:', e.message);
         return { gateway: 'minibits.cash', pubkey: '', success: false, error: e.message };
     }
 };
@@ -490,46 +490,9 @@ export const registerWithMinibits = async (): Promise<GatewayRegistration> => {
  * Register with eNuts gateway
  */
 export const registerWithENuts = async (): Promise<GatewayRegistration> => {
-    const session = getSession();
-    if (!session) {
-        return { gateway: 'enuts.cash', pubkey: '', success: false, error: 'No session' };
-    }
-
-    try {
-        // Generate static Cashu keypair
-        const walletService = new WalletService('https://legend.lnbits.com/cashu/api/v1/A6X7jKLMnU');
-        await walletService.connect();
-
-        const pubkey = await walletService.getPublicKey();
-        if (!pubkey) {
-            return { gateway: 'enuts.cash', pubkey: '', success: false, error: 'Failed to generate keys' };
-        }
-
-        // eNuts registration via API (if available)
-        // For now, we'll assume eNuts uses similar registration
-        const response = await fetch('https://enuts.com/api/v1/register', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                pubkey: pubkey,
-                mintUrl: 'https://legend.lnbits.com/cashu/api/v1/A6X7jKLMnU',
-                npub: session.pk
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Registration failed: ${response.status}`);
-        }
-
-        console.log(`✅ Registered with eNuts: ${pubkey}`);
-        return { gateway: 'enuts.cash', pubkey, success: true };
-
-    } catch (e: any) {
-        console.error('❌ Failed to register with eNuts:', e);
-        return { gateway: 'enuts.cash', pubkey: '', success: false, error: e.message };
-    }
+    // eNuts integration is not yet implemented - return gracefully
+    console.log('ℹ️ eNuts gateway registration skipped (not yet implemented)');
+    return { gateway: 'enuts.cash', pubkey: '', success: false, error: 'Not yet implemented' };
 };
 
 /**

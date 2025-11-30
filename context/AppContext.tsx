@@ -1787,7 +1787,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const removeMint = (url: string) => {
-    setMints(prev => prev.filter(m => m.url !== url));
+    setMints(prev => {
+      const filtered = prev.filter(m => m.url !== url);
+      // Ensure there's always at least one mint (fallback to Minibits if needed)
+      if (filtered.length === 0) {
+        return [{ url: 'https://mint.minibits.cash/Bitcoin', nickname: 'Minibits', isActive: true }];
+      }
+      // If we removed the active mint, make the first remaining mint active
+      const wasActiveRemoved = prev.find(m => m.url === url)?.isActive;
+      if (wasActiveRemoved && !filtered.some(m => m.isActive)) {
+        filtered[0].isActive = true;
+      }
+      return filtered;
+    });
   };
 
   const setActiveMint = (url: string) => {
