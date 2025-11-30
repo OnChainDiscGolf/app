@@ -16,6 +16,8 @@ export const Scorecard: React.FC = () => {
     const [viewHole, setViewHole] = useState(activeRound?.startingHole || 1);
     const [showHalfwayReview, setShowHalfwayReview] = useState(false);
     const [showFinalReview, setShowFinalReview] = useState(false);
+    const [showConfirmFinalize, setShowConfirmFinalize] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
 
     // Calculate pots based on granular payment selections
@@ -150,12 +152,22 @@ export const Scorecard: React.FC = () => {
         updateScore(viewHole, newScore, playerId);
     };
 
-    const handleFinish = async () => {
-        if (window.confirm("Are you sure you want to finalize this round?")) {
+    const handleFinish = () => {
+        setShowConfirmFinalize(true);
+    };
+
+    const confirmFinalize = async () => {
+        setIsSubmitting(true);
+        try {
             // Publish final scores before finalizing
             await publishCurrentScores();
-            finalizeRound();
-            navigate('/wallet');
+            await finalizeRound();
+            // Don't navigate - the round summary modal will show
+        } catch (e) {
+            console.error("Failed to finalize round:", e);
+        } finally {
+            setIsSubmitting(false);
+            setShowConfirmFinalize(false);
         }
     };
 
@@ -634,6 +646,86 @@ export const Scorecard: React.FC = () => {
 
             {/* Fixed spacer for BottomNav */}
             <div className="h-16"></div>
+
+            {/* Confirm Finalize Modal */}
+            {showConfirmFinalize && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
+                        
+                        {/* Header */}
+                        <div className="relative bg-gradient-to-r from-amber-600/20 via-amber-500/30 to-amber-600/20 p-5 text-center border-b border-amber-500/20">
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.15),transparent_70%)]" />
+                            <div className="relative">
+                                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-amber-500/20 border-2 border-amber-400/50 mb-3">
+                                    <Icons.Trophy size={28} className="text-amber-400" />
+                                </div>
+                                <h2 className="text-lg font-bold text-white">Finalize Round?</h2>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-5 space-y-4">
+                            <p className="text-slate-300 text-sm text-center leading-relaxed">
+                                This will lock all scores and automatically send payouts to winners.
+                            </p>
+
+                            {/* Quick Summary */}
+                            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3 space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-400">Players</span>
+                                    <span className="text-white font-medium">{players.length}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-400">Total Pot</span>
+                                    <span className="text-emerald-400 font-bold">{totalPot} sats</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-400">Leader</span>
+                                    <span className="text-amber-400 font-medium">
+                                        {[...players].sort((a, b) => a.totalScore - b.totalScore)[0]?.name || '-'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Warning */}
+                            <div className="flex items-start space-x-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                                <Icons.Zap size={18} className="text-amber-400 shrink-0 mt-0.5" />
+                                <p className="text-xs text-amber-200/80">
+                                    Scores cannot be changed after finalizing. Make sure everyone's scores are correct!
+                                </p>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex space-x-3 pt-2">
+                                <Button
+                                    variant="secondary"
+                                    fullWidth
+                                    onClick={() => setShowConfirmFinalize(false)}
+                                    disabled={isSubmitting}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    variant="primary"
+                                    fullWidth
+                                    onClick={confirmFinalize}
+                                    disabled={isSubmitting}
+                                    className={isSubmitting ? 'animate-pulse' : ''}
+                                >
+                                    {isSubmitting ? (
+                                        <span className="flex items-center justify-center space-x-2">
+                                            <Icons.Zap size={16} className="animate-bounce" />
+                                            <span>Sending...</span>
+                                        </span>
+                                    ) : (
+                                        'Finalize & Pay'
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

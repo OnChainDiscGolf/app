@@ -4,6 +4,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { BottomNav } from './components/BottomNav';
 import { SplashScreen } from './components/SplashScreen';
 import { LightningStrikeNotification } from './components/LightningStrike';
+import { RoundSummaryModal } from './components/RoundSummaryModal';
 import { Home } from './pages/Home';
 import { Scorecard } from './pages/Scorecard';
 import { Wallet } from './pages/Wallet';
@@ -18,7 +19,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useSwipeBack(); // Enable global swipe-to-back
   const navigate = useNavigate();
   const location = useLocation();
-  const { paymentNotification, setPaymentNotification, lightningStrike, isGuest } = useApp();
+  const { paymentNotification, setPaymentNotification, lightningStrike, isGuest, roundSummary, setRoundSummary } = useApp();
 
   // Hide nav on onboarding/profile-setup for guests
   const hideNav = isGuest && (location.pathname === '/' || location.pathname === '/profile-setup');
@@ -69,6 +70,22 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               setPaymentNotification(null);
             }}
             extendedDuration={paymentNotification.context === 'wallet_receive'}
+          />
+        )}
+
+        {/* Round Summary Modal */}
+        {roundSummary && (
+          <RoundSummaryModal
+            isOpen={roundSummary.isOpen}
+            onClose={() => setRoundSummary(null)}
+            roundName={roundSummary.roundName}
+            standings={roundSummary.standings}
+            payouts={roundSummary.payouts}
+            aceWinners={roundSummary.aceWinners}
+            acePotAmount={roundSummary.acePotAmount}
+            totalPot={roundSummary.totalPot}
+            par={roundSummary.par}
+            isProcessingPayments={roundSummary.isProcessingPayments}
           />
         )}
       </div>

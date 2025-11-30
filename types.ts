@@ -53,6 +53,7 @@ export interface RoundSettings {
   isFinalized: boolean;
   holeCount: number;
   players: string[]; // List of pubkeys
+  par: number; // Course par (default 54)
 
   // Customization Config
   startingHole: number;

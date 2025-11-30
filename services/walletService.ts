@@ -225,10 +225,11 @@ export class WalletService {
                 }
             }
 
-            // Encode the token
+            // Encode the token (cashu-ts v2 format)
             const token = getEncodedToken({
-                token: [{ mint: this.mintUrl, proofs: send }]
-            } as any);
+                mint: this.mintUrl,
+                proofs: send
+            });
 
             return {
                 token,

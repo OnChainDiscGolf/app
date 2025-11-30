@@ -70,6 +70,20 @@ interface AppContextType extends AppState {
     amount: number;
     show: boolean;
   } | null;
+
+  // Round Summary Modal
+  roundSummary: {
+    isOpen: boolean;
+    roundName: string;
+    standings: Player[];
+    payouts: { playerName: string; amount: number; isCurrentUser: boolean }[];
+    aceWinners: { name: string; hole: number }[];
+    acePotAmount: number;
+    totalPot: number;
+    par: number;
+    isProcessingPayments: boolean;
+  } | null;
+  setRoundSummary: (summary: AppContextType['roundSummary']) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -186,6 +200,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [lightningStrike, setLightningStrike] = useState<{
     amount: number;
     show: boolean;
+  } | null>(null);
+
+  // Round Summary Modal State
+  const [roundSummary, setRoundSummary] = useState<{
+    isOpen: boolean;
+    roundName: string;
+    standings: Player[];
+    payouts: { playerName: string; amount: number; isCurrentUser: boolean }[];
+    aceWinners: { name: string; hole: number }[];
+    acePotAmount: number;
+    totalPot: number;
+    par: number;
+    isProcessingPayments: boolean;
   } | null>(null);
 
   // Auto-reset lightning strike after animation
@@ -1116,7 +1143,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       players: [currentUserPubkey, ...selectedPlayers.map(p => p.pubkey)],
       startingHole: settings.startingHole || 1,
       trackPenalties: settings.trackPenalties || false,
-      hideOverallScore: settings.hideOverallScore || false
+      hideOverallScore: settings.hideOverallScore || false,
+      par: settings.par || ((settings.holeCount || DEFAULT_HOLE_COUNT) * 3) // Par 3 per hole
     };
 
     setActiveRound(newRound);
@@ -1268,29 +1296,137 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ));
   }, []);
 
+  // Helper function to resolve Lightning Address to an invoice
+  const resolveLightningAddress = async (address: string, amountSats: number): Promise<string | null> => {
+    try {
+      const [user, domain] = address.split('@');
+      if (!user || !domain) return null;
+
+      console.log(`⚡ Resolving Lightning Address: ${address} for ${amountSats} sats`);
+      const res = await fetch(`https://${domain}/.well-known/lnurlp/${user}`);
+      const data = await res.json();
+
+      if (data.callback) {
+        const amountMsat = amountSats * 1000;
+        const callbackUrl = new URL(data.callback);
+        callbackUrl.searchParams.set('amount', amountMsat.toString());
+
+        const invoiceRes = await fetch(callbackUrl.toString());
+        const invoiceData = await invoiceRes.json();
+
+        if (invoiceData.pr) {
+          console.log(`✅ Got invoice from Lightning Address`);
+          return invoiceData.pr;
+        }
+      }
+      return null;
+    } catch (e) {
+      console.error("Failed to resolve Lightning Address:", e);
+      return null;
+    }
+  };
+
   const finalizeRound = async () => {
     if (!activeRound) return;
 
     const sortedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
     const winner = sortedPlayers[0];
-    const potSize = activeRound.entryFeeSats * players.length; // Simplified pot
-    const prize = Math.floor(potSize * 0.8); // 80% payout example
+    const potSize = activeRound.entryFeeSats * players.length;
+    const prize = Math.floor(potSize * 0.8); // 80% payout
+    const acePotAmount = activeRound.acePotFeeSats ? activeRound.acePotFeeSats * players.length : 0;
+    // Calculate par dynamically: 3 strokes per hole
+    const par = activeRound.par || (activeRound.holeCount * 3);
 
+    // Detect aces (score of 1 on any hole)
+    const aceWinners: { name: string; hole: number }[] = [];
+    players.forEach(player => {
+      Object.entries(player.scores).forEach(([hole, score]) => {
+        if (score === 1) {
+          aceWinners.push({ name: player.name, hole: parseInt(hole) });
+        }
+      });
+    });
+
+    // Show the round summary modal IMMEDIATELY with processing state
+    setRoundSummary({
+      isOpen: true,
+      roundName: activeRound.name,
+      standings: sortedPlayers,
+      payouts: [], // Empty initially
+      aceWinners,
+      acePotAmount,
+      totalPot: potSize,
+      par,
+      isProcessingPayments: prize > 0 && !winner.isCurrentUser
+    });
+
+    // Track payouts for summary
+    const payoutsMade: { playerName: string; amount: number; isCurrentUser: boolean }[] = [];
+
+    // Pay main pot (async, modal already showing)
     if (prize > 0) {
       if (winner.isCurrentUser) {
         // I won, I keep the pot (which I already hold as host)
         addTransaction('payout', prize, `Won Round: ${activeRound.name}`);
+        payoutsMade.push({ playerName: winner.name, amount: prize, isCurrentUser: true });
+        
+        // Update modal with payout info
+        setRoundSummary(prev => prev ? {
+          ...prev,
+          payouts: payoutsMade,
+          isProcessingPayments: false
+        } : null);
       } else {
-        // Someone else won, pay them
+        // Someone else won, pay them via their Lightning Address
         try {
-          const token = await createToken(prize);
-          await sendDirectMessage(winner.id, `You won ${activeRound.name}! Here is your prize: ${token}`);
-          addTransaction('payout', prize, `Payout to ${winner.name}`);
+          const winnerLightningAddress = winner.lightningAddress || getMagicLightningAddress(winner.id);
+          
+          if (!winnerLightningAddress) {
+            throw new Error("Winner has no Lightning Address configured");
+          }
+          
+          console.log(`💸 Paying ${prize} sats to winner ${winner.name} at ${winnerLightningAddress}`);
+          
+          const invoice = await resolveLightningAddress(winnerLightningAddress, prize);
+          
+          if (!invoice) {
+            throw new Error(`Could not get invoice from ${winnerLightningAddress}`);
+          }
+          
+          const success = await sendFunds(prize, invoice);
+          
+          if (success) {
+            console.log(`✅ Successfully paid ${prize} sats to ${winner.name}`);
+            addTransaction('payout', prize, `Payout to ${winner.name}`);
+            payoutsMade.push({ playerName: winner.name, amount: prize, isCurrentUser: false });
+          } else {
+            throw new Error("Payment failed");
+          }
         } catch (e) {
           console.error("Failed to pay winner", e);
           const errorMessage = e instanceof Error ? e.message : String(e);
+          // Show error in modal or alert
           alert(`Failed to pay winner: ${errorMessage}. Please pay manually.`);
         }
+        
+        // Update modal with payout info (whether success or fail)
+        setRoundSummary(prev => prev ? {
+          ...prev,
+          payouts: payoutsMade,
+          isProcessingPayments: false
+        } : null);
+      }
+    }
+
+    // Pay ace pot if someone got an ace
+    if (aceWinners.length > 0 && acePotAmount > 0) {
+      const aceWinner = players.find(p => 
+        Object.values(p.scores).includes(1)
+      );
+      if (aceWinner) {
+        const aceShare = Math.floor(acePotAmount / aceWinners.length);
+        // For now, just log - ace pot payment logic can be similar to main pot
+        console.log(`🎯 Ace pot: ${aceShare} sats to ${aceWinner.name}`);
       }
     }
 
@@ -1888,7 +2024,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       checkForPayments,
       paymentNotification,
       setPaymentNotification,
-      lightningStrike
+      lightningStrike,
+      roundSummary,
+      setRoundSummary
     }}>
       {children}
     </AppContext.Provider>
