@@ -18,7 +18,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useSwipeBack(); // Enable global swipe-to-back
   const navigate = useNavigate();
   const location = useLocation();
-  const { paymentNotification, setPaymentNotification, isGuest } = useApp();
+  const { paymentNotification, setPaymentNotification, lightningStrike, isGuest } = useApp();
 
   // Hide nav on onboarding/profile-setup for guests
   const hideNav = isGuest && (location.pathname === '/' || location.pathname === '/profile-setup');
@@ -45,7 +45,19 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {!hideNav && <BottomNav />}
 
         {/* Global Lightning Strike Notification */}
-        {paymentNotification && (
+        {lightningStrike?.show && (
+          <LightningStrikeNotification
+            amount={lightningStrike.amount}
+            onComplete={() => {
+              // Reset lightning strike state
+              // Note: We don't navigate here - lightning strikes are pure notifications
+            }}
+            extendedDuration={false}
+          />
+        )}
+
+        {/* Legacy payment notification (for QR code payments) */}
+        {paymentNotification && !lightningStrike?.show && (
           <LightningStrikeNotification
             amount={paymentNotification.amount}
             onComplete={() => {

@@ -40,6 +40,24 @@ export class WalletService {
     }
 
     /**
+     * Get the public key for gateway registration
+     */
+    async getPublicKey(): Promise<string | null> {
+        try {
+            // Load the keyset to get the public key
+            const keysets = await this.mint.getKeySets();
+            if (keysets && keysets.length > 0) {
+                // Return the first active keyset's public key
+                return keysets[0].keys['02']; // The public key for amount 2 (DER encoded)
+            }
+            return null;
+        } catch (e) {
+            console.error("Failed to get public key", e);
+            return null;
+        }
+    }
+
+    /**
      * Verify proofs with the mint and return only unspent (valid) ones.
      */
     async verifyProofs(proofs: Proof[]): Promise<Proof[]> {

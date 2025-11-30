@@ -3,11 +3,14 @@ import { CashuMint, CashuWallet, getDecodedToken } from '@cashu/cashu-ts';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, Player, RoundSettings, WalletTransaction, UserProfile, UserStats, NOSTR_KIND_SCORE, Mint, DisplayProfile, Proof, PayoutConfig } from '../types';
 import { DEFAULT_HOLE_COUNT } from '../constants';
-import { publishProfile, publishRound, publishScore, subscribeToRound, subscribeToPlayerRounds, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, loginWithAmber, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages, subscribeToGiftWraps, fetchHistoricalGiftWraps, getMagicLightningAddress } from '../services/nostrService';
-import { checkPendingPayments, NpubCashQuote, subscribeToQuoteUpdates, unsubscribeFromQuoteUpdates, getQuoteById } from '../services/npubCashService';
+import { publishProfile, publishRound, publishScore, subscribeToRound, subscribeToPlayerRounds, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, loginWithAmber, generateNewProfile, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages, subscribeToGiftWraps, subscribeToNutzaps, subscribeToLightningGiftWraps, fetchHistoricalGiftWraps, getMagicLightningAddress } from '../services/nostrService';
+import { checkPendingPayments, NpubCashQuote, subscribeToQuoteUpdates, unsubscribeFromQuoteUpdates, getQuoteById, registerWithAllGateways, checkGatewayRegistration } from '../services/npubCashService';
+import { checkGatewayRegistration as getGatewayRegistrations } from '../services/npubCashService';
 import { WalletService } from '../services/walletService';
 import { NWCService } from '../services/nwcService';
 import { bytesToHex } from '@noble/hashes/utils';
+import { LightningStrikeNotification } from '../components/LightningStrike';
+import { completeAmberConnection } from '../services/amberSigner';
 
 interface AppContextType extends AppState {
   // Actions
@@ -60,6 +63,12 @@ interface AppContextType extends AppState {
     context?: 'wallet_receive' | 'buyin_qr';
   } | null;
   setPaymentNotification: (notification: { amount: number; context?: 'wallet_receive' | 'buyin_qr' } | null) => void;
+
+  // Lightning Strike
+  lightningStrike: {
+    amount: number;
+    show: boolean;
+  } | null;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -172,6 +181,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     context?: 'wallet_receive' | 'buyin_qr';
   } | null>(null);
 
+  // Lightning Strike State
+  const [lightningStrike, setLightningStrike] = useState<{
+    amount: number;
+    show: boolean;
+  } | null>(null);
+
+  // Auto-reset lightning strike after animation
+  useEffect(() => {
+    if (lightningStrike?.show) {
+      const timer = setTimeout(() => {
+        setLightningStrike(null);
+      }, 3000); // 3 seconds matches the animation duration
+
+      return () => clearTimeout(timer);
+    }
+  }, [lightningStrike]);
+
   // --- Effects ---
 
   // Helper to force immediate sync (bypass debounce)
@@ -179,7 +205,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isAuthenticated && !isGuest) {
       console.log("Syncing wallet to Nostr...");
       try {
-        await publishWalletBackup(currentProofs, currentMints, currentTransactions);
+        const gatewayRegistrations = checkGatewayRegistration();
+        await publishWalletBackup(currentProofs, currentMints, currentTransactions, gatewayRegistrations);
       } catch (e) {
         console.error("Wallet Sync Failed:", e);
       }
@@ -283,6 +310,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let session = getSession();
       let guestMode = localStorage.getItem('is_guest_mode') === 'true';
 
+      // Check for completed Amber connection
+      const amberResult = await completeAmberConnection();
+      if (amberResult) {
+        console.log('✅ Amber connection completed:', amberResult);
+        // Create session with Amber
+        session = {
+          method: 'amber',
+          pk: amberResult.userPubkey,
+          sk: '' // Amber handles signing
+        };
+        guestMode = false;
+        localStorage.removeItem('is_guest_mode');
+        localStorage.setItem('amber_ephemeral_sk', bytesToHex(amberResult.ephemeralSk));
+        localStorage.setItem('amber_relay', amberResult.relay);
+      }
+
       // Auto-create Guest Account if no session exists
       if (!session) {
         const newIdentity = generateNewProfile();
@@ -314,6 +357,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (currentUserPubkey && !isGuest) {
       setIsProfileLoading(true);
 
+      // Log the user's Lightning address for debugging
+      const lightningAddress = getMagicLightningAddress(currentUserPubkey);
+      console.log(`⚡ Your Lightning Address: ${lightningAddress}`);
+      console.log(`📡 Your Pubkey: ${currentUserPubkey}`);
+
       // 1. Fetch Profile
       fetchProfile(currentUserPubkey).then(profile => {
         if (profile) {
@@ -339,7 +387,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }).catch(e => console.warn("Contacts fetch failed", e));
 
       // 3. Restore Wallet Proofs (Merge Strategy)
-      fetchWalletBackup(currentUserPubkey).then(backup => {
+      fetchWalletBackup(currentUserPubkey).then(async (backup) => {
         if (backup) {
           console.log("Found remote backup, merging...");
 
@@ -357,6 +405,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
 
           if (backup.mints.length > 0) setMints(backup.mints);
+
+          // 3.1. Restore Gateway Registrations
+          if (backup.gatewayRegistrations && backup.gatewayRegistrations.length > 0) {
+            console.log(`Restoring ${backup.gatewayRegistrations.length} gateway registrations...`);
+            localStorage.setItem('gateway_registrations', JSON.stringify(backup.gatewayRegistrations));
+
+            // Check if registrations are still valid and re-register if needed
+            const needsReregistration = backup.gatewayRegistrations.some(reg => !reg.success);
+            if (needsReregistration) {
+              console.log("Some gateway registrations failed previously, attempting to re-register...");
+              try {
+                const newRegistrations = await registerWithAllGateways();
+                // Merge with existing registrations
+                const mergedRegistrations = backup.gatewayRegistrations.map(existing => {
+                  const updated = newRegistrations.find(newReg => newReg.gateway === existing.gateway);
+                  return updated || existing;
+                });
+                localStorage.setItem('gateway_registrations', JSON.stringify(mergedRegistrations));
+              } catch (e) {
+                console.warn("Failed to re-register gateways:", e);
+              }
+            }
+          } else {
+            // No gateway registrations in backup, register now
+            console.log("No gateway registrations in backup, registering now...");
+            try {
+              await registerWithAllGateways();
+            } catch (e) {
+              console.warn("Failed to register gateways on restore:", e);
+            }
+          }
         } else {
           console.log("No wallet backup found. Creating initial backup to enable payment detection.");
           // Create initial backup immediately (even if empty) to ensure npub.cash payments work
@@ -376,6 +455,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }, 100); // Minimal delay to allow state to settle
             return current;
           });
+
+          // Register with gateways for new account
+          console.log("Registering with payment gateways for new account...");
+          try {
+            await registerWithAllGateways();
+          } catch (e) {
+            console.warn("Failed to register gateways for new account:", e);
+          }
         }
       }).catch(e => console.error("Wallet restore failed:", e));
 
@@ -550,7 +637,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 if (success) {
                   console.log("Auto-redeemed token from Gift Wrap!");
                   // Notify user (could add a toast here later)
-                  addTransaction('receive', 0, 'Received via Lightning Bridge', 'cashu'); // Amount will be updated by receiveEcash logic if we tracked it better, but for now this logs the event. 
+                  addTransaction('receive', 0, 'Received via Lightning Bridge', 'cashu'); // Amount will be updated by receiveEcash logic if we tracked it better, but for now this logs the event.
                   // Actually receiveEcash updates the proofs, so balance updates automatically.
                 }
               } catch (e) {
@@ -558,6 +645,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
             }
           }
+        }
+      });
+
+      return () => sub.close();
+    }
+  }, [isAuthenticated, isGuest]);
+
+  // Listen for Lightning Nutzaps (kind 9735)
+  useEffect(() => {
+    if (isAuthenticated && !isGuest) {
+      const sub = subscribeToNutzaps(async (event) => {
+        console.log("🔔 Processing nutzap payment!", event);
+
+        try {
+          // Parse the zap event to extract payment details
+          const zapRequest = event.tags.find(t => t[0] === 'description')?.[1];
+          if (zapRequest) {
+            const zapData = JSON.parse(zapRequest);
+            const amountMsats = parseInt(zapData.amount);
+            const amount = Math.floor(amountMsats / 1000); // msats to sats
+
+            // Check if this is a payment to us (via our lud16 or pubkey)
+            const recipient = zapData.tags?.find((t: any[]) => t[0] === 'p')?.[1];
+            const ourLud16 = getMagicLightningAddress(currentUserPubkey);
+
+            if (recipient === currentUserPubkey || zapData.lud16 === ourLud16) {
+              // This is a payment to us via Lightning
+              console.log(`⚡ Lightning nutzap received: ${amount} sats`);
+
+              // Add transaction and show notification
+              addTransaction('receive', amount, 'Received via Lightning Zap', 'cashu');
+              setPaymentNotification({ amount, context: 'wallet_receive' });
+              setLightningStrike({ amount, show: true });
+
+              // Play lightning strike sound
+              try {
+                const audio = new Audio('/lightning-strike.mp3');
+                audio.volume = 0.3;
+                audio.play().catch(e => console.warn('Could not play lightning sound:', e));
+              } catch (e) {
+                console.warn('Audio not supported:', e);
+              }
+
+              // Trigger balance refresh to ensure UI updates
+              refreshWalletBalance();
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to process nutzap", e);
+        }
+      });
+
+      return () => sub.close();
+    }
+  }, [isAuthenticated, isGuest, currentUserPubkey]);
+
+  // Listen for Lightning Gift Wraps (kinds 23194/23195)
+  useEffect(() => {
+    if (isAuthenticated && !isGuest) {
+      const sub = subscribeToLightningGiftWraps(async (event) => {
+        console.log("⚡ Processing Lightning gift-wrap payment!", event);
+
+        try {
+          const content = event.content;
+          if (content && content.includes('cashuA')) {
+            console.log("Found Cashu token in Lightning gift-wrap!");
+            const tokens = content.match(/cashuA[A-Za-z0-9_=-]+/g);
+            if (tokens) {
+              for (const token of tokens) {
+                try {
+                  const success = await receiveEcash(token);
+                  if (success) {
+                    console.log("Auto-redeemed token from Lightning gift-wrap!");
+                    // Extract amount from token if possible
+                    const amount = 0; // TODO: Extract amount from token
+                    addTransaction('receive', amount, 'Received via Lightning Gateway', 'cashu');
+                    setPaymentNotification({ amount: amount || 0, context: 'wallet_receive' });
+                  }
+                } catch (e) {
+                  console.warn("Failed to redeem token from Lightning gift-wrap", e);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to process Lightning gift-wrap", e);
         }
       });
 
@@ -616,20 +789,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [isAuthenticated, currentUserPubkey, activeRound]);
 
-  // Real-time npub.cash payment detection via WebSocket
+  // Real-time multi-gateway payment detection via WebSocket
   useEffect(() => {
     if (isAuthenticated && currentUserPubkey) {
-      console.log("🔌 [npub.cash] Setting up WebSocket subscription for payment detection...");
+      console.log("🔌 Setting up multi-gateway WebSocket subscriptions for payment detection...");
 
-      const handleQuoteUpdate = async (quoteId: string) => {
-        console.log(`📥 [npub.cash] Received quote update: ${quoteId}`);
+      const handleQuoteUpdate = async (quoteId: string, gateway: string) => {
+        console.log(`📥 [${gateway}] Received quote update: ${quoteId}`);
 
         try {
           // Fetch the updated quote
           const quote = await getQuoteById(quoteId);
 
           if (!quote) {
-            console.warn(`Quote ${quoteId} not found`);
+            console.warn(`Quote ${quoteId} not found on ${gateway}`);
             return;
           }
 
@@ -642,13 +815,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
 
           // Check if we've already processed this quote
-          const processedKey = `processed_quote_${quoteId}`;
+          const processedKey = `processed_quote_${gateway}_${quoteId}`;
           if (localStorage.getItem(processedKey)) {
-            console.log(`Quote ${quoteId} already processed, skipping...`);
+            console.log(`Quote ${quoteId} from ${gateway} already processed, skipping...`);
             return;
           }
 
-          console.log(`🪙 [npub.cash] Minting ${quote.amount} sats from ${quote.mintUrl} for quote ${quoteId}...`);
+          console.log(`🪙 [${gateway}] Minting ${quote.amount} sats from ${quote.mintUrl} for quote ${quoteId}...`);
 
           // Mint the tokens
           const mint = new CashuMint(quote.mintUrl);
@@ -665,41 +838,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // Add mint to state if not exists
             setMints(prev => {
               if (prev.find(m => m.url === quote.mintUrl)) return prev;
-              return [...prev, { url: quote.mintUrl, nickname: 'npub.cash', isActive: true }];
+              return [...prev, { url: quote.mintUrl, nickname: gateway, isActive: true }];
             });
 
             // Mark as processed
             localStorage.setItem(processedKey, Date.now().toString());
 
             // Add transaction record
-            addTransaction('receive', quote.amount, 'Received via npub.cash', 'cashu');
+            addTransaction('receive', quote.amount, `Received via ${gateway}`, 'cashu');
 
-            console.log(`✅ [npub.cash] Successfully received ${quote.amount} sats!`);
+            // Trigger lightning strike notification
+            setLightningStrike({ amount: quote.amount, show: true });
+
+            console.log(`✅ [${gateway}] Successfully received ${quote.amount} sats!`);
 
             // Dispatch event for UI with context metadata
             const context = window.location.pathname.includes('/wallet') ? 'wallet_receive' : undefined;
-            window.dispatchEvent(new CustomEvent('npubcash-payment-received', {
-              detail: { quoteId, amount: quote.amount, context }
+            window.dispatchEvent(new CustomEvent('gateway-payment-received', {
+              detail: { quoteId, amount: quote.amount, gateway, context }
             }));
           }
         } catch (e) {
-          console.error(`Failed to process quote ${quoteId}:`, e);
+          console.error(`Failed to process quote ${quoteId} from ${gateway}:`, e);
         }
       };
 
-      const handleError = (error: any) => {
-        console.error("❌ [npub.cash] WebSocket subscription error:", error);
-        // Fall back to manual polling if WebSocket fails
-        // This ensures payments are still detected even if WebSocket has issues
+      const handleError = (error: any, gateway: string) => {
+        console.error(`❌ [${gateway}] WebSocket subscription error:`, error);
+        // Individual gateway reconnection is handled automatically
+        // No need for additional fallback polling since we have multiple gateways
       };
 
-      // Subscribe to real-time updates
-      const disposer = subscribeToQuoteUpdates(handleQuoteUpdate, handleError);
+      // Subscribe to all registered gateways
+      const disposer = subscribeToAllGatewayUpdates(handleQuoteUpdate, handleError);
+
+      // FALLBACK: Poll all gateways for pending payments every 60 seconds
+      // This ensures we catch payments even if all WebSockets fail
+      let pollingInterval: NodeJS.Timeout | null = null;
+      let pollingTimeout: NodeJS.Timeout | null = null;
+
+      const pollAllGateways = async () => {
+        try {
+          console.log("🔄 Polling all gateways for pending payments (fallback)...");
+          const pendingQuotes = await checkPendingPayments();
+
+          for (const quote of pendingQuotes) {
+            // Determine which gateway this quote is from (simplified - in practice you'd check the mint URL)
+            const gateway = quote.mintUrl?.includes('minibits') ? 'minibits.cash' : 'npub.cash';
+            await handleQuoteUpdate(quote.quoteId, gateway);
+          }
+        } catch (e) {
+          console.error("❌ Multi-gateway polling failed:", e);
+        }
+      };
+
+      // Wait 60 seconds before starting polling to give WebSockets a chance
+      pollingTimeout = setTimeout(() => {
+        pollingInterval = setInterval(pollAllGateways, 60000);
+        console.log("⏰ Started multi-gateway fallback polling (every 60s)");
+        // Do the first poll immediately
+        pollAllGateways();
+      }, 60000);
 
       // Cleanup on unmount
       return () => {
-        console.log("🔌 [npub.cash] Cleaning up WebSocket subscription...");
+        console.log("🔌 Cleaning up multi-gateway WebSocket subscriptions...");
         disposer();
+        if (pollingTimeout) {
+          clearTimeout(pollingTimeout);
+          console.log("⏰ Cancelled polling startup timeout");
+        }
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+          console.log("⏰ Stopped multi-gateway fallback polling");
+        }
       };
     }
   }, [isAuthenticated, isGuest, currentUserPubkey]);
@@ -756,7 +968,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 3. Publish the new profile (with LUD16) to Nostr
     await updateUserProfile(initialProfile);
 
-    // 4. Create initial wallet backup to enable payment detection
+    // 4. Register with payment gateways for automatic receiving
+    console.log("🔗 Registering with payment gateways...");
+    try {
+      const registrations = await registerWithAllGateways();
+      const successful = registrations.filter(r => r.success).length;
+      console.log(`✅ Registered with ${successful}/${registrations.length} gateways`);
+    } catch (e) {
+      console.error("⚠️ Gateway registration failed:", e);
+    }
+
+    // 5. Create initial wallet backup to enable payment detection
     // This ensures npub.cash can send payments immediately
     console.log("📦 Creating initial wallet backup for new account...");
     try {
@@ -1511,6 +1733,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return updatedTxs;
       });
 
+      // Trigger payment notification and lightning strike for auto-received payments
+      setPaymentNotification({ amount, context: 'wallet_receive' });
+      setLightningStrike({ amount, show: true });
+
+      // Play lightning strike sound
+      try {
+        const audio = new Audio('/lightning-strike.mp3');
+        audio.volume = 0.3;
+        audio.play().catch(e => console.warn('Could not play lightning sound:', e));
+      } catch (e) {
+        console.warn('Audio not supported:', e);
+      }
+
       return true;
     } catch (e) {
       console.error("Receive failed", e);
@@ -1601,7 +1836,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setNwcConnection,
       checkForPayments,
       paymentNotification,
-      setPaymentNotification
+      setPaymentNotification,
+      lightningStrike
     }}>
       {children}
     </AppContext.Provider>

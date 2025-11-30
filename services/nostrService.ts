@@ -850,14 +850,21 @@ export const fetchProfilesBatch = async (pubkeys: string[]): Promise<DisplayProf
 
 const NOSTR_KIND_WALLET_BACKUP = 30005; // Replaceable event for wallet backup
 
-export const publishWalletBackup = async (proofs: Proof[], mints: Mint[], transactions: WalletTransaction[]) => {
+export const publishWalletBackup = async (proofs: Proof[], mints: Mint[], transactions: WalletTransaction[], gatewayRegistrations?: any[]) => {
     const session = getSession();
     if (!session) throw new Error("Not authenticated");
 
     console.log(`📦 [Backup] Publishing wallet backup for pubkey: ${session.pk.substring(0, 8)}...`);
     console.log(`📦 [Backup] Backup contains: ${proofs.length} proofs, ${mints.length} mints, ${transactions.length} transactions`);
 
-    const rawData = JSON.stringify({ proofs, mints, transactions, timestamp: Date.now() });
+    const rawData = JSON.stringify({
+        proofs,
+        mints,
+        transactions,
+        gatewayRegistrations: gatewayRegistrations || [],
+        version: 2, // Include version for backward compatibility
+        timestamp: Date.now()
+    });
 
     // Encrypt content using NIP-44 (self-encryption)
     const encryptedContent = await encryptInternal(session.pk, rawData);
@@ -886,7 +893,7 @@ export const publishWalletBackup = async (proofs: Proof[], mints: Mint[], transa
     }
 };
 
-export const fetchWalletBackup = async (pubkey: string): Promise<{ proofs: Proof[], mints: Mint[], transactions: WalletTransaction[] } | null> => {
+export const fetchWalletBackup = async (pubkey: string): Promise<{ proofs: Proof[], mints: Mint[], transactions: WalletTransaction[], gatewayRegistrations?: any[] } | null> => {
     console.log(`🔍 [Backup] Fetching wallet backup for pubkey: ${pubkey.substring(0, 8)}...`);
     console.log(`🔍 [Backup] Querying ${getRelays().length} relays for kind ${NOSTR_KIND_WALLET_BACKUP} events...`);
 
@@ -914,12 +921,13 @@ export const fetchWalletBackup = async (pubkey: string): Promise<{ proofs: Proof
         const data = JSON.parse(decryptedContent);
 
         console.log(`✅ [Backup] Backup decrypted successfully!`);
-        console.log(`✅ [Backup] Restored: ${data.proofs?.length || 0} proofs, ${data.mints?.length || 0} mints, ${data.transactions?.length || 0} transactions`);
+        console.log(`✅ [Backup] Restored: ${data.proofs?.length || 0} proofs, ${data.mints?.length || 0} mints, ${data.transactions?.length || 0} transactions, ${data.gatewayRegistrations?.length || 0} gateway registrations`);
 
         return {
             proofs: data.proofs || [],
             mints: data.mints || [],
-            transactions: data.transactions || []
+            transactions: data.transactions || [],
+            gatewayRegistrations: data.gatewayRegistrations || []
         };
     } catch (e) {
         console.error("❌ [Backup] Failed to fetch or decrypt wallet backup:", e);
@@ -986,6 +994,65 @@ export const subscribeToGiftWraps = (callback: (event: Event) => void) => {
                     }
                 } catch (e) {
                     console.warn("Failed to unwrap gift wrap", e);
+                }
+            },
+        }
+    );
+};
+
+/**
+ * Subscribe to Lightning nutzaps (kind 9735)
+ */
+export const subscribeToNutzaps = (callback: (event: Event) => void) => {
+    const session = getSession();
+    if (!session) return { close: () => { } };
+
+    const filters: Filter[] = [{
+        kinds: [9735], // NIP-57 nutzap
+        '#p': [session.pk], // Zaps sent to us
+        since: Math.floor(Date.now() / 1000)
+    }];
+
+    return pool.subscribeMany(
+        getRelays(),
+        filters as any,
+        {
+            onevent: (event) => {
+                console.log("🔔 Received nutzap:", event);
+                callback(event);
+            },
+        }
+    );
+};
+
+/**
+ * Subscribe to Lightning gift-wraps (kinds 23194/23195)
+ */
+export const subscribeToLightningGiftWraps = (callback: (event: Event) => void) => {
+    const session = getSession();
+    if (!session) return { close: () => { } };
+
+    const filters: Filter[] = [{
+        kinds: [23194, 23195], // Lightning gift-wrap events
+        '#p': [session.pk],
+        since: Math.floor(Date.now() / 1000)
+    }];
+
+    return pool.subscribeMany(
+        getRelays(),
+        filters as any,
+        {
+            onevent: async (event) => {
+                try {
+                    console.log("⚡ Received Lightning gift-wrap:", event);
+                    // These are direct Lightning payments wrapped in gift-wraps
+                    // The content contains the payment details
+                    const unwrapped = await unwrapGiftWrap(event);
+                    if (unwrapped) {
+                        callback(unwrapped);
+                    }
+                } catch (e) {
+                    console.warn("Failed to unwrap Lightning gift-wrap", e);
                 }
             },
         }

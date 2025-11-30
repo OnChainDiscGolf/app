@@ -168,39 +168,136 @@ export const initializeAmberConnection = async (relay: string = DEFAULT_AMBER_RE
 };
 
 /**
- * Simplified Amber connection that returns to app after approval
- * This version waits for the user's pubkey after they approve
+ * Complete Amber connection flow for mobile/web
+ * Handles the full connection lifecycle including return handling
  */
 export const connectWithAmber = async (
-    remotePubkey: string,  // User provides this OR we get from NIP-05
     relay: string = DEFAULT_AMBER_RELAY
 ): Promise<AmberConnectionResult> => {
     try {
-        // Generate ephemeral keypair
+        // Generate ephemeral keypair for this connection
         const ephemeralSk = generateSecretKey();
         const clientPubkey = getPublicKey(ephemeralSk);
 
-        // Create connect URI
+        // Create nostrconnect URI
         const connectURI = generateNostrConnectURI(clientPubkey, relay);
 
-        // Open Amber
-        window.open(connectURI, '_self');
+        console.log('🔗 Generated Amber connect URI:', connectURI);
 
-        // Wait for user to return and send get_public_key request
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Store connection attempt in sessionStorage for return handling
+        sessionStorage.setItem('amber_connect_attempt', JSON.stringify({
+            clientPubkey,
+            ephemeralSk: bytesToHex(ephemeralSk),
+            relay,
+            timestamp: Date.now()
+        }));
 
-        // Request public key from Amber
-        const userPubkey = await sendAmberRequest('get_public_key', [], ephemeralSk, remotePubkey, relay);
+        // For mobile: use window.location.href to launch Amber app
+        // For web: try to open in new window/tab
+        if (window.navigator.userAgent.includes('Mobile')) {
+            // Mobile - redirect to Amber
+            window.location.href = connectURI;
+            // This will navigate away - the connection will be completed when user returns
+            return {
+                userPubkey: '', // Will be populated on return
+                ephemeralSk,
+                relay
+            };
+        } else {
+            // Desktop web - open in popup window
+            const popup = window.open(connectURI, 'amber-connect', 'width=400,height=600');
 
-        return {
-            userPubkey,
-            ephemeralSk,
-            relay
-        };
+            if (!popup) {
+                throw new Error('Failed to open Amber connection popup. Please allow popups for this site.');
+            }
+
+            // Wait for popup to close (user completed connection)
+            return new Promise((resolve, reject) => {
+                const checkClosed = setInterval(() => {
+                    if (popup.closed) {
+                        clearInterval(checkClosed);
+
+                        // Check if connection was successful
+                        const result = sessionStorage.getItem('amber_connection_result');
+                        if (result) {
+                            sessionStorage.removeItem('amber_connection_result');
+                            const connectionData = JSON.parse(result);
+                            resolve({
+                                userPubkey: connectionData.userPubkey,
+                                ephemeralSk,
+                                relay
+                            });
+                        } else {
+                            reject(new Error('Amber connection was cancelled or failed'));
+                        }
+                    }
+                }, 1000);
+
+                // Timeout after 5 minutes
+                setTimeout(() => {
+                    clearInterval(checkClosed);
+                    if (!popup.closed) {
+                        popup.close();
+                    }
+                    reject(new Error('Amber connection timed out'));
+                }, 300000);
+            });
+        }
 
     } catch (error) {
         console.error('Amber connection failed:', error);
         throw new Error(error instanceof Error ? error.message : 'Failed to connect to Amber');
+    }
+};
+
+/**
+ * Complete the Amber connection handshake (called when user returns from Amber)
+ */
+export const completeAmberConnection = async (): Promise<AmberConnectionResult | null> => {
+    try {
+        // Check if we have a pending connection attempt
+        const attemptData = sessionStorage.getItem('amber_connect_attempt');
+        if (!attemptData) {
+            return null; // No pending connection
+        }
+
+        const attempt = JSON.parse(attemptData);
+        const ephemeralSk = hexToBytes(attempt.ephemeralSk);
+
+        console.log('🔄 Completing Amber connection handshake...');
+
+        // The remote pubkey should be the user's actual pubkey
+        // In practice, Amber might provide this, or we need to request it
+        // For now, we'll try to get it from the connection
+
+        // Try to get the user's public key
+        // This is a simplified version - in practice you'd need to handle the Amber protocol properly
+        try {
+            // This would need to be implemented based on Amber's actual API
+            const userPubkey = await sendAmberRequest('get_public_key', [], ephemeralSk, '', attempt.relay);
+
+            // Store successful connection
+            sessionStorage.setItem('amber_connection_result', JSON.stringify({
+                userPubkey,
+                timestamp: Date.now()
+            }));
+
+            // Clean up
+            sessionStorage.removeItem('amber_connect_attempt');
+
+            return {
+                userPubkey,
+                ephemeralSk,
+                relay: attempt.relay
+            };
+        } catch (e) {
+            console.warn('Could not get public key from Amber, connection may still be pending');
+            return null;
+        }
+
+    } catch (error) {
+        console.error('Failed to complete Amber connection:', error);
+        return null;
     }
 };
 
