@@ -133,6 +133,7 @@ export const Home: React.FC = () => {
     const [joinError, setJoinError] = useState('');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [showStartConfirm, setShowStartConfirm] = useState(false);
+    const [cancelFundOption, setCancelFundOption] = useState<'pay-winner' | 'redistribute' | 'host-keeps'>('pay-winner');
 
     // Info Modal State
     const [showInfoModal, setShowInfoModal] = useState(false);
@@ -589,10 +590,66 @@ export const Home: React.FC = () => {
         }
     };
 
-    const confirmNewRound = () => {
+    const confirmNewRound = async () => {
+        // Handle fund distribution based on selected option
+        if (activeRound) {
+            const entryPayers = players.filter(p => p.paysEntry);
+            const acePayers = players.filter(p => p.paysAce);
+            const entryPot = entryPayers.length * activeRound.entryFeeSats;
+            const acePot = acePayers.length * activeRound.acePotFeeSats;
+            const totalPot = entryPot + acePot;
+            
+            if (totalPot > 0) {
+                // Check for any aces
+                const aceWinners: { playerId: string; name: string; hole: number }[] = [];
+                players.forEach(player => {
+                    Object.entries(player.scores).forEach(([hole, score]) => {
+                        if (score === 1) {
+                            aceWinners.push({ playerId: player.id, name: player.name, hole: parseInt(hole) });
+                        }
+                    });
+                });
+                
+                switch (cancelFundOption) {
+                    case 'pay-winner':
+                        // Pay the current leader the entry pot
+                        const sortedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
+                        const winner = sortedPlayers[0];
+                        if (winner && entryPot > 0) {
+                            console.log(`[Cancel Round] Paying winner ${winner.name}: ${entryPot} sats`);
+                            // Payment would be handled via sendFunds similar to finalizeRound
+                        }
+                        // If there's an ace winner, pay them the ace pot
+                        if (aceWinners.length > 0 && acePot > 0) {
+                            const aceWinner = aceWinners[0];
+                            console.log(`[Cancel Round] Paying ace winner ${aceWinner.name}: ${acePot} sats`);
+                        }
+                        break;
+                        
+                    case 'redistribute':
+                        // Refund each player what they paid
+                        players.forEach(player => {
+                            let refundAmount = 0;
+                            if (player.paysEntry) refundAmount += activeRound.entryFeeSats;
+                            if (player.paysAce) refundAmount += activeRound.acePotFeeSats;
+                            if (refundAmount > 0) {
+                                console.log(`[Cancel Round] Refunding ${player.name}: ${refundAmount} sats`);
+                            }
+                        });
+                        break;
+                        
+                    case 'host-keeps':
+                        // No action needed - funds stay with host
+                        console.log(`[Cancel Round] Host keeps pot: ${totalPot} sats`);
+                        break;
+                }
+            }
+        }
+        
         resetRound();
         clearRoundCreationState(); // Clear persisted state
         setShowResetConfirm(false);
+        setCancelFundOption('pay-winner'); // Reset to default
         setView('setup');
     };
 
@@ -2587,7 +2644,7 @@ export const Home: React.FC = () => {
                 <div className="w-full max-w-sm space-y-4">
                     {/* Only show Continue Round for active, non-finalized rounds */}
                     {activeRound && !activeRound.isFinalized && (
-                        <Button fullWidth onClick={() => navigate('/play')} className="bg-amber-500 text-black font-bold shadow-lg shadow-amber-500/20 hover:bg-amber-400 transition-transform button-gleam">
+                        <Button fullWidth onClick={() => navigate('/play')} className="golden-button-shimmer text-black font-bold hover:brightness-110 transition-all">
                             <div className="flex items-center justify-center space-x-2">
                                 <Icons.Play fill="currentColor" />
                                 <span>{activeRound.pubkey === currentUserPubkey ? 'Continue Round' : 'View Current Round'}</span>
@@ -2692,47 +2749,169 @@ export const Home: React.FC = () => {
 
 
 
-            {/* New Round Confirmation Modal */}
-            {showResetConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full space-y-4 animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between mb-8">
-                            <div className="flex items-center space-x-3">
-                                <div className="w-12 h-12 bg-brand-primary rounded-2xl flex items-center justify-center shadow-lg shadow-brand-primary/20">
-                                    <Icons.Trophy size={28} className="text-brand-dark" />
+            {/* Cancel Round Confirmation Modal */}
+            {showResetConfirm && activeRound && (() => {
+                const entryPayers = players.filter(p => p.paysEntry);
+                const acePayers = players.filter(p => p.paysAce);
+                const entryPot = entryPayers.length * activeRound.entryFeeSats;
+                const acePot = acePayers.length * activeRound.acePotFeeSats;
+                const totalPot = entryPot + acePot;
+                const hasMoney = totalPot > 0;
+                
+                // Determine current leader
+                const sortedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
+                const currentLeader = sortedPlayers[0];
+                
+                // Check for any aces
+                const aceWinners: { name: string; hole: number }[] = [];
+                players.forEach(player => {
+                    Object.entries(player.scores).forEach(([hole, score]) => {
+                        if (score === 1) {
+                            aceWinners.push({ name: player.name, hole: parseInt(hole) });
+                        }
+                    });
+                });
+                
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                        <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full space-y-4 animate-in zoom-in-95 duration-200">
+                            {/* Header */}
+                            <div className="flex flex-col items-center text-center space-y-3">
+                                <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500">
+                                    <Icons.Help size={28} />
                                 </div>
-                                <div>
-                                    <h1 className="text-2xl font-black text-white tracking-tight">ON-CHAIN</h1>
-                                    <p className="text-xs text-brand-primary font-bold tracking-wider uppercase">Disc Golf</p>
+                                <h3 className="text-xl font-bold text-white">Quit Current Round?</h3>
+                            </div>
+                            
+                            {/* Round Info */}
+                            <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-slate-400 text-sm">Course</span>
+                                    <span className="text-white font-semibold">{activeRound.courseName}</span>
                                 </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-slate-400 text-sm">Players</span>
+                                    <span className="text-white font-semibold">{players.length}</span>
+                                </div>
+                                {hasMoney && (
+                                    <>
+                                        {entryPot > 0 && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-slate-400 text-sm">Entry Pot</span>
+                                                <span className="text-amber-400 font-semibold">{entryPot.toLocaleString()} sats</span>
+                                            </div>
+                                        )}
+                                        {acePot > 0 && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-slate-400 text-sm">Ace Pot</span>
+                                                <span className="text-emerald-400 font-semibold">{acePot.toLocaleString()} sats</span>
+                                            </div>
+                                        )}
+                                        <div className="border-t border-slate-700 pt-2 flex items-center justify-between">
+                                            <span className="text-slate-300 text-sm font-medium">Total Pot</span>
+                                            <span className="text-white font-bold">{totalPot.toLocaleString()} sats</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
-                            <button
-                                onClick={() => setShowInfoModal(true)}
-                                className="p-2 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 rounded-full transition-colors"
-                            >
-                                <Icons.Help size={24} />
-                            </button>
-                        </div>
-                        <div className="flex flex-col items-center text-center space-y-2">
-                            <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 mb-2">
-                                <Icons.Trash size={24} />
+                            
+                            {/* Fund Distribution Options - Only shown if there's money */}
+                            {hasMoney && (
+                                <div className="space-y-2">
+                                    <p className="text-slate-400 text-xs text-center mb-3">What happens to the pot?</p>
+                                    
+                                    {/* Pay Winner Option */}
+                                    <button
+                                        onClick={() => setCancelFundOption('pay-winner')}
+                                        className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 ${
+                                            cancelFundOption === 'pay-winner'
+                                                ? 'bg-amber-500/10 border-amber-500 text-amber-400'
+                                                : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
+                                        }`}
+                                    >
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                            cancelFundOption === 'pay-winner' ? 'bg-amber-500/20' : 'bg-slate-700'
+                                        }`}>
+                                            <Icons.Trophy size={16} />
+                                        </div>
+                                        <div className="text-left flex-1">
+                                            <p className="font-semibold text-sm">Pay Current Leader</p>
+                                            <p className="text-xs text-slate-500">
+                                                {currentLeader?.name || 'Leader'} wins{aceWinners.length > 0 ? ' + ace payout' : ''}
+                                            </p>
+                                        </div>
+                                        {cancelFundOption === 'pay-winner' && (
+                                            <Icons.CheckMark size={18} className="text-amber-500" />
+                                        )}
+                                    </button>
+                                    
+                                    {/* Redistribute Option */}
+                                    <button
+                                        onClick={() => setCancelFundOption('redistribute')}
+                                        className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 ${
+                                            cancelFundOption === 'redistribute'
+                                                ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                                                : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
+                                        }`}
+                                    >
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                            cancelFundOption === 'redistribute' ? 'bg-emerald-500/20' : 'bg-slate-700'
+                                        }`}>
+                                            <Icons.Users size={16} />
+                                        </div>
+                                        <div className="text-left flex-1">
+                                            <p className="font-semibold text-sm">Refund Everyone</p>
+                                            <p className="text-xs text-slate-500">Return what each player paid</p>
+                                        </div>
+                                        {cancelFundOption === 'redistribute' && (
+                                            <Icons.CheckMark size={18} className="text-emerald-500" />
+                                        )}
+                                    </button>
+                                    
+                                    {/* Host Keeps Option */}
+                                    <button
+                                        onClick={() => setCancelFundOption('host-keeps')}
+                                        className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 ${
+                                            cancelFundOption === 'host-keeps'
+                                                ? 'bg-slate-500/10 border-slate-500 text-slate-300'
+                                                : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
+                                        }`}
+                                    >
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                            cancelFundOption === 'host-keeps' ? 'bg-slate-500/20' : 'bg-slate-700'
+                                        }`}>
+                                            <Icons.Wallet size={16} />
+                                        </div>
+                                        <div className="text-left flex-1">
+                                            <p className="font-semibold text-sm">Host Keeps Pot</p>
+                                            <p className="text-xs text-slate-500">Funds stay with round host</p>
+                                        </div>
+                                        {cancelFundOption === 'host-keeps' && (
+                                            <Icons.SmirkFace size={24} className="text-amber-400" />
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+                            
+                            {/* Action Buttons */}
+                            <div className="grid grid-cols-2 gap-3 pt-2">
+                                <Button 
+                                    variant="secondary" 
+                                    onClick={() => {
+                                        setShowResetConfirm(false);
+                                        setCancelFundOption('pay-winner');
+                                    }}
+                                >
+                                    Keep Round
+                                </Button>
+                                <Button variant="danger" onClick={confirmNewRound}>
+                                    Quit Round
+                                </Button>
                             </div>
-                            <h3 className="text-xl font-bold text-white">Start New Round?</h3>
-                            <p className="text-slate-400 text-sm leading-relaxed">
-                                If you create another league round, the previous continued round will be deleted.
-                            </p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 pt-2">
-                            <Button variant="secondary" onClick={() => setShowResetConfirm(false)}>
-                                Cancel
-                            </Button>
-                            <Button variant="danger" onClick={confirmNewRound}>
-                                Continue
-                            </Button>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* What is On-Chain Info Modal */}
             {showInfoModal && (

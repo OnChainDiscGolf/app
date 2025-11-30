@@ -287,3 +287,44 @@ body {
   -webkit-text-fill-color: transparent;
   animation: golden-shimmer 5s linear infinite;
 }
+
+/* Golden Button Shimmer Animation */
+@keyframes golden-button-shimmer {
+  0% {
+    transform: translateX(-100%) skewX(-20deg);
+    opacity: 0;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateX(300%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+.golden-button-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #f59e0b 100%);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4), 0 0 40px rgba(217, 119, 6, 0.2);
+}
+
+.golden-button-shimmer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.6),
+      rgba(254, 243, 199, 0.8),
+      rgba(255, 255, 255, 0.6),
+      transparent);
+  animation: golden-button-shimmer 2s ease-in-out infinite;
+  pointer-events: none;
+}

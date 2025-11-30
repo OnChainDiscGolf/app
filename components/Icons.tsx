@@ -136,6 +136,34 @@ const IOSShare = ({ size = 24, className = "", strokeWidth = 2 }: { size?: numbe
   </svg>
 );
 
+// Cheeky Smirk Face - for when the host keeps the pot!
+const SmirkFace = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={`lucide lucide-smirk ${className}`}
+  >
+    {/* Face circle */}
+    <circle cx="12" cy="12" r="10" />
+    
+    {/* Left eye - normal */}
+    <circle cx="9" cy="10" r="1" fill="currentColor" />
+    
+    {/* Right eye - winking */}
+    <path d="M14 9.5c.5.5 1 .5 1.5 0" />
+    
+    {/* Smirk mouth - asymmetric smile */}
+    <path d="M8 15c1 1.5 3 2 5 1.5s2.5-1.5 3-2.5" />
+  </svg>
+);
+
 // Custom Bitcoin Icon - Accurate ₿ symbol matching standard Bitcoin glyph
 const Bitcoin = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
   <svg
@@ -208,5 +236,6 @@ export const Icons = {
   User,
   ChevronDown,
   Bitcoin,
-  IOSShare
+  IOSShare,
+  SmirkFace
 };
