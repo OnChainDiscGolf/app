@@ -146,7 +146,7 @@ export const generateMemoryStoryForPDF = (mnemonic: string): { text: string; isB
 // =============================================================================
 
 /**
- * Generate a QR code as a data URL with branding
+ * Generate a QR code as a data URL with minimal branding
  * Returns a canvas element that includes the QR + "On-Chain Disc Golf" text
  */
 export const generateBrandedQRCode = async (mnemonic: string): Promise<string> => {
@@ -168,7 +168,7 @@ export const generateBrandedQRCode = async (mnemonic: string): Promise<string> =
     const ctx = brandedCanvas.getContext('2d')!;
     
     const padding = 20;
-    const textHeight = 50;
+    const textHeight = 35;
     
     brandedCanvas.width = qrCanvas.width + (padding * 2);
     brandedCanvas.height = qrCanvas.height + (padding * 2) + textHeight;
@@ -180,15 +180,11 @@ export const generateBrandedQRCode = async (mnemonic: string): Promise<string> =
     // Draw QR code
     ctx.drawImage(qrCanvas, padding, padding);
     
-    // Add branding text
-    ctx.fillStyle = '#1e293b'; // slate-800
-    ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
+    // Add branding text - just the app name
+    ctx.fillStyle = '#0d9488'; // teal-600
+    ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('On-Chain Disc Golf', brandedCanvas.width / 2, qrCanvas.height + padding + 25);
-    
-    ctx.fillStyle = '#64748b'; // slate-500
-    ctx.font = '12px system-ui, -apple-system, sans-serif';
-    ctx.fillText('Recovery Phrase Backup', brandedCanvas.width / 2, qrCanvas.height + padding + 42);
     
     return brandedCanvas.toDataURL('image/png');
 };
@@ -201,7 +197,7 @@ export const downloadQRCode = async (mnemonic: string): Promise<void> => {
     
     const link = document.createElement('a');
     link.href = dataUrl;
-    link.download = 'onchain-discgolf-recovery.png';
+    link.download = 'ocdg-card.png';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -212,16 +208,16 @@ export const downloadQRCode = async (mnemonic: string): Promise<void> => {
 // =============================================================================
 
 /**
- * Generate a secure PDF backup card with:
- * - On-brand title matching app design
- * - Memory story with BOLD UPPERCASE seed words (no visible word grid - defeats malware scanners)
- * - QR code for quick recovery
- * - On-brand warning card
+ * Generate a clean, minimal PDF card with:
+ * - Simple branding
+ * - Memory story with BOLD UPPERCASE words
+ * - QR code
+ * - Warning notice
  */
 export const generateWalletCardPDF = async (mnemonic: string): Promise<jsPDF> => {
     const storyParts = generateMemoryStoryForPDF(mnemonic);
     
-    // Create PDF (A5 size for a nice card feel)
+    // Create PDF (A5 size)
     const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -230,135 +226,121 @@ export const generateWalletCardPDF = async (mnemonic: string): Promise<jsPDF> =>
     
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 15;
+    const margin = 18;
     
-    // Background - dark slate like the app
-    pdf.setFillColor(15, 23, 42); // slate-900
+    // Background - dark
+    pdf.setFillColor(15, 23, 42);
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
     
-    // ============ HEADER - On-Chain Disc Golf branding ============
-    // "On-Chain" in teal gradient effect (using solid teal)
-    pdf.setFontSize(24);
-    pdf.setTextColor(45, 212, 191); // teal-400 (brand-primary)
+    // ============ HEADER ============
+    pdf.setFontSize(20);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('On-Chain', pageWidth / 2 - 2, 22, { align: 'center' });
+    
+    // "On-Chain" in teal
+    pdf.setTextColor(45, 212, 191);
+    const onChainWidth = pdf.getTextWidth('On-Chain ');
+    const discGolfWidth = pdf.getTextWidth('Disc Golf');
+    const totalWidth = onChainWidth + discGolfWidth;
+    const startX = (pageWidth - totalWidth) / 2;
+    
+    pdf.text('On-Chain ', startX, 25);
     
     // "Disc Golf" in white
     pdf.setTextColor(255, 255, 255);
-    pdf.text('Disc Golf', pageWidth / 2 + 35, 22, { align: 'center' });
+    pdf.text('Disc Golf', startX + onChainWidth, 25);
     
-    // Decorative line under title
-    pdf.setDrawColor(45, 212, 191); // teal-400
-    pdf.setLineWidth(0.8);
-    pdf.line(margin + 20, 28, pageWidth - margin - 20, 28);
+    // Subtle line
+    pdf.setDrawColor(45, 212, 191);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin + 25, 32, pageWidth - margin - 25, 32);
     
-    // ============ STORY SECTION ============
-    const storyStartY = 42;
-    
-    pdf.setFontSize(9);
-    pdf.setTextColor(148, 163, 184); // slate-400
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('YOUR RECOVERY STORY', margin, storyStartY);
-    
-    // Render story with bold words
+    // ============ STORY ============
     let currentX = margin;
-    let currentY = storyStartY + 10;
-    const maxWidth = pageWidth - (margin * 2);
-    const lineHeight = 6;
+    let currentY = 48;
+    const lineHeight = 7;
     
     pdf.setFontSize(11);
     
     storyParts.forEach(part => {
         if (part.isBold) {
             pdf.setFont('helvetica', 'bold');
-            pdf.setTextColor(45, 212, 191); // teal-400 for seed words
+            pdf.setTextColor(45, 212, 191);
         } else {
             pdf.setFont('helvetica', 'normal');
-            pdf.setTextColor(226, 232, 240); // slate-200
+            pdf.setTextColor(203, 213, 225);
         }
         
-        const words = part.text.split(' ');
-        words.forEach((word, i) => {
-            const wordWidth = pdf.getTextWidth(word + ' ');
+        const words = part.text.split(' ').filter(w => w.length > 0);
+        words.forEach((word) => {
+            const wordText = word + ' ';
+            const wordWidth = pdf.getTextWidth(wordText);
             
             if (currentX + wordWidth > pageWidth - margin) {
                 currentX = margin;
                 currentY += lineHeight;
             }
             
-            pdf.text(word + (i < words.length - 1 ? ' ' : ''), currentX, currentY);
+            pdf.text(wordText, currentX, currentY);
             currentX += wordWidth;
         });
     });
     
-    // ============ QR CODE SECTION ============
-    const qrY = currentY + 15;
+    // ============ QR CODE ============
+    const qrY = currentY + 20;
     
-    // Generate QR code
     const qrCanvas = document.createElement('canvas');
     await QRCode.toCanvas(qrCanvas, mnemonic, {
-        width: 100,
+        width: 120,
         margin: 1,
         color: {
-            dark: '#0f172a', // slate-900
+            dark: '#0f172a',
             light: '#ffffff'
         },
         errorCorrectionLevel: 'M'
     });
     
-    // Add QR to PDF
     const qrDataUrl = qrCanvas.toDataURL('image/png');
-    const qrSize = 40;
+    const qrSize = 38;
     const qrX = (pageWidth - qrSize) / 2;
     
-    // White background for QR
+    // White rounded background
     pdf.setFillColor(255, 255, 255);
-    pdf.roundedRect(qrX - 3, qrY - 3, qrSize + 6, qrSize + 6, 2, 2, 'F');
+    pdf.roundedRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, 3, 3, 'F');
     
     pdf.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
     
-    // QR label
-    pdf.setFontSize(8);
-    pdf.setTextColor(148, 163, 184); // slate-400
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('Scan to recover', pageWidth / 2, qrY + qrSize + 8, { align: 'center' });
+    // ============ WARNING ============
+    const warningY = pageHeight - 38;
     
-    // ============ WARNING CARD - On brand ============
-    const warningY = pageHeight - 42;
-    
-    // Amber/orange warning box (on-brand)
-    pdf.setFillColor(245, 158, 11, 0.15); // amber-500 with transparency effect
-    pdf.setFillColor(30, 27, 20); // dark amber tint
-    pdf.setDrawColor(245, 158, 11); // amber-500
+    pdf.setFillColor(30, 27, 20);
+    pdf.setDrawColor(245, 158, 11);
     pdf.setLineWidth(0.5);
-    pdf.roundedRect(margin, warningY, pageWidth - (margin * 2), 28, 3, 3, 'FD');
+    pdf.roundedRect(margin, warningY, pageWidth - (margin * 2), 24, 3, 3, 'FD');
     
-    pdf.setFontSize(10);
-    pdf.setTextColor(251, 191, 36); // amber-400
+    pdf.setFontSize(9);
+    pdf.setTextColor(251, 191, 36);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('KEEP THIS SAFE', pageWidth / 2, warningY + 9, { align: 'center' });
+    pdf.text('KEEP THIS PRIVATE', pageWidth / 2, warningY + 8, { align: 'center' });
     
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8);
-    pdf.setTextColor(253, 230, 138); // amber-200
-    const warningText = 'Anyone with this story can access your funds. Never share it online or with anyone claiming to be support.';
-    const warningLines = pdf.splitTextToSize(warningText, pageWidth - (margin * 2) - 10);
-    pdf.text(warningLines, pageWidth / 2, warningY + 17, { align: 'center' });
-    
-    // Footer
     pdf.setFontSize(7);
-    pdf.setTextColor(71, 85, 105); // slate-600
-    pdf.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+    pdf.setTextColor(253, 230, 138);
+    pdf.text('Do not share online or with anyone claiming to be support.', pageWidth / 2, warningY + 16, { align: 'center' });
+    
+    // Footer - just date, no labels
+    pdf.setFontSize(6);
+    pdf.setTextColor(71, 85, 105);
+    pdf.text(new Date().toLocaleDateString(), pageWidth / 2, pageHeight - 6, { align: 'center' });
     
     return pdf;
 };
 
 /**
- * Download the recovery card PDF
+ * Download the card PDF
  */
 export const downloadWalletCardPDF = async (mnemonic: string): Promise<void> => {
     const pdf = await generateWalletCardPDF(mnemonic);
-    pdf.save('onchain-discgolf-backup.pdf');
+    pdf.save('ocdg-card.pdf');
 };
 
 // =============================================================================

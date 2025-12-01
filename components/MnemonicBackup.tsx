@@ -203,7 +203,7 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                         }`}
                     >
                         <div className="space-y-2 pt-1">
-                            {/* 1. Download Recovery Card (PDF) - First */}
+                            {/* 1. Download Card (PDF) - First */}
                             <button
                                 onClick={handleDownloadPDF}
                                 className="w-full p-3 flex items-center space-x-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl transition-colors text-left"
@@ -212,8 +212,8 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                                     <Icons.CreditCard className="text-teal-400" size={20} />
                                 </div>
                                 <div>
-                                    <p className="text-white font-medium text-sm">Download Recovery Card</p>
-                                    <p className="text-slate-500 text-xs">PDF with story + QR code</p>
+                                    <p className="text-white font-medium text-sm">Download Card</p>
+                                    <p className="text-slate-500 text-xs">PDF with story + QR</p>
                                 </div>
                             </button>
 
@@ -227,11 +227,11 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                                 </div>
                                 <div>
                                     <p className="text-white font-medium text-sm">Download QR</p>
-                                    <p className="text-slate-500 text-xs">Quick scan for recovery</p>
+                                    <p className="text-slate-500 text-xs">Scannable image</p>
                                 </div>
                             </button>
 
-                            {/* 3. Backup to Nostr - Third (Purple) */}
+                            {/* 3. Save to Nostr - Third (Purple) */}
                             <button
                                 onClick={() => setShowNostrModal(true)}
                                 className="w-full p-3 flex items-center space-x-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl transition-colors text-left"
@@ -240,8 +240,8 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                                     <Icons.Key className="text-purple-400" size={20} />
                                 </div>
                                 <div>
-                                    <p className="text-white font-medium text-sm">Backup to Nostr</p>
-                                    <p className="text-slate-500 text-xs">Encrypted cloud backup</p>
+                                    <p className="text-white font-medium text-sm">Save to Nostr</p>
+                                    <p className="text-slate-500 text-xs">Encrypted cloud sync</p>
                                 </div>
                             </button>
                         </div>
