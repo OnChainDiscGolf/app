@@ -14,6 +14,11 @@ on:
         default: '7'
         type: string
 
+# Need write permissions to create issues
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   generate-digest:
     name: Generate Feedback Digest
@@ -31,7 +36,8 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install nostr-sdk anthropic
+          pip install --upgrade pip
+          pip install anthropic websockets secp256k1 cryptography
       
       - name: Generate feedback digest
         id: digest
