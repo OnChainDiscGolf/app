@@ -350,19 +350,39 @@ body {
   pointer-events: none;
 }
 
-/* Wallet Mode Shimmer Sweep Animation */
-@keyframes shimmerSweep {
+/* Wallet Mode Shimmer Sweep Animations */
+@keyframes shimmerSweepLeft {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  
+  30% {
+    opacity: 0.7;
+  }
+  
+  70% {
+    opacity: 0.5;
+  }
+  
+  100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes shimmerSweepRight {
   0% {
     transform: translateX(-100%);
     opacity: 0;
   }
   
   30% {
-    opacity: 0.6;
+    opacity: 0.7;
   }
   
   70% {
-    opacity: 0.4;
+    opacity: 0.5;
   }
   
   100% {
