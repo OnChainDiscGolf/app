@@ -38,7 +38,8 @@ import {
   BarChart3,
   Bug,
   MessageSquare,
-  Send
+  Send,
+  CreditCard
 } from 'lucide-react';
 
 // Custom Disc Golf Basket Icon matching Lucide style
@@ -247,4 +248,5 @@ export const Icons = {
   BarChart: BarChart3,
   Bug,
   Feedback: MessageSquare,
+  CreditCard,
 };

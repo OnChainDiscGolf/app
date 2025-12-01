@@ -18,55 +18,127 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 // =============================================================================
 
 /**
- * Story templates for each word position (1-12)
- * These create a coherent narrative when combined
+ * Multiple story template sets - each user gets a random one
+ * Words are marked with {WORD} and will be CAPITALIZED + BOLD in output
  */
-const STORY_TEMPLATES = [
-    "In a distant land known as {WORD},",
-    "there lived a brave {WORD}",
-    "who discovered a magical {WORD}.",
-    "The journey led through the {WORD} valley,",
-    "where a wise {WORD} offered guidance.",
-    "Together they faced the fearsome {WORD},",
-    "crossing the bridge of {WORD}",
-    "beneath the ancient {WORD} mountains.",
-    "At last they found the hidden {WORD},",
-    "guarded by the spirit of {WORD}.",
-    "With courage like {WORD},",
-    "they claimed the treasure of {WORD}."
+const STORY_TEMPLATE_SETS = [
+    // Adventure Quest
+    [
+        "In a distant land known as {WORD},",
+        "there lived a brave {WORD}",
+        "who discovered a magical {WORD}.",
+        "The journey led through the {WORD} valley,",
+        "where a wise {WORD} offered guidance.",
+        "Together they faced the fearsome {WORD},",
+        "crossing the bridge of {WORD}",
+        "beneath the ancient {WORD} mountains.",
+        "At last they found the hidden {WORD},",
+        "guarded by the spirit of {WORD}.",
+        "With courage like {WORD},",
+        "they claimed the treasure of {WORD}."
+    ],
+    // Space Odyssey
+    [
+        "Captain {WORD} launched from Station",
+        "{WORD} into the cosmic void.",
+        "The ship named {WORD} carried them",
+        "past the nebula of {WORD}.",
+        "Navigator {WORD} charted the course",
+        "through asteroid field {WORD}.",
+        "They discovered planet {WORD}",
+        "orbiting the twin suns of {WORD}.",
+        "The alien council of {WORD}",
+        "shared the coordinates to {WORD}.",
+        "Using fuel type {WORD},",
+        "they reached the galaxy of {WORD}."
+    ],
+    // Disc Golf Championship
+    [
+        "The legendary course at {WORD}",
+        "was home to champion {WORD}.",
+        "Their favorite disc, the {WORD},",
+        "soared over lake {WORD}.",
+        "Caddy {WORD} offered advice",
+        "on the tricky hole at {WORD}.",
+        "The wind shifted near {WORD}",
+        "as crowds gathered at {WORD} pavilion.",
+        "With a perfect {WORD} throw,",
+        "they conquered the gap at {WORD}.",
+        "The trophy named {WORD}",
+        "was theirs at tournament {WORD}."
+    ],
+    // Mountain Expedition
+    [
+        "Base camp {WORD} sat at the foot",
+        "of Mount {WORD}, shrouded in mist.",
+        "Guide {WORD} led the expedition",
+        "through the pass of {WORD}.",
+        "They rested at lodge {WORD}",
+        "before crossing glacier {WORD}.",
+        "The summit called {WORD}",
+        "revealed views of valley {WORD}.",
+        "Eagle {WORD} soared overhead",
+        "as they planted flag {WORD}.",
+        "The descent through {WORD}",
+        "brought them safely to village {WORD}."
+    ]
 ];
+
+/**
+ * Get a deterministic but varied story template based on mnemonic
+ * Uses first word to pick template so same mnemonic always gets same story
+ */
+const getStoryTemplateForMnemonic = (mnemonic: string): string[] => {
+    const words = splitMnemonicToWords(mnemonic);
+    // Use sum of character codes from first word to pick template
+    const seed = words[0].split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const templateIndex = seed % STORY_TEMPLATE_SETS.length;
+    return STORY_TEMPLATE_SETS[templateIndex];
+};
 
 /**
  * Generate a memorable story from the mnemonic words
  * Each word is woven into a narrative structure
+ * Words are returned in UPPERCASE for security (harder for malware to detect)
  */
 export const generateMemoryStory = (mnemonic: string): string => {
     const words = splitMnemonicToWords(mnemonic);
+    const templates = getStoryTemplateForMnemonic(mnemonic);
     
     const storyParts = words.map((word, index) => {
-        const template = STORY_TEMPLATES[index] || `The {WORD} was significant.`;
-        // Capitalize the word for proper noun treatment in the story
-        const capitalizedWord = word.charAt(0).toUpperCase() + word.slice(1);
-        return template.replace('{WORD}', capitalizedWord);
+        const template = templates[index] || `The {WORD} was significant.`;
+        // UPPERCASE the word - makes it harder for malware pattern matching
+        const uppercaseWord = word.toUpperCase();
+        return template.replace('{WORD}', uppercaseWord);
     });
     
     return storyParts.join(' ');
 };
 
 /**
- * Generate story with word numbers for reference
+ * Generate story for PDF with words marked for bold formatting
+ * Returns object with story parts for rich text rendering
  */
-export const generateMemoryStoryWithNumbers = (mnemonic: string): string => {
+export const generateMemoryStoryForPDF = (mnemonic: string): { text: string; isBold: boolean }[] => {
     const words = splitMnemonicToWords(mnemonic);
+    const templates = getStoryTemplateForMnemonic(mnemonic);
+    const parts: { text: string; isBold: boolean }[] = [];
     
-    const storyParts = words.map((word, index) => {
-        const template = STORY_TEMPLATES[index] || `The {WORD} was significant.`;
-        const capitalizedWord = word.charAt(0).toUpperCase() + word.slice(1);
-        // Add word number in parentheses for reference
-        return template.replace('{WORD}', `${capitalizedWord} (#${index + 1})`);
+    words.forEach((word, index) => {
+        const template = templates[index] || `The {WORD} was significant.`;
+        const [before, after] = template.split('{WORD}');
+        
+        if (before) {
+            parts.push({ text: before, isBold: false });
+        }
+        // Word is UPPERCASE and marked as bold
+        parts.push({ text: word.toUpperCase(), isBold: true });
+        if (after) {
+            parts.push({ text: after + ' ', isBold: false });
+        }
     });
     
-    return storyParts.join(' ');
+    return parts;
 };
 
 // =============================================================================
@@ -140,14 +212,14 @@ export const downloadQRCode = async (mnemonic: string): Promise<void> => {
 // =============================================================================
 
 /**
- * Generate a beautiful PDF wallet card with:
- * - 12 words in a grid
- * - Memory story for easier recall
- * - Branding and instructions
+ * Generate a secure PDF backup card with:
+ * - On-brand title matching app design
+ * - Memory story with BOLD UPPERCASE seed words (no visible word grid - defeats malware scanners)
+ * - QR code for quick recovery
+ * - On-brand warning card
  */
 export const generateWalletCardPDF = async (mnemonic: string): Promise<jsPDF> => {
-    const words = splitMnemonicToWords(mnemonic);
-    const story = generateMemoryStory(mnemonic);
+    const storyParts = generateMemoryStoryForPDF(mnemonic);
     
     // Create PDF (A5 size for a nice card feel)
     const pdf = new jsPDF({
@@ -160,113 +232,133 @@ export const generateWalletCardPDF = async (mnemonic: string): Promise<jsPDF> =>
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 15;
     
-    // Background color (very light teal tint)
-    pdf.setFillColor(240, 253, 250);
+    // Background - dark slate like the app
+    pdf.setFillColor(15, 23, 42); // slate-900
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
     
-    // Header
-    pdf.setFontSize(22);
-    pdf.setTextColor(13, 148, 136); // teal-600
+    // ============ HEADER - On-Chain Disc Golf branding ============
+    // "On-Chain" in teal gradient effect (using solid teal)
+    pdf.setFontSize(24);
+    pdf.setTextColor(45, 212, 191); // teal-400 (brand-primary)
     pdf.setFont('helvetica', 'bold');
-    pdf.text('On-Chain Disc Golf', pageWidth / 2, 20, { align: 'center' });
+    pdf.text('On-Chain', pageWidth / 2 - 2, 22, { align: 'center' });
     
-    pdf.setFontSize(12);
-    pdf.setTextColor(100, 116, 139); // slate-500
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('Recovery Phrase Backup', pageWidth / 2, 28, { align: 'center' });
+    // "Disc Golf" in white
+    pdf.setTextColor(255, 255, 255);
+    pdf.text('Disc Golf', pageWidth / 2 + 35, 22, { align: 'center' });
     
-    // Divider line
-    pdf.setDrawColor(203, 213, 225); // slate-300
-    pdf.setLineWidth(0.5);
-    pdf.line(margin, 35, pageWidth - margin, 35);
+    // Decorative line under title
+    pdf.setDrawColor(45, 212, 191); // teal-400
+    pdf.setLineWidth(0.8);
+    pdf.line(margin + 20, 28, pageWidth - margin - 20, 28);
     
-    // Word grid section
-    pdf.setFontSize(10);
-    pdf.setTextColor(71, 85, 105); // slate-600
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('YOUR 12 WORDS:', margin, 45);
-    
-    // Draw word grid (4 columns x 3 rows)
-    const gridStartY = 50;
-    const colWidth = (pageWidth - (margin * 2)) / 4;
-    const rowHeight = 12;
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(11);
-    pdf.setTextColor(30, 41, 59); // slate-800
-    
-    words.forEach((word, index) => {
-        const col = index % 4;
-        const row = Math.floor(index / 4);
-        const x = margin + (col * colWidth) + 5;
-        const y = gridStartY + (row * rowHeight);
-        
-        // Word number
-        pdf.setTextColor(148, 163, 184); // slate-400
-        pdf.setFontSize(9);
-        pdf.text(`${index + 1}.`, x, y);
-        
-        // Word
-        pdf.setTextColor(30, 41, 59); // slate-800
-        pdf.setFontSize(11);
-        pdf.text(word, x + 8, y);
-    });
-    
-    // Divider
-    pdf.setDrawColor(203, 213, 225);
-    pdf.line(margin, gridStartY + 40, pageWidth - margin, gridStartY + 40);
-    
-    // Memory Story section
-    const storyStartY = gridStartY + 50;
-    
-    pdf.setFontSize(10);
-    pdf.setTextColor(71, 85, 105);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('MEMORY STORY:', margin, storyStartY);
-    
-    pdf.setFont('helvetica', 'italic');
-    pdf.setFontSize(10);
-    pdf.setTextColor(51, 65, 85); // slate-700
-    
-    // Split story into lines that fit the page width
-    const maxWidth = pageWidth - (margin * 2);
-    const storyLines = pdf.splitTextToSize(story, maxWidth);
-    pdf.text(storyLines, margin, storyStartY + 8);
-    
-    // Warning box at bottom
-    const warningY = pageHeight - 45;
-    
-    pdf.setFillColor(254, 242, 242); // red-50
-    pdf.setDrawColor(252, 165, 165); // red-300
-    pdf.roundedRect(margin, warningY, pageWidth - (margin * 2), 30, 3, 3, 'FD');
+    // ============ STORY SECTION ============
+    const storyStartY = 42;
     
     pdf.setFontSize(9);
-    pdf.setTextColor(185, 28, 28); // red-700
+    pdf.setTextColor(148, 163, 184); // slate-400
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('YOUR RECOVERY STORY', margin, storyStartY);
+    
+    // Render story with bold words
+    let currentX = margin;
+    let currentY = storyStartY + 10;
+    const maxWidth = pageWidth - (margin * 2);
+    const lineHeight = 6;
+    
+    pdf.setFontSize(11);
+    
+    storyParts.forEach(part => {
+        if (part.isBold) {
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(45, 212, 191); // teal-400 for seed words
+        } else {
+            pdf.setFont('helvetica', 'normal');
+            pdf.setTextColor(226, 232, 240); // slate-200
+        }
+        
+        const words = part.text.split(' ');
+        words.forEach((word, i) => {
+            const wordWidth = pdf.getTextWidth(word + ' ');
+            
+            if (currentX + wordWidth > pageWidth - margin) {
+                currentX = margin;
+                currentY += lineHeight;
+            }
+            
+            pdf.text(word + (i < words.length - 1 ? ' ' : ''), currentX, currentY);
+            currentX += wordWidth;
+        });
+    });
+    
+    // ============ QR CODE SECTION ============
+    const qrY = currentY + 15;
+    
+    // Generate QR code
+    const qrCanvas = document.createElement('canvas');
+    await QRCode.toCanvas(qrCanvas, mnemonic, {
+        width: 100,
+        margin: 1,
+        color: {
+            dark: '#0f172a', // slate-900
+            light: '#ffffff'
+        },
+        errorCorrectionLevel: 'M'
+    });
+    
+    // Add QR to PDF
+    const qrDataUrl = qrCanvas.toDataURL('image/png');
+    const qrSize = 40;
+    const qrX = (pageWidth - qrSize) / 2;
+    
+    // White background for QR
+    pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(qrX - 3, qrY - 3, qrSize + 6, qrSize + 6, 2, 2, 'F');
+    
+    pdf.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+    
+    // QR label
+    pdf.setFontSize(8);
+    pdf.setTextColor(148, 163, 184); // slate-400
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Scan to recover', pageWidth / 2, qrY + qrSize + 8, { align: 'center' });
+    
+    // ============ WARNING CARD - On brand ============
+    const warningY = pageHeight - 42;
+    
+    // Amber/orange warning box (on-brand)
+    pdf.setFillColor(245, 158, 11, 0.15); // amber-500 with transparency effect
+    pdf.setFillColor(30, 27, 20); // dark amber tint
+    pdf.setDrawColor(245, 158, 11); // amber-500
+    pdf.setLineWidth(0.5);
+    pdf.roundedRect(margin, warningY, pageWidth - (margin * 2), 28, 3, 3, 'FD');
+    
+    pdf.setFontSize(10);
+    pdf.setTextColor(251, 191, 36); // amber-400
     pdf.setFont('helvetica', 'bold');
-    pdf.text('⚠️ KEEP THIS SAFE!', margin + 5, warningY + 8);
+    pdf.text('KEEP THIS SAFE', pageWidth / 2, warningY + 9, { align: 'center' });
     
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8);
-    pdf.setTextColor(127, 29, 29); // red-800
-    const warningText = 'Anyone with these words can access your wallet. Never share them online or with anyone claiming to be support.';
+    pdf.setTextColor(253, 230, 138); // amber-200
+    const warningText = 'Anyone with this story can access your funds. Never share it online or with anyone claiming to be support.';
     const warningLines = pdf.splitTextToSize(warningText, pageWidth - (margin * 2) - 10);
-    pdf.text(warningLines, margin + 5, warningY + 15);
+    pdf.text(warningLines, pageWidth / 2, warningY + 17, { align: 'center' });
     
     // Footer
-    pdf.setFontSize(8);
-    pdf.setTextColor(148, 163, 184);
-    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(71, 85, 105); // slate-600
     pdf.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
     
     return pdf;
 };
 
 /**
- * Download the wallet card PDF
+ * Download the recovery card PDF
  */
 export const downloadWalletCardPDF = async (mnemonic: string): Promise<void> => {
     const pdf = await generateWalletCardPDF(mnemonic);
-    pdf.save('onchain-discgolf-wallet-card.pdf');
+    pdf.save('onchain-discgolf-backup.pdf');
 };
 
 // =============================================================================

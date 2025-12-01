@@ -15,12 +15,9 @@ import React, { useState, useMemo } from 'react';
 import { Icons } from './Icons';
 import { splitMnemonicToWords } from '../services/mnemonicService';
 import { 
-    generateBrandedQRCode, 
     downloadQRCode, 
     downloadWalletCardPDF,
-    generateMemoryStory,
-    backupToNostr,
-    hasNostrBackup
+    backupToNostr
 } from '../services/backupService';
 
 interface MnemonicBackupProps {
@@ -43,8 +40,6 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
     const [showBackupOptions, setShowBackupOptions] = useState(false);
     
     // Backup option states
-    const [showQRModal, setShowQRModal] = useState(false);
-    const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
     const [showNostrModal, setShowNostrModal] = useState(false);
     const [nostrPassword, setNostrPassword] = useState('');
     const [nostrPasswordConfirm, setNostrPasswordConfirm] = useState('');
@@ -53,18 +48,11 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
     const [isBackingUp, setIsBackingUp] = useState(false);
 
     const words = useMemo(() => splitMnemonicToWords(mnemonic), [mnemonic]);
-    const memoryStory = useMemo(() => generateMemoryStory(mnemonic), [mnemonic]);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(mnemonic);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-    };
-
-    const handleShowQR = async () => {
-        const url = await generateBrandedQRCode(mnemonic);
-        setQrCodeUrl(url);
-        setShowQRModal(true);
     };
 
     const handleDownloadQR = async () => {
@@ -175,25 +163,23 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                     </div>
                 </div>
 
-                {/* Copy Button */}
-                {showWords && (
-                    <button
-                        onClick={handleCopy}
-                        className="mt-3 w-full py-2 flex items-center justify-center space-x-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-sm"
-                    >
-                        {copied ? (
-                            <>
-                                <Icons.CheckMark size={16} className="text-green-400" />
-                                <span className="text-green-400">Copied!</span>
-                            </>
-                        ) : (
-                            <>
-                                <Icons.Copy size={16} className="text-slate-400" />
-                                <span className="text-slate-300">Copy to clipboard</span>
-                            </>
-                        )}
-                    </button>
-                )}
+                {/* Copy Button - Always visible directly under word grid */}
+                <button
+                    onClick={handleCopy}
+                    className="mt-3 w-full py-2 flex items-center justify-center space-x-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-sm"
+                >
+                    {copied ? (
+                        <>
+                            <Icons.CheckMark size={16} className="text-green-400" />
+                            <span className="text-green-400">Copied!</span>
+                        </>
+                    ) : (
+                        <>
+                            <Icons.Copy size={16} className="text-slate-400" />
+                            <span className="text-slate-300">Copy to clipboard</span>
+                        </>
+                    )}
+                </button>
 
                 {/* More Ways to Save - Accordion (always visible) */}
                 <div className="mt-4">
@@ -213,41 +199,41 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
 
                     {showBackupOptions && (
                         <div className="mt-2 space-y-2 animate-in slide-in-from-top-2 duration-200">
-                            {/* QR Code Option */}
-                            <button
-                                onClick={handleShowQR}
-                                className="w-full p-3 flex items-center space-x-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl transition-colors text-left"
-                            >
-                                <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                                    <Icons.QrCode className="text-purple-400" size={20} />
-                                </div>
-                                <div>
-                                    <p className="text-white font-medium text-sm">Save as QR Code</p>
-                                    <p className="text-slate-500 text-xs">Quick scan for recovery</p>
-                                </div>
-                            </button>
-
-                            {/* PDF Wallet Card Option */}
+                            {/* 1. Download Recovery Card (PDF) - First */}
                             <button
                                 onClick={handleDownloadPDF}
                                 className="w-full p-3 flex items-center space-x-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl transition-colors text-left"
                             >
-                                <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                                    <Icons.Zap className="text-orange-400" size={20} />
+                                <div className="w-10 h-10 bg-teal-500/20 rounded-lg flex items-center justify-center">
+                                    <Icons.CreditCard className="text-teal-400" size={20} />
                                 </div>
                                 <div>
-                                    <p className="text-white font-medium text-sm">Download Wallet Card</p>
-                                    <p className="text-slate-500 text-xs">PDF with words + memory story</p>
+                                    <p className="text-white font-medium text-sm">Download Recovery Card</p>
+                                    <p className="text-slate-500 text-xs">PDF with story + QR code</p>
                                 </div>
                             </button>
 
-                            {/* Nostr Backup Option */}
+                            {/* 2. Download QR - Second */}
+                            <button
+                                onClick={handleDownloadQR}
+                                className="w-full p-3 flex items-center space-x-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl transition-colors text-left"
+                            >
+                                <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                                    <Icons.QrCode className="text-orange-400" size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-white font-medium text-sm">Download QR</p>
+                                    <p className="text-slate-500 text-xs">Quick scan for recovery</p>
+                                </div>
+                            </button>
+
+                            {/* 3. Backup to Nostr - Third (Purple) */}
                             <button
                                 onClick={() => setShowNostrModal(true)}
                                 className="w-full p-3 flex items-center space-x-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl transition-colors text-left"
                             >
-                                <div className="w-10 h-10 bg-teal-500/20 rounded-lg flex items-center justify-center">
-                                    <Icons.Key className="text-teal-400" size={20} />
+                                <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                                    <Icons.Key className="text-purple-400" size={20} />
                                 </div>
                                 <div>
                                     <p className="text-white font-medium text-sm">Backup to Nostr</p>
@@ -274,45 +260,6 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                     <Icons.Next size={18} />
                 </button>
             </div>
-
-            {/* QR Code Modal */}
-            {showQRModal && qrCodeUrl && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
-                        <div className="p-6 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-bold text-white">QR Code Backup</h3>
-                                <button onClick={() => setShowQRModal(false)} className="text-slate-400 hover:text-white">
-                                    <Icons.Close size={24} />
-                                </button>
-                            </div>
-
-                            <div className="flex justify-center">
-                                <img src={qrCodeUrl} alt="Recovery QR Code" className="rounded-lg" />
-                            </div>
-
-                            <p className="text-xs text-slate-400 text-center">
-                                Screenshot or save this image. Scan to recover your wallet.
-                            </p>
-
-                            <div className="flex space-x-2">
-                                <button
-                                    onClick={() => setShowQRModal(false)}
-                                    className="flex-1 py-3 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-600 transition-colors"
-                                >
-                                    Close
-                                </button>
-                                <button
-                                    onClick={handleDownloadQR}
-                                    className="flex-1 py-3 bg-purple-500 text-white font-bold rounded-xl hover:bg-purple-400 transition-colors"
-                                >
-                                    Download
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Nostr Backup Modal */}
             {showNostrModal && (
