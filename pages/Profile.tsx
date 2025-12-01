@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Icons } from '../components/Icons';
 import { Button } from '../components/Button';
+import { FeedbackModal, FeedbackButton } from '../components/FeedbackModal';
 import { getSession, getRelays, addRelay, removeRelay, resetRelays, uploadProfileImage, getMagicLightningAddress } from '../services/nostrService';
 import { nip19 } from 'nostr-tools';
 import { bytesToHex } from '@noble/hashes/utils';
@@ -29,6 +30,7 @@ export const Profile: React.FC = () => {
     const [view, setView] = useState<'main' | 'settings'>('main');
     const [isEditing, setIsEditing] = useState(false);
     const [copiedAddress, setCopiedAddress] = useState(false);
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
     const lightningAddress = userProfile.lud16 || getMagicLightningAddress(currentUserPubkey);
 
@@ -719,14 +721,23 @@ export const Profile: React.FC = () => {
                                         <a href="https://github.com/OnChainDiscGolf/app" target="_blank" rel="noreferrer" className="text-brand-primary hover:underline">GitHub</a>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Developer</span>
-                                        <a href="https://primal.net/Garrett" target="_blank" rel="noreferrer" className="text-brand-primary hover:underline">Nostr Profile</a>
+                                        <span>Contact</span>
+                                        <span className="text-brand-primary">Use Feedback Button ↓</span>
                                     </div>
                                 </div>
                             </div>
                         )}
                     </div>
+
+                    {/* Feedback Button */}
+                    <FeedbackButton onClick={() => setShowFeedbackModal(true)} />
                 </div>
+
+                {/* Feedback Modal */}
+                <FeedbackModal
+                    isOpen={showFeedbackModal}
+                    onClose={() => setShowFeedbackModal(false)}
+                />
             </div>
         );
     }

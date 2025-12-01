@@ -35,7 +35,10 @@ import {
   UserPlus,
   Search,
   User,
-  BarChart3
+  BarChart3,
+  Bug,
+  MessageSquare,
+  Send
 } from 'lucide-react';
 
 // Custom Disc Golf Basket Icon matching Lucide style
@@ -214,6 +217,7 @@ export const Icons = {
   Close: XCircle,
   More: MoreVertical,
   Send: ArrowUpRight,
+  SendMessage: Send,
   Receive: ArrowDownLeft,
   Settings,
   Copy,
@@ -240,4 +244,6 @@ export const Icons = {
   IOSShare,
   SmirkFace,
   BarChart: BarChart3,
+  Bug,
+  Feedback: MessageSquare,
 };

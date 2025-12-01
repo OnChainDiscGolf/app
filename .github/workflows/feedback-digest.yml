@@ -1,0 +1,115 @@
+name: Weekly Feedback Digest
+
+on:
+  # Run every Sunday at 9:00 AM UTC
+  schedule:
+    - cron: '0 9 * * 0'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Number of days to look back'
+        required: false
+        default: '7'
+        type: string
+
+jobs:
+  generate-digest:
+    name: Generate Feedback Digest
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install nostr-sdk anthropic
+      
+      - name: Generate feedback digest
+        id: digest
+        env:
+          SUPPORT_NSEC: ${{ secrets.SUPPORT_NSEC }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NOSTR_RELAYS: "wss://relay.damus.io,wss://relay.snort.social,wss://relay.nostr.net,wss://relay.primal.net"
+        run: |
+          DAYS="${{ github.event.inputs.days || '7' }}"
+          python scripts/feedback_digest.py --days $DAYS --output file
+          
+          # Store the filename for the next step
+          DIGEST_FILE=$(ls -t feedback_digest_*.md 2>/dev/null | head -1)
+          echo "digest_file=$DIGEST_FILE" >> $GITHUB_OUTPUT
+      
+      - name: Upload digest as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: feedback-digest-${{ github.run_number }}
+          path: feedback_digest_*.md
+          retention-days: 30
+      
+      - name: Create Issue with Digest
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const files = fs.readdirSync('.').filter(f => f.startsWith('feedback_digest_') && f.endsWith('.md'));
+            
+            if (files.length === 0) {
+              console.log('No digest file found');
+              return;
+            }
+            
+            const digestContent = fs.readFileSync(files[0], 'utf8');
+            const date = new Date().toISOString().split('T')[0];
+            
+            // Create a new issue with the digest
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `📬 Feedback Digest - ${date}`,
+              body: digestContent,
+              labels: ['feedback', 'automated']
+            });
+            
+            console.log('Created feedback digest issue');
+      
+      - name: Summary
+        run: |
+          echo "## 📬 Feedback Digest Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the uploaded artifact or the new issue for the full digest." >> $GITHUB_STEP_SUMMARY
+          if [ -f "${{ steps.digest.outputs.digest_file }}" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Preview" >> $GITHUB_STEP_SUMMARY
+            head -50 "${{ steps.digest.outputs.digest_file }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: generate-digest
+    if: failure()
+    
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString().split('T')[0];
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `⚠️ Feedback Digest Failed - ${date}`,
+              body: `The weekly feedback digest workflow failed.\n\nCheck the [workflow run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.`,
+              labels: ['bug', 'automated']
+            });
+

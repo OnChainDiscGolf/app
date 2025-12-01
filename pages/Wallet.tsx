@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { sendGiftWrap, getMagicLightningAddress } from '../services/nostrService';
 import { Button } from '../components/Button';
 import { Icons } from '../components/Icons';
+import { FeedbackModal, FeedbackButton } from '../components/FeedbackModal';
 import { useNavigate } from 'react-router-dom';
 
 // Helper Component for Success Animation
@@ -91,6 +92,7 @@ export const Wallet: React.FC = () => {
     const [sendAmount, setSendAmount] = useState('');
     const [sendInput, setSendInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
     // Contacts state
     const [contacts, setContacts] = useState<Array<{ pubkey: string; name?: string; image?: string; lud16?: string }>>([]);
@@ -732,9 +734,18 @@ export const Wallet: React.FC = () => {
                                 Sends a self-encrypted Gift Wrap with a mock token to test the listener.
                             </p>
                         </div>
+
+                        {/* Feedback Button */}
+                        <FeedbackButton onClick={() => setShowFeedbackModal(true)} />
                     </div>
                 )
                 }
+
+                {/* Feedback Modal */}
+                <FeedbackModal
+                    isOpen={showFeedbackModal}
+                    onClose={() => setShowFeedbackModal(false)}
+                />
             </div >
         );
     }

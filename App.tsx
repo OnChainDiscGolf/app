@@ -15,6 +15,7 @@ import { RoundDetails } from './pages/RoundDetails';
 import { Onboarding } from './pages/Onboarding';
 import { RoundHistory } from './pages/RoundHistory';
 import { useSwipeBack } from './hooks/useSwipeBack';
+import { initErrorCapture, trackNavigation } from './services/feedbackService';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useSwipeBack(); // Enable global swipe-to-back
@@ -24,6 +25,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // Hide nav on onboarding/profile-setup for guests
   const hideNav = isGuest && (location.pathname === '/' || location.pathname === '/profile-setup');
+
+  // Track navigation for feedback logs
+  useEffect(() => {
+    trackNavigation(location.pathname);
+  }, [location.pathname]);
 
   // Listen for payment events
   useEffect(() => {
@@ -106,6 +112,11 @@ const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Initialize error capture for feedback logs
+  useEffect(() => {
+    initErrorCapture();
+  }, []);
 
   useEffect(() => {
     // Start exit animation after 1 second

@@ -4,6 +4,7 @@ import { useApp, getTopHeavyDistribution, getLinearDistribution } from '../conte
 import { Button } from '../components/Button';
 import { Icons } from '../components/Icons';
 import { InfoModal } from '../components/InfoModal';
+import { FeedbackModal, FeedbackButton } from '../components/FeedbackModal';
 import { useNavigate } from 'react-router-dom';
 import { getPool, getRelays, listEvents, lookupUser, publishProfileWithKey, getMagicLightningAddress, updateContactList } from '../services/nostrService';
 import { NOSTR_KIND_ROUND, DisplayProfile } from '../types';
@@ -69,6 +70,7 @@ export const Home: React.FC = () => {
 
     // Local UI state for the creation wizard
     const [view, setView] = useState<'menu' | 'setup' | 'select_players' | 'customize' | 'scan_player' | 'settings'>('menu');
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
     // Setup Form State
     const [courseName, setCourseName] = useState('');
@@ -241,8 +243,8 @@ export const Home: React.FC = () => {
     };
 
     const handlePayToSkip = () => {
-        // Open Lightning Address payment
-        window.location.href = 'lightning:Garrett@minibits.net?amount=1000000'; // 1000 sats in millisats
+        // Open Lightning Address payment to project support
+        window.location.href = 'lightning:npub1xg8nc32sw6u3m337wzhk8gs3nqmh73r86z6a93s3hetca4jvktls68qyue@npubx.cash?amount=1000000'; // 1000 sats in millisats
         setShowScoldingModal(false);
         setShowShieldModal(false);
     };
@@ -2623,6 +2625,15 @@ export const Home: React.FC = () => {
                 <div className="text-slate-400 text-center mt-10">
                     <p>Settings coming soon...</p>
                 </div>
+
+                {/* Feedback Button */}
+                <FeedbackButton onClick={() => setShowFeedbackModal(true)} />
+
+                {/* Feedback Modal */}
+                <FeedbackModal
+                    isOpen={showFeedbackModal}
+                    onClose={() => setShowFeedbackModal(false)}
+                />
             </div>
         );
     }

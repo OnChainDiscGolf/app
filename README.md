@@ -201,7 +201,7 @@ MIT License — see [LICENSE](LICENSE)
 
 ## 💜 Support the Project
 
-All you have to do is... PLAY DISC GOLF ON-CHAIN <3
+All you have to do is... PLAY DISC GOLF ON-CHAIN ⚡🥏
 
 ---
 
