@@ -39,7 +39,8 @@ import {
   Bug,
   MessageSquare,
   Send,
-  CreditCard
+  CreditCard,
+  Link2
 } from 'lucide-react';
 
 // Custom Disc Golf Basket Icon matching Lucide style
@@ -249,4 +250,5 @@ export const Icons = {
   Bug,
   Feedback: MessageSquare,
   CreditCard,
+  Link: Link2,
 };

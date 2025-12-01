@@ -60,8 +60,8 @@ interface AppContextType extends AppState {
   authSource: AuthSource | null;
   hasUnifiedBackup: boolean;
 
-  // NWC Actions
-  setWalletMode: (mode: 'cashu' | 'nwc') => void;
+  // Wallet Mode Actions
+  setWalletMode: (mode: 'cashu' | 'nwc' | 'breez') => void;
   setNwcConnection: (uri: string) => void;
   checkForPayments: () => Promise<number>;
 
@@ -193,8 +193,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   // Wallet Mode
-  const [walletMode, setWalletMode] = useState<'cashu' | 'nwc'>(() => {
-    const savedMode = localStorage.getItem('cdg_wallet_mode') as 'cashu' | 'nwc';
+  const [walletMode, setWalletMode] = useState<'cashu' | 'nwc' | 'breez'>(() => {
+    const savedMode = localStorage.getItem('cdg_wallet_mode') as 'cashu' | 'nwc' | 'breez';
     const savedString = localStorage.getItem('cdg_nwc_string');
     // Only allow NWC as default if we have a connection string
     if (savedMode === 'nwc' && savedString) return 'nwc';
@@ -2071,7 +2071,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMints(prev => prev.map(m => ({ ...m, isActive: m.url === url })));
   };
 
-  const setWalletModeAction = (mode: 'cashu' | 'nwc') => {
+  const setWalletModeAction = (mode: 'cashu' | 'nwc' | 'breez') => {
     setWalletMode(mode);
   };
 

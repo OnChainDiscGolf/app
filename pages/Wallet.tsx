@@ -578,32 +578,86 @@ export const Wallet: React.FC = () => {
                 {/* Wallet Mode Selection */}
                 <div className="mb-8">
                     <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Active Wallet Provider</h3>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-2">
+                        {/* Breez Wallet */}
+                        <button
+                            onClick={() => setWalletMode('breez')}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'breez' ? 'bg-blue-500/20 border-blue-500' : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'}`}
+                        >
+                            <Icons.Zap size={20} className={`mb-1 ${walletMode === 'breez' ? 'text-blue-400' : 'text-slate-400'}`} />
+                            <span className="font-bold text-sm mb-0.5">Breez</span>
+                            <span className="text-[10px] text-center text-slate-400 leading-tight">Lightning</span>
+                        </button>
+                        {/* Cashu Wallet */}
                         <button
                             onClick={() => setWalletMode('cashu')}
-                            className={`p-4 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'cashu' ? 'bg-brand-primary/20 border-brand-primary' : 'bg-slate-800 border-slate-700 opacity-60'}`}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'cashu' ? 'bg-emerald-500/20 border-emerald-500' : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'}`}
                         >
-                            <span className="font-bold text-lg mb-1">Cashu</span>
-                            <span className="text-xs text-center text-slate-400">Private, Instant, eCash</span>
+                            <Icons.Wallet size={20} className={`mb-1 ${walletMode === 'cashu' ? 'text-emerald-400' : 'text-slate-400'}`} />
+                            <span className="font-bold text-sm mb-0.5">Cashu</span>
+                            <span className="text-[10px] text-center text-slate-400 leading-tight">eCash</span>
                         </button>
+                        {/* NWC Wallet */}
                         <button
                             onClick={() => setWalletMode('nwc')}
-                            className={`p-4 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'nwc' ? 'bg-brand-secondary/20 border-brand-secondary' : 'bg-slate-800 border-slate-700 opacity-60'}`}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'nwc' ? 'bg-purple-500/20 border-purple-500' : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'}`}
                         >
-                            <span className="font-bold text-lg mb-1">NWC</span>
-                            <span className="text-xs text-center text-slate-400">Self-Custody, Lightning</span>
+                            <Icons.Link size={20} className={`mb-1 ${walletMode === 'nwc' ? 'text-purple-400' : 'text-slate-400'}`} />
+                            <span className="font-bold text-sm mb-0.5">NWC</span>
+                            <span className="text-[10px] text-center text-slate-400 leading-tight">Connect</span>
                         </button>
                     </div>
                     {showNwcError && walletMode === 'nwc' && !nwcString && (
                         <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center animate-in fade-in slide-in-from-top-2">
                             <Icons.Close className="text-red-500 mr-2" size={16} />
                             <p className="text-xs text-red-400 font-bold">
-                                Please save a connection or switch to Cashu.
+                                Please save a connection or switch to another wallet.
                             </p>
                         </div>
                     )}
                 </div>
 
+                {/* Breez Wallet Settings */}
+                {walletMode === 'breez' && (
+                    <div className="mb-8 animate-in fade-in slide-in-from-top-4">
+                        <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Lightning Wallet</h3>
+                        
+                        <div className="bg-blue-500/10 border border-blue-500/30 p-6 rounded-xl">
+                            <div className="flex items-center space-x-3 mb-4">
+                                <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center">
+                                    <Icons.Zap size={24} className="text-blue-400" />
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-bold">Breez SDK</h4>
+                                    <p className="text-slate-400 text-xs">Non-custodial Lightning</p>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700">
+                                    <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Lightning Address</label>
+                                    <p className="text-sm text-white font-mono">Coming soon...</p>
+                                </div>
+                                
+                                <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700">
+                                    <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Node Status</label>
+                                    <div className="flex items-center space-x-2">
+                                        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                                        <p className="text-sm text-amber-400">Pending Setup</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                                <p className="text-xs text-amber-400">
+                                    <span className="font-bold">Coming Soon:</span> Breez SDK integration is in progress. Your self-custodial Lightning wallet will be available here.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* NWC Settings */}
                 {walletMode === 'nwc' && (
                     <div className="mb-8 animate-in fade-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">NWC Connection</h3>
@@ -643,7 +697,7 @@ export const Wallet: React.FC = () => {
                                     {showNwcError ? 'Connection Required' : 'Connection String (nostr+walletconnect://...)'}
                                 </label>
                                 <textarea
-                                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-xs font-mono h-24 focus:ring-2 focus:ring-brand-secondary outline-none resize-none mb-3"
+                                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-xs font-mono h-24 focus:ring-2 focus:ring-purple-500 outline-none resize-none mb-3"
                                     placeholder="nostr+walletconnect://..."
                                     value={localNwcString}
                                     onChange={e => {
@@ -680,7 +734,7 @@ export const Wallet: React.FC = () => {
                                 </div>
                                 <p className="text-xs text-slate-400">
                                     Paste your NWC connection string from Alby, Mutiny, or your home node.
-                                    <br /><span className="text-brand-secondary">Note: This is stored locally on your device.</span>
+                                    <br /><span className="text-purple-400">Note: This is stored locally on your device.</span>
                                 </p>
                             </div>
                         )}
@@ -1276,23 +1330,64 @@ export const Wallet: React.FC = () => {
                 </div>
             </div>
 
-            <div className={`rounded-3xl p-6 shadow-xl border relative overflow-hidden mb-8 transition-all duration-500 ${walletMode === 'nwc' ? 'bg-gradient-to-br from-slate-800 to-indigo-950 border-indigo-500/30' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700'}`}>
-                <div className={`absolute -top-6 -right-6 w-32 h-32 rounded-full blur-3xl ${walletMode === 'nwc' ? 'bg-indigo-500/10' : 'bg-brand-primary/5'}`}></div>
+            {/* Wallet Balance Tile - Color coded by wallet type */}
+            <div className={`rounded-3xl p-6 shadow-xl border relative overflow-hidden mb-8 transition-all duration-500 ${
+                walletMode === 'breez' 
+                    ? 'bg-gradient-to-br from-slate-800 via-slate-900 to-blue-950 border-blue-500/30' 
+                    : walletMode === 'nwc' 
+                        ? 'bg-gradient-to-br from-slate-800 via-slate-900 to-purple-950 border-purple-500/30' 
+                        : 'bg-gradient-to-br from-slate-800 via-slate-900 to-emerald-950 border-emerald-500/30'
+            }`}>
+                {/* Ambient glow effect */}
+                <div className={`absolute -top-6 -right-6 w-32 h-32 rounded-full blur-3xl ${
+                    walletMode === 'breez' 
+                        ? 'bg-blue-500/15' 
+                        : walletMode === 'nwc' 
+                            ? 'bg-purple-500/15' 
+                            : 'bg-emerald-500/15'
+                }`}></div>
+                <div className={`absolute -bottom-10 -left-10 w-40 h-40 rounded-full blur-3xl ${
+                    walletMode === 'breez' 
+                        ? 'bg-blue-600/10' 
+                        : walletMode === 'nwc' 
+                            ? 'bg-purple-600/10' 
+                            : 'bg-emerald-600/10'
+                }`}></div>
 
                 {/* Mode Indicator Header */}
                 <div className="relative z-10 flex items-center justify-between mb-6">
-                    <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border ${walletMode === 'nwc' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300' : 'bg-brand-primary/10 border-brand-primary/20 text-brand-primary'}`}>
-                        {walletMode === 'nwc' ? <Icons.Zap size={16} /> : <Icons.Wallet size={16} />}
+                    <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border ${
+                        walletMode === 'breez' 
+                            ? 'bg-blue-500/10 border-blue-500/30 text-blue-300' 
+                            : walletMode === 'nwc' 
+                                ? 'bg-purple-500/10 border-purple-500/30 text-purple-300' 
+                                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    }`}>
+                        {walletMode === 'breez' ? (
+                            <Icons.Zap size={16} />
+                        ) : walletMode === 'nwc' ? (
+                            <Icons.Link size={16} />
+                        ) : (
+                            <Icons.Wallet size={16} />
+                        )}
                         <span className="text-xs font-bold tracking-wider uppercase">
-                            {walletMode === 'nwc' ? 'NWC Wallet' : 'Cashu Wallet'}
+                            {walletMode === 'breez' ? 'Lightning' : walletMode === 'nwc' ? 'NWC' : 'Cashu'}
                         </span>
                     </div>
 
                     {walletMode === 'cashu' && activeMint && (
                         <div className="flex items-center space-x-1.5 bg-black/30 px-2 py-1 rounded-md border border-white/5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></div>
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]"></div>
                             <span className="text-[10px] text-slate-400 font-mono truncate max-w-[100px]">
                                 {activeMint.nickname}
+                            </span>
+                        </div>
+                    )}
+                    {walletMode === 'breez' && (
+                        <div className="flex items-center space-x-1.5 bg-black/30 px-2 py-1 rounded-md border border-white/5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                                Pending
                             </span>
                         </div>
                     )}
@@ -1305,20 +1400,62 @@ export const Wallet: React.FC = () => {
 
                     <div className="flex items-baseline space-x-1 mb-8">
                         <span className="text-5xl font-extrabold tracking-tight text-white drop-shadow-sm">{walletBalance.toLocaleString()}</span>
-                        <span className={`text-xl font-bold ${walletMode === 'nwc' ? 'text-indigo-400' : 'text-brand-accent'}`}>SATS</span>
+                        <span className={`text-xl font-bold ${
+                            walletMode === 'breez' 
+                                ? 'text-blue-400' 
+                                : walletMode === 'nwc' 
+                                    ? 'text-purple-400' 
+                                    : 'text-emerald-400'
+                        }`}>SATS</span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <button onClick={() => setView('send-input')} className="flex flex-col items-center justify-center bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl py-3 transition-all active:scale-95">
-                            <div className="bg-brand-accent/20 p-2 rounded-full mb-1">
-                                <Icons.Send size={20} className="text-brand-accent" />
+                        <button 
+                            onClick={() => setView('send-input')} 
+                            className={`flex flex-col items-center justify-center bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl py-3 transition-all active:scale-95`}
+                        >
+                            <div className={`p-2 rounded-full mb-1 ${
+                                walletMode === 'breez' 
+                                    ? 'bg-blue-500/20' 
+                                    : walletMode === 'nwc' 
+                                        ? 'bg-purple-500/20' 
+                                        : 'bg-emerald-500/20'
+                            }`}>
+                                <Icons.Send size={20} className={
+                                    walletMode === 'breez' 
+                                        ? 'text-blue-400' 
+                                        : walletMode === 'nwc' 
+                                            ? 'text-purple-400' 
+                                            : 'text-emerald-400'
+                                } />
                             </div>
                             <span className="text-sm font-bold text-white">Send</span>
                         </button>
 
-                        <button onClick={() => walletMode === 'nwc' ? setView('deposit') : setView('receive')} className="flex flex-col items-center justify-center bg-brand-primary/20 hover:bg-brand-primary/30 border border-brand-primary/50 hover:border-brand-primary rounded-xl py-3 transition-all active:scale-95">
-                            <div className="bg-brand-primary/20 p-2 rounded-full mb-1">
-                                <Icons.Receive size={20} className="text-brand-primary" />
+                        <button 
+                            onClick={() => walletMode === 'nwc' ? setView('deposit') : setView('receive')} 
+                            className={`flex flex-col items-center justify-center rounded-xl py-3 transition-all active:scale-95 ${
+                                walletMode === 'breez' 
+                                    ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 hover:border-blue-500' 
+                                    : walletMode === 'nwc' 
+                                        ? 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 hover:border-purple-500' 
+                                        : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 hover:border-emerald-500'
+                            }`}
+                        >
+                            <div className={`p-2 rounded-full mb-1 ${
+                                walletMode === 'breez' 
+                                    ? 'bg-blue-500/20' 
+                                    : walletMode === 'nwc' 
+                                        ? 'bg-purple-500/20' 
+                                        : 'bg-emerald-500/20'
+                            }`}>
+                                <Icons.Receive size={20} className={
+                                    walletMode === 'breez' 
+                                        ? 'text-blue-400' 
+                                        : walletMode === 'nwc' 
+                                            ? 'text-purple-400' 
+                                            : 'text-emerald-400'
+                                } />
                             </div>
                             <span className="text-sm font-bold text-white">Receive</span>
                         </button>
