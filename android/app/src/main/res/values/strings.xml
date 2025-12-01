@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">On-Chain Disc Golf</string>
+    <string name="title_activity_main">On-Chain Disc Golf</string>
+    <string name="package_name">app.onchain.discgolf</string>
+    <string name="custom_url_scheme">app.onchain.discgolf</string>
+</resources>

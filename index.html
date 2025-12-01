@@ -3,17 +3,32 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- viewport-fit=cover enables proper rendering on iOS devices with notches -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>On-Chain Disc Golf</title>
+  
+  <!-- PWA Support -->
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0f172a">
   <link rel="icon" href="/icon.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="/icon.jpg">
+  
+  <!-- iOS Web App / Capacitor Support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="On-Chain DG">
+  
+  <!-- Android/Chrome Web App -->
+  <meta name="mobile-web-app-capable" content="yes">
+  
   <!-- Preconnect to QR API for faster loading -->
   <link rel="preconnect" href="https://api.qrserver.com">
   <link rel="dns-prefetch" href="https://api.qrserver.com">
+  
+  <!-- Service Worker for PWA (skipped in native Capacitor context) -->
   <script>
-    if ('serviceWorker' in navigator) {
+    // Only register service worker in browser context, not in Capacitor native
+    if ('serviceWorker' in navigator && !window.Capacitor) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
           .then(registration => {

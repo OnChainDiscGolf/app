@@ -16,6 +16,7 @@ import { Onboarding } from './pages/Onboarding';
 import { RoundHistory } from './pages/RoundHistory';
 import { useSwipeBack } from './hooks/useSwipeBack';
 import { initErrorCapture, trackNavigation } from './services/feedbackService';
+import { initializeCapacitor, setupAppStateListener, isNative } from './services/capacitorService';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useSwipeBack(); // Enable global swipe-to-back
@@ -113,9 +114,31 @@ const App: React.FC = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Initialize error capture for feedback logs
+  // Initialize error capture for feedback logs and Capacitor services
   useEffect(() => {
     initErrorCapture();
+    
+    // Initialize Capacitor for native platforms
+    initializeCapacitor().then(() => {
+      if (isNative()) {
+        console.log('📱 Capacitor initialized successfully');
+      }
+    });
+
+    // Setup app state listener to refresh data when app comes to foreground
+    const cleanupAppState = setupAppStateListener(
+      () => {
+        console.log('📱 App resumed - checking for updates');
+        // Could trigger wallet refresh, notification checks, etc.
+      },
+      () => {
+        console.log('📱 App paused');
+      }
+    );
+
+    return () => {
+      cleanupAppState();
+    };
   }, []);
 
   useEffect(() => {
