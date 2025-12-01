@@ -4,7 +4,7 @@
 
 **On-Chain Disc Golf** is a disc golf scorecard app with integrated Bitcoin payments. No banks. No IOUs. No "Venmo is acting weird." Just pay when you start, get paid when you finish.
 
-Oh, and ironically, despite the name — all payments are actually *off-chain*. ⚡
+Ironically, despite the name, all payments are actually *off-chain*. ;)
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Built with Nostr](https://img.shields.io/badge/Built%20with-Nostr-purple.svg)](https://nostr.com)
