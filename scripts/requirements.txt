@@ -1,6 +1,5 @@
-# Dependencies for feedback digest script
+# Dependencies for local feedback digest script (optional)
 anthropic>=0.40.0
 websockets>=12.0
-coincurve>=19.0.0
-cryptography>=43.0.0
-
+coincurve>=18.0
+cryptography>=41.0
