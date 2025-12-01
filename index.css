@@ -391,6 +391,32 @@ body {
   }
 }
 
+/* Balance Loading Shimmer Animation */
+@keyframes balanceShimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.balance-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.6) 0%,
+    rgba(226, 232, 240, 0.9) 25%,
+    rgba(255, 255, 255, 1) 50%,
+    rgba(226, 232, 240, 0.9) 75%,
+    rgba(148, 163, 184, 0.6) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: balanceShimmer 1.5s ease-in-out infinite;
+}
+
 /* ===========================================
    Bottom Nav Safe Area Utilities
    =========================================== */

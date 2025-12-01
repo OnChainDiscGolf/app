@@ -41,6 +41,7 @@ interface AppContextType extends AppState {
   receiveEcash: (token: string) => Promise<boolean>;
   getLightningQuote: (invoice: string) => Promise<{ amount: number, fee: number }>;
   refreshWalletBalance: () => Promise<void>;
+  isBalanceLoading: boolean;
 
   // Player Management
   addRecentPlayer: (player: DisplayProfile) => void;
@@ -114,6 +115,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number>(() => {
     const saved = localStorage.getItem('cdg_proofs');
     if (saved) {
@@ -1640,6 +1642,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const refreshWalletBalance = async () => {
+    setIsBalanceLoading(true);
+    
+    // Breez Logic (placeholder - will be implemented when API key arrives)
+    if (walletMode === 'breez') {
+      // TODO: Implement Breez balance fetch
+      // const breezBalance = await breezService.getBalance();
+      // setWalletBalance(breezBalance);
+      console.log('Breez balance fetch - pending implementation');
+      // For now, keep balance at 0 or last known value
+      setIsBalanceLoading(false);
+      return;
+    }
+    
+    // NWC Logic
     if (walletMode === 'nwc') {
       if (nwcServiceRef.current) {
         try {
@@ -1649,6 +1665,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.error("NWC Balance fetch failed", e);
         }
       }
+      setIsBalanceLoading(false);
       return;
     }
 
@@ -1682,9 +1699,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
             }
           }
-        }).catch(e => console.warn("Refresh Gift Wrap check failed:", e));
+        }).catch(e => console.warn("Refresh Gift Wrap check failed:", e))
+        .finally(() => setIsBalanceLoading(false));
 
         // NOTE: npub.cash payments now handled by WebSocket subscription
+      } else {
+        setIsBalanceLoading(false);
       }
       return;
     }
@@ -1775,6 +1795,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (e) {
       console.error("Wallet refresh failed:", e);
+    } finally {
+      setIsBalanceLoading(false);
     }
   };
 
@@ -2085,6 +2107,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{
       walletBalance,
+      isBalanceLoading,
       transactions,
       walletMode,
       nwcString,

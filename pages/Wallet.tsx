@@ -202,7 +202,7 @@ const getLeftGlowColor = (currentMode: 'breez' | 'cashu' | 'nwc'): 'breez' | 'ca
 };
 
 export const Wallet: React.FC = () => {
-    const { walletBalance, transactions, userProfile, currentUserPubkey, mints, setActiveMint, addMint, removeMint, sendFunds, receiveEcash, depositFunds, checkDepositStatus, confirmDeposit, getLightningQuote, isAuthenticated, refreshWalletBalance, walletMode, nwcString, setWalletMode, setNwcConnection, checkForPayments } = useApp();
+    const { walletBalance, isBalanceLoading, transactions, userProfile, currentUserPubkey, mints, setActiveMint, addMint, removeMint, sendFunds, receiveEcash, depositFunds, checkDepositStatus, confirmDeposit, getLightningQuote, isAuthenticated, refreshWalletBalance, walletMode, nwcString, setWalletMode, setNwcConnection, checkForPayments } = useApp();
     const navigate = useNavigate();
     
     // Track wallet mode for gradient transitions
@@ -225,6 +225,9 @@ export const Wallet: React.FC = () => {
         
         setIsTransitioning(true);
         setWalletMode(newMode);
+        
+        // Refresh balance for the new wallet
+        refreshWalletBalance();
         
         // End transition after animation completes
         setTimeout(() => {
@@ -1588,8 +1591,16 @@ export const Wallet: React.FC = () => {
                     </div>
 
                     <div className="flex items-baseline space-x-1 mb-8">
-                        <span className="text-5xl font-extrabold tracking-tight text-white drop-shadow-sm">{walletBalance.toLocaleString()}</span>
-                        <span className={`text-xl font-bold ${
+                        <span 
+                            className={`text-5xl font-extrabold tracking-tight drop-shadow-sm transition-all duration-300 ${
+                                isBalanceLoading 
+                                    ? 'balance-shimmer' 
+                                    : 'text-white'
+                            }`}
+                        >
+                            {walletBalance.toLocaleString()}
+                        </span>
+                        <span className={`text-xl font-bold transition-colors duration-300 ${
                             walletMode === 'breez' 
                                 ? 'text-blue-400' 
                                 : walletMode === 'nwc' 
