@@ -981,14 +981,7 @@ export const Wallet: React.FC = () => {
                 <div className="flex items-center mb-6">
                     <button
                         onClick={() => {
-                            if (walletMode === 'nwc' && !nwcString) {
-                                setShowNwcError(true);
-                                setIsWiggling(true);
-                                setTimeout(() => setIsWiggling(false), 500);
-                                // Vibrate if supported
-                                if (navigator.vibrate) navigator.vibrate(200);
-                                return;
-                            }
+                            // User can always go back - no more blocking for NWC setup
                             setView('main');
                         }}
                         className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700"
@@ -1115,18 +1108,15 @@ export const Wallet: React.FC = () => {
                                 </Button>
                             </div>
                         ) : (
-                            <div className={`bg-slate-800 p-4 rounded-xl border transition-all duration-200 ${showNwcError ? 'border-red-500 ring-2 ring-red-500/20' : 'border-slate-700'} ${isWiggling ? 'animate-wiggle' : ''}`}>
-                                <label className={`block text-xs mb-2 ${showNwcError ? 'text-red-400 font-bold' : 'text-slate-500'}`}>
-                                    {showNwcError ? 'Connection Required' : 'Connection String (nostr+walletconnect://...)'}
+                            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 transition-all duration-200">
+                                <label className="block text-xs mb-2 text-slate-500">
+                                    Connection String (nostr+walletconnect://...)
                                 </label>
                                 <textarea
                                     className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-xs font-mono h-24 focus:ring-2 focus:ring-purple-500 outline-none resize-none mb-3"
                                     placeholder="nostr+walletconnect://..."
                                     value={localNwcString}
-                                    onChange={e => {
-                                        setLocalNwcString(e.target.value);
-                                        if (showNwcError) setShowNwcError(false);
-                                    }}
+                                    onChange={e => setLocalNwcString(e.target.value)}
                                 />
                                 <Button
                                     fullWidth
@@ -1163,6 +1153,36 @@ export const Wallet: React.FC = () => {
                                 </p>
                             </div>
                         )}
+                        
+                        {/* NWC Explanation */}
+                        <div className="mt-6 bg-purple-500/5 border border-purple-500/20 rounded-xl p-4">
+                            <h4 className="text-sm font-bold text-purple-400 mb-2">What is NWC?</h4>
+                            <p className="text-xs text-slate-400 leading-relaxed mb-3">
+                                <strong className="text-slate-300">Nostr Wallet Connect</strong> is a protocol that lets this app communicate securely with your existing Lightning wallet. Think of it like connecting your bank account to Venmo — your funds stay in your wallet, and this app just sends payment requests.
+                            </p>
+                            
+                            <h4 className="text-sm font-bold text-purple-400 mb-2">Why use NWC?</h4>
+                            <ul className="text-xs text-slate-400 space-y-1.5 mb-3">
+                                <li className="flex items-start space-x-2">
+                                    <span className="text-purple-400">•</span>
+                                    <span><strong className="text-slate-300">Use your existing wallet</strong> — No need to manage another balance</span>
+                                </li>
+                                <li className="flex items-start space-x-2">
+                                    <span className="text-purple-400">•</span>
+                                    <span><strong className="text-slate-300">Full control</strong> — Your keys and funds never leave your wallet</span>
+                                </li>
+                                <li className="flex items-start space-x-2">
+                                    <span className="text-purple-400">•</span>
+                                    <span><strong className="text-slate-300">One balance</strong> — See your disc golf funds in your main wallet</span>
+                                </li>
+                            </ul>
+                            
+                            <div className="bg-slate-800/50 rounded-lg p-3">
+                                <p className="text-xs text-slate-500">
+                                    <strong className="text-slate-400">Best for:</strong> Experienced Lightning users who already have Alby, Zeus, Phoenix, or another NWC-compatible wallet set up.
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 )}
                 {walletMode === 'cashu' && (
@@ -1345,50 +1365,18 @@ export const Wallet: React.FC = () => {
             );
         }
         
-        // NWC wallet receive view (Setup Required if not connected)
+        // NWC wallet receive view - if not connected, go directly to settings
         if (walletMode === 'nwc' && !nwcString) {
-            return (
-                <div className="p-6 h-full flex flex-col items-center text-center">
-                    <div className="w-full flex justify-start mb-6">
-                        <button onClick={() => setView('main')} className="p-2 bg-slate-800 rounded-full hover:bg-slate-700">
-                            <Icons.Prev />
-                        </button>
-                    </div>
-                    
-                    <div className="flex-1 flex flex-col items-center justify-center max-w-xs">
-                        <div className="w-24 h-24 rounded-full bg-purple-500/20 flex items-center justify-center mb-6">
-                            <Icons.Link size={48} className="text-purple-400" />
-                        </div>
-                        
-                        <h2 className="text-2xl font-bold text-white mb-3">Connect Your Wallet</h2>
-                        <p className="text-slate-400 text-sm mb-6">
-                            To receive with NWC, you need to connect an external Lightning wallet first.
-                        </p>
-                        
-                        <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 w-full mb-6">
-                            <p className="text-purple-400 text-sm font-bold mb-2">Setup Required</p>
-                            <p className="text-slate-400 text-xs">
-                                NWC lets you use your existing wallet (like Alby or Zeus) to send and receive. Go to settings to connect.
-                            </p>
-                        </div>
-                        
-                        <Button 
-                            fullWidth 
-                            onClick={() => setView('settings')}
-                        >
-                            <Icons.Settings size={18} className="mr-2" /> 
-                            Go to Settings
-                        </Button>
-                        
-                        <button 
-                            onClick={() => { setWalletMode('cashu'); setView('receive'); }}
-                            className="mt-4 text-sm text-slate-400 hover:text-emerald-400 transition-colors"
-                        >
-                            Or use Cashu instead
-                        </button>
-                    </div>
-                </div>
-            );
+            // Redirect to settings immediately
+            setView('settings');
+            return null;
+        }
+        
+        // NWC wallet receive view - if connected, go to deposit/invoice
+        if (walletMode === 'nwc' && nwcString) {
+            // NWC uses invoice generation, not static address
+            setView('deposit');
+            return null;
         }
 
         // Cashu (and connected NWC) receive view - shows npub.cash address
@@ -1649,50 +1637,11 @@ export const Wallet: React.FC = () => {
             );
         }
         
-        // NWC wallet send view (Setup Required if not connected)
+        // NWC wallet send view - if not connected, go directly to settings
         if (walletMode === 'nwc' && !nwcString) {
-            return (
-                <div className="p-6 h-full flex flex-col items-center text-center">
-                    <div className="w-full flex justify-start mb-6">
-                        <button onClick={() => setView('main')} className="p-2 bg-slate-800 rounded-full hover:bg-slate-700">
-                            <Icons.Prev />
-                        </button>
-                    </div>
-                    
-                    <div className="flex-1 flex flex-col items-center justify-center max-w-xs">
-                        <div className="w-24 h-24 rounded-full bg-purple-500/20 flex items-center justify-center mb-6">
-                            <Icons.Link size={48} className="text-purple-400" />
-                        </div>
-                        
-                        <h2 className="text-2xl font-bold text-white mb-3">Connect Your Wallet</h2>
-                        <p className="text-slate-400 text-sm mb-6">
-                            To send with NWC, you need to connect an external Lightning wallet first.
-                        </p>
-                        
-                        <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 w-full mb-6">
-                            <p className="text-purple-400 text-sm font-bold mb-2">Setup Required</p>
-                            <p className="text-slate-400 text-xs">
-                                NWC lets you use your existing wallet (like Alby or Zeus) to send and receive. Go to settings to connect.
-                            </p>
-                        </div>
-                        
-                        <Button 
-                            fullWidth 
-                            onClick={() => setView('settings')}
-                        >
-                            <Icons.Settings size={18} className="mr-2" /> 
-                            Go to Settings
-                        </Button>
-                        
-                        <button 
-                            onClick={() => { setWalletMode('cashu'); }}
-                            className="mt-4 text-sm text-slate-400 hover:text-emerald-400 transition-colors"
-                        >
-                            Or use Cashu instead
-                        </button>
-                    </div>
-                </div>
-            );
+            // Redirect to settings immediately
+            setView('settings');
+            return null;
         }
 
         return (
