@@ -1612,29 +1612,52 @@ export const Wallet: React.FC = () => {
                         onModeChange={handleWalletModeChange} 
                     />
 
-                    {/* Status Indicator */}
-                    {walletMode === 'cashu' && activeMint && (
-                        <div className="flex items-center space-x-1.5 bg-black/30 px-2 py-1 rounded-md border border-white/5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]"></div>
-                            <span className="text-[10px] text-slate-400 font-mono truncate max-w-[80px]">
-                                {activeMint.nickname}
-                            </span>
-                        </div>
-                    )}
+                    {/* Status Indicator - Consistent across all wallet types */}
                     {walletMode === 'breez' && (
                         <div className="flex items-center space-x-1.5 bg-black/30 px-2 py-1 rounded-md border border-white/5">
+                            {/* TODO: When Breez is connected, show blue dot + "Ready" */}
                             <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
                             <span className="text-[10px] text-slate-400 font-mono">
                                 Setup
                             </span>
                         </div>
                     )}
-                    {walletMode === 'nwc' && nwcString && (
+                    {walletMode === 'cashu' && (
                         <div className="flex items-center space-x-1.5 bg-black/30 px-2 py-1 rounded-md border border-white/5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_5px_rgba(168,85,247,0.5)]"></div>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                                Connected
-                            </span>
+                            {activeMint ? (
+                                <>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]"></div>
+                                    <span className="text-[10px] text-slate-400 font-mono truncate max-w-[80px]">
+                                        {activeMint.nickname}
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                        No Mint
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    )}
+                    {walletMode === 'nwc' && (
+                        <div className="flex items-center space-x-1.5 bg-black/30 px-2 py-1 rounded-md border border-white/5">
+                            {nwcString ? (
+                                <>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_5px_rgba(168,85,247,0.5)]"></div>
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                        Connected
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                        Not Connected
+                                    </span>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
