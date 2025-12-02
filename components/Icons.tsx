@@ -170,36 +170,17 @@ const SmirkFace = ({ size = 24, className = "" }: { size?: number, className?: s
   </svg>
 );
 
-// Custom Bitcoin Icon - Accurate ₿ symbol matching standard Bitcoin glyph
+// Custom Bitcoin Icon - Official ₿ symbol
 const Bitcoin = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width={size}
     height={size}
-    viewBox="0 0 24 24"
+    viewBox="-10.5 0 32 32"
     fill="currentColor"
     className={`${className}`}
   >
-    {/* Bitcoin ₿ symbol - larger and more centered */}
-    {/* Left vertical stroke */}
-    <path d="M7.5 1.5C7.22 1.5 7 1.72 7 2v2.5C7 4.78 7.22 5 7.5 5S8 4.78 8 4.5V2C8 1.72 7.78 1.5 7.5 1.5z" />
-    <rect x="7" y="5" width="1" height="14" />
-    <path d="M7.5 19C7.22 19 7 19.22 7 19.5v2.5c0 .28.22.5.5.5s.5-.22.5-.5v-2.5c0-.28-.22-.5-.5-.5z" />
-
-    {/* Right vertical stroke */}
-    <path d="M9.5 1.5c-.28 0-.5.22-.5.5v2.5c0 .28.22.5.5.5s.5-.22.5-.5V2c0-.28-.22-.5-.5-.5z" />
-    <rect x="9" y="5" width="1" height="14" />
-    <path d="M9.5 19c-.28 0-.5.22-.5.5v2.5c0 .28.22.5.5.5s.5-.22.5-.5v-2.5c0-.28-.22-.5-.5-.5z" />
-
-    {/* B shape - Larger and more centered */}
-    {/* Vertical bar of B */}
-    <path d="M8 5h1.5v14H8z" />
-
-    {/* Upper hump of B - bigger */}
-    <path d="M9.5 5h4.5c1.93 0 3.5 1.57 3.5 3.5S16.43 12 14.5 12H9.5V5z" />
-
-    {/* Lower hump of B - bigger */}
-    <path d="M9.5 12h5.5c2.21 0 4 1.79 4 4s-1.79 4-4 4h-5.5v-8z" />
+    <path d="M11.28 18.6c0-1.44-0.72-2.72-1.84-3.48 0.68-0.64 1.080-1.52 1.080-2.52 0-1.84-1.44-3.36-3.24-3.44v-1.48c0-0.48-0.4-0.84-0.84-0.84s-0.84 0.4-0.84 0.84v1.48h-0.56v-1.48c0-0.48-0.4-0.84-0.84-0.84s-0.84 0.4-0.84 0.84v1.48h-2.52c-0.44 0-0.84 0.36-0.84 0.84s0.4 0.84 0.84 0.84h0.8v10.32h-0.8c-0.44 0-0.84 0.36-0.84 0.84s0.4 0.84 0.84 0.84h2.44v1.48c0 0.48 0.4 0.84 0.84 0.84s0.84-0.4 0.84-0.84v-1.48h0.56v1.48c0 0.48 0.4 0.84 0.84 0.84s0.84-0.4 0.84-0.84v-1.48c2.32-0.12 4.080-1.96 4.080-4.24zM7.040 10.84c0.96 0 1.76 0.8 1.76 1.76s-0.8 1.76-1.76 1.76h-3.68v-3.52h3.68zM7.040 21.16h-3.68v-5.080h3.72c1.4 0 2.52 1.12 2.52 2.52s-1.16 2.56-2.56 2.56z" />
   </svg>
 );
 

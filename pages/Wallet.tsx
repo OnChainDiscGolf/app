@@ -1216,8 +1216,8 @@ export const Wallet: React.FC = () => {
                             <div className="p-5 border-b border-slate-800">
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-center space-x-3">
-                                        <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                                            <Icons.Zap size={20} className="text-amber-400" />
+                                        <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                                            <Icons.Bitcoin size={22} className="text-orange-500" />
                                         </div>
                                         <h3 className="text-lg font-bold text-white">Getting Your First Sats</h3>
                                     </div>
@@ -1863,19 +1863,19 @@ export const Wallet: React.FC = () => {
                     {walletBalance === 0 && !isBalanceLoading && (
                         <button
                             onClick={() => setShowFundModal(true)}
-                            className="w-full mb-4 p-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-brand-primary/30 rounded-xl transition-all group"
+                            className="w-full mb-4 p-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-orange-500/30 rounded-xl transition-all group"
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
-                                    <div className="w-8 h-8 bg-brand-primary/20 rounded-lg flex items-center justify-center">
-                                        <Icons.Zap size={16} className="text-brand-primary" />
+                                    <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                                        <Icons.Bitcoin size={18} className="text-orange-500" />
                                     </div>
                                     <div className="text-left">
                                         <p className="text-sm font-medium text-white">New to Bitcoin?</p>
                                         <p className="text-xs text-slate-400">Learn how to add sats</p>
                                     </div>
                                 </div>
-                                <Icons.Next size={18} className="text-slate-500 group-hover:text-brand-primary transition-colors" />
+                                <Icons.Next size={18} className="text-slate-500 group-hover:text-orange-500 transition-colors" />
                             </div>
                         </button>
                     )}
@@ -1978,8 +1978,8 @@ export const Wallet: React.FC = () => {
                         <div className="p-5 border-b border-slate-800">
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center space-x-3">
-                                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                                        <Icons.Zap size={20} className="text-amber-400" />
+                                    <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                                        <Icons.Bitcoin size={22} className="text-orange-500" />
                                     </div>
                                     <h3 className="text-lg font-bold text-white">Getting Your First Sats</h3>
                                 </div>
