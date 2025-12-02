@@ -794,7 +794,7 @@ export const Wallet: React.FC = () => {
                             onClick={() => setWalletMode('cashu')}
                             className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'cashu' ? 'bg-emerald-500/20 border-emerald-500' : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'}`}
                         >
-                            <Icons.Wallet size={20} className={`mb-1 ${walletMode === 'cashu' ? 'text-emerald-400' : 'text-slate-400'}`} />
+                            <Icons.Cashew size={20} className={`mb-1 ${walletMode === 'cashu' ? 'text-emerald-400' : 'text-slate-400'}`} />
                             <span className="font-bold text-sm mb-0.5">Cashu</span>
                             <span className="text-[10px] text-center text-slate-400 leading-tight">eCash</span>
                         </button>
