@@ -170,17 +170,17 @@ const SmirkFace = ({ size = 24, className = "" }: { size?: number, className?: s
   </svg>
 );
 
-// Custom Bitcoin Icon - Official ₿ symbol (properly centered and scaled)
+// Custom Bitcoin Icon - Official ₿ symbol (original SVG from user, viewBox adjusted to center)
 const Bitcoin = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width={size}
     height={size}
-    viewBox="0 0 24 24"
+    viewBox="-1 5 14 22"
     fill="currentColor"
     className={`${className}`}
   >
-    <path d="M12.75 2.5a.75.75 0 0 0-1.5 0v1.26a4.25 4.25 0 0 0-1.5 8.17 4.75 4.75 0 0 0 1.5 9.3v1.27a.75.75 0 0 0 1.5 0v-1.27a4.75 4.75 0 0 0 1.5-9.3 4.25 4.25 0 0 0-1.5-8.17V2.5zm-1.5 2.79v4.92a2.75 2.75 0 0 1 0-4.92zm1.5 0a2.75 2.75 0 0 1 0 4.92V5.29zm-1.5 6.48v6.94a3.25 3.25 0 0 1 0-6.94zm1.5 0a3.25 3.25 0 0 1 0 6.94v-6.94z" />
+    <path d="M11.28 18.6c0-1.44-0.72-2.72-1.84-3.48 0.68-0.64 1.080-1.52 1.080-2.52 0-1.84-1.44-3.36-3.24-3.44v-1.48c0-0.48-0.4-0.84-0.84-0.84s-0.84 0.4-0.84 0.84v1.48h-0.56v-1.48c0-0.48-0.4-0.84-0.84-0.84s-0.84 0.4-0.84 0.84v1.48h-2.52c-0.44 0-0.84 0.36-0.84 0.84s0.4 0.84 0.84 0.84h0.8v10.32h-0.8c-0.44 0-0.84 0.36-0.84 0.84s0.4 0.84 0.84 0.84h2.44v1.48c0 0.48 0.4 0.84 0.84 0.84s0.84-0.4 0.84-0.84v-1.48h0.56v1.48c0 0.48 0.4 0.84 0.84 0.84s0.84-0.4 0.84-0.84v-1.48c2.32-0.12 4.080-1.96 4.080-4.24zM7.040 10.84c0.96 0 1.76 0.8 1.76 1.76s-0.8 1.76-1.76 1.76h-3.68v-3.52h3.68zM7.040 21.16h-3.68v-5.080h3.72c1.4 0 2.52 1.12 2.52 2.52s-1.16 2.56-2.56 2.56z" />
   </svg>
 );
 
