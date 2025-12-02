@@ -1216,8 +1216,8 @@ export const Wallet: React.FC = () => {
                             <div className="p-5 border-b border-slate-800">
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-center space-x-3">
-                                        <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
-                                            <Icons.Bitcoin size={22} className="text-orange-500" />
+                                        <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">
+                                            <Icons.Bitcoin size={32} className="text-orange-500" />
                                         </div>
                                         <h3 className="text-lg font-bold text-white">Getting Your First Sats</h3>
                                     </div>
@@ -1867,8 +1867,8 @@ export const Wallet: React.FC = () => {
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
-                                    <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                                        <Icons.Bitcoin size={18} className="text-orange-500" />
+                                    <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                                        <Icons.Bitcoin size={28} className="text-orange-500" />
                                     </div>
                                     <div className="text-left">
                                         <p className="text-sm font-medium text-white">New to Bitcoin?</p>
