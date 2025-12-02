@@ -92,7 +92,7 @@ const WalletModeSwitcher: React.FC<{
 }> = ({ activeMode, onModeChange }) => {
     const modes = [
         { id: 'breez' as const, label: 'Lightning', icon: Icons.Zap, color: 'blue' },
-        { id: 'cashu' as const, label: 'Cashu', icon: Icons.Wallet, color: 'emerald' },
+        { id: 'cashu' as const, label: 'Cashu', icon: Icons.Cashew, color: 'emerald' },
         { id: 'nwc' as const, label: 'NWC', icon: Icons.Link, color: 'purple' },
     ];
 

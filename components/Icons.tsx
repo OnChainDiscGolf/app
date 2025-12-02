@@ -203,6 +203,29 @@ const Bitcoin = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number
   </svg>
 );
 
+// Custom Cashew Nut Icon - for Cashu wallet
+const Cashew = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={`lucide lucide-cashew ${className}`}
+  >
+    <g transform="scale(-1,1) translate(-24,0)">
+      <path 
+        d="M9.39961786,5.16239885 L9.790122,5.33671324 C11.2461411,5.98665534 12.909875,5.98665534 14.365894,5.33671324 L15.2027995,4.96313291 C15.8731908,4.66388165 16.6592414,4.96475012 16.9584927,5.63514143 C16.9905732,5.70700902 17.0162078,5.78158367 17.0350944,5.85798656 C17.2583783,6.76124615 16.8295087,7.69921353 16.0002677,8.12122407 L13.2508222,9.52044928 C11.8861907,10.2149263 10.2711695,10.2122957 8.90880767,9.51337663 L8.58835113,9.34897597 C7.49151241,8.78627564 6.89469218,7.5698063 7.12092165,6.35798656 C7.28699849,5.4683801 8.1427989,4.88184346 9.03240536,5.0479203 C9.15887933,5.07153119 9.28213245,5.10995537 9.39961786,5.16239885 Z M9.07800802,6.42713768 C10.998008,7.22713768 13.158008,7.22713768 15.078008,6.42713768"
+        transform="translate(12.083585, 7.443400) rotate(-75) translate(-12.083585, -7.443400)"
+      />
+    </g>
+  </svg>
+);
+
 export const Icons = {
   Trophy: Basket, // Replaced Trophy with Basket
   Wallet,
@@ -251,4 +274,5 @@ export const Icons = {
   Feedback: MessageSquare,
   CreditCard,
   Link: Link2,
+  Cashew,
 };
