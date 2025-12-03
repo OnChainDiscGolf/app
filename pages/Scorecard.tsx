@@ -259,9 +259,11 @@ export const Scorecard: React.FC = () => {
             return;
         }
         
-        // Don't go back past the starting hole
+        // On the first hole, navigate back to the round setup/payments page
         if (viewHole === startingHole) {
-            return; // Already at the first hole of the round
+            // Navigate back to Home with the customize view to see payments
+            navigate('/');
+            return;
         }
         
         setViewHole(getPrevHole(viewHole, totalHoles));
@@ -346,9 +348,11 @@ export const Scorecard: React.FC = () => {
 
         const isComplete = areScoresCompleteForHoles(reviewHoles);
         
-        // Split into two rows for display (first half and second half of reviewed holes)
-        const firstHalf = reviewHoles.slice(0, Math.ceil(reviewHoles.length / 2));
-        const secondHalf = reviewHoles.slice(Math.ceil(reviewHoles.length / 2));
+        // Split into rows of 9 holes each for display
+        const holesPerRow = 9;
+        const firstHalf = reviewHoles.slice(0, holesPerRow);
+        const secondHalf = reviewHoles.slice(holesPerRow, holesPerRow * 2);
+        const thirdRow = reviewHoles.slice(holesPerRow * 2);
 
         const reviewSortedPlayers = [...players].sort((a, b) => {
             const aTotal = getPlayerTotalText(a.scores, a.handicap, rangeEnd);
@@ -501,7 +505,7 @@ export const Scorecard: React.FC = () => {
                                             </div>
                                         )}
 
-                                        {/* Second Half of Reviewed Holes */}
+                                        {/* Second Row of Holes (holes 10-18) */}
                                         {secondHalf.length > 0 && (
                                             <div className="bg-slate-900/50 rounded-xl p-3">
                                                 <div className="grid gap-1 text-center" style={{ gridTemplateColumns: `repeat(${secondHalf.length}, 1fr)` }}>
@@ -537,6 +541,43 @@ export const Scorecard: React.FC = () => {
                                                 </div>
                                             </div>
                                         )}
+
+                                        {/* Third Row of Holes (holes 19+) */}
+                                        {thirdRow.length > 0 && (
+                                            <div className="bg-slate-900/50 rounded-xl p-3">
+                                                <div className="grid gap-1 text-center" style={{ gridTemplateColumns: `repeat(${thirdRow.length}, 1fr)` }}>
+                                                    {thirdRow.map(h => {
+                                                        const isMissing = !p.scores[h] || p.scores[h] === 0;
+                                                        return (
+                                                            <button
+                                                                key={`h-${h}`}
+                                                                onClick={() => navigateToHole(h)}
+                                                                className={`text-[10px] font-bold rounded transition-colors ${isMissing ? 'text-rose-400 hover:bg-rose-500/20' : 'text-slate-500 hover:bg-slate-700/50'}`}
+                                                            >
+                                                                {h}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                    {thirdRow.map(h => {
+                                                        const score = p.scores[h];
+                                                        const isAce = score === 1;
+                                                        return (
+                                                            <button
+                                                                key={`s-${h}`}
+                                                                onClick={() => navigateToHole(h)}
+                                                                className={`text-sm font-bold rounded-md py-1 transition-all hover:scale-110 ${
+                                                                    isAce 
+                                                                        ? 'text-amber-300 bg-amber-500/20 shadow-[0_0_10px_rgba(251,191,36,0.5)]' 
+                                                                        : score ? getScoreColor(score) : 'text-slate-600'
+                                                                }`}
+                                                            >
+                                                                {score || '-'}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -545,7 +586,7 @@ export const Scorecard: React.FC = () => {
                 </div>
 
                 {/* Bottom Actions */}
-                <div className="fixed bottom-16 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 p-4 z-20">
+                <div className="fixed bottom-20 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 p-4 z-20">
                     <div className="max-w-md mx-auto">
                         {showHalfwayReview ? (
                             <div className="flex items-center justify-between">
@@ -580,7 +621,7 @@ export const Scorecard: React.FC = () => {
                                             : 'bg-gradient-to-r from-amber-500 to-amber-600 text-black shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30'}`}
                                     >
                                         <Icons.Trophy size={20} />
-                                        <span>Confirm Scores & Send Payouts</span>
+                                        <span>{totalPot > 0 ? 'Confirm Scores & Send Payouts' : 'Confirm Scores'}</span>
                                     </button>
                                 ) : (
                                     <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700">
@@ -601,6 +642,98 @@ export const Scorecard: React.FC = () => {
                     </div>
                 </div>
                 <div className="h-16"></div>
+
+                {/* Confirm Finalize Modal - Must be inside Final Review section */}
+                {showConfirmFinalize && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
+                            
+                            {/* Header */}
+                            <div className="relative bg-gradient-to-r from-amber-600/20 via-amber-500/30 to-amber-600/20 p-5 text-center border-b border-amber-500/20">
+                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.15),transparent_70%)]" />
+                                <div className="relative">
+                                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-amber-500/20 border-2 border-amber-400/50 mb-3">
+                                        <Icons.Trophy size={28} className="text-amber-400" />
+                                    </div>
+                                    <h2 className="text-lg font-bold text-white">Finalize Round?</h2>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-5 space-y-4">
+                                <p className="text-slate-300 text-sm text-center leading-relaxed">
+                                    {totalPot > 0 
+                                        ? 'This will lock all scores and automatically send payouts to winners.'
+                                        : 'This will lock all scores and complete the round.'}
+                                </p>
+
+                                {/* Quick Summary */}
+                                <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3 space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-400">Players</span>
+                                        <span className="text-white font-medium">{players.length}</span>
+                                    </div>
+                                    {totalPot > 0 && (
+                                        <>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-slate-400">Entry Pot</span>
+                                                <span className="text-emerald-400 font-bold">{entryPot.toLocaleString()} sats</span>
+                                            </div>
+                                            {acePot > 0 && (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-slate-400">Ace Pot</span>
+                                                    <span className="text-amber-400 font-bold">{acePot.toLocaleString()} sats</span>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                    <div className="flex justify-between text-sm border-t border-slate-700/50 pt-2 mt-2">
+                                        <span className="text-slate-400">Leader</span>
+                                        <span className="text-amber-400 font-medium">
+                                            {reviewSortedPlayers[0]?.name || '-'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Warning */}
+                                <div className="flex items-start space-x-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                                    <Icons.Zap size={18} className="text-amber-400 shrink-0 mt-0.5" />
+                                    <p className="text-xs text-amber-200/80">
+                                        Scores cannot be changed after finalizing. Make sure everyone's scores are correct!
+                                    </p>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex space-x-3 pt-2">
+                                    <Button
+                                        variant="secondary"
+                                        fullWidth
+                                        onClick={() => setShowConfirmFinalize(false)}
+                                        disabled={isSubmitting}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        variant="primary"
+                                        fullWidth
+                                        onClick={confirmFinalize}
+                                        disabled={isSubmitting}
+                                        className={isSubmitting ? 'animate-pulse' : ''}
+                                    >
+                                        {isSubmitting ? (
+                                            <span className="flex items-center justify-center space-x-2">
+                                                <Icons.Zap size={16} className="animate-bounce" />
+                                                <span>Sending...</span>
+                                            </span>
+                                        ) : (
+                                            totalPot > 0 ? 'Finalize & Pay' : 'Finalize'
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -802,7 +935,7 @@ export const Scorecard: React.FC = () => {
             </div>
 
             {/* Bottom Navigation Bar - Redesigned */}
-            <div className="fixed bottom-16 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 z-20">
+            <div className="fixed bottom-20 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 z-20">
                 <div className="max-w-md mx-auto px-3 py-3">
                     {/* Progress Bar - based on holes played, not hole number */}
                     <div className="mb-3">
@@ -918,12 +1051,12 @@ export const Scorecard: React.FC = () => {
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-slate-400">Entry Pot</span>
-                                    <span className="text-emerald-400 font-bold">{entryPot} sats</span>
+                                    <span className="text-emerald-400 font-bold">{entryPot.toLocaleString()} sats</span>
                                 </div>
                                 {acePot > 0 && (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-slate-400">Ace Pot</span>
-                                        <span className="text-amber-400 font-bold">{acePot} sats</span>
+                                        <span className="text-amber-400 font-bold">{acePot.toLocaleString()} sats</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between text-sm border-t border-slate-700/50 pt-2 mt-2">

@@ -12,6 +12,7 @@ interface PayoutInfo {
 interface RoundSummaryModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onDone?: () => void; // Called when Done is clicked, for navigation
     roundName: string;
     standings: Player[];
     payouts: PayoutInfo[];
@@ -23,16 +24,18 @@ interface RoundSummaryModalProps {
 }
 
 // Helper to format score relative to par
-const formatScore = (totalStrokes: number, par: number): string => {
+const formatScore = (totalStrokes: number, par: number): { total: number; diff: string; diffNum: number } => {
     const diff = totalStrokes - par;
-    if (diff === 0) return `${totalStrokes} (E)`;
-    if (diff > 0) return `${totalStrokes} (+${diff})`;
-    return `${totalStrokes} (${diff})`;
+    let diffStr = 'E';
+    if (diff > 0) diffStr = `+${diff}`;
+    else if (diff < 0) diffStr = `${diff}`;
+    return { total: totalStrokes, diff: diffStr, diffNum: diff };
 };
 
 export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
     isOpen,
     onClose,
+    onDone,
     roundName,
     standings,
     payouts,
@@ -46,122 +49,134 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
 
     const winner = standings[0];
     const hasAces = aceWinners.length > 0;
+    const hasPayouts = totalPot > 0;
     
     // Calculate total strokes for each player (sum of all hole scores)
     const getTotalStrokes = (player: Player): number => {
-        return Object.values(player.scores).reduce((sum, score) => sum + score, 0);
+        return Object.values(player.scores || {}).reduce((sum, score) => sum + score, 0);
+    };
+
+    // Get payout for a specific player
+    const getPlayerPayout = (playerName: string): number => {
+        const payout = payouts.find(p => p.playerName === playerName);
+        return payout?.amount || 0;
     };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/85 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-sm w-full max-h-[80vh] overflow-hidden overflow-y-auto animate-in zoom-in-95 duration-300">
+            <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-sm w-full max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
                 
                 {/* Header - Celebration */}
-                <div className="relative bg-gradient-to-r from-emerald-600/20 via-emerald-500/30 to-emerald-600/20 p-6 text-center border-b border-emerald-500/20">
+                <div className="relative bg-gradient-to-r from-emerald-600/20 via-emerald-500/30 to-emerald-600/20 p-5 text-center border-b border-emerald-500/20 shrink-0">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.15),transparent_70%)]" />
                     
                     <div className="relative">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-400/50 mb-3">
-                            <Icons.Trophy size={32} className="text-emerald-400" />
+                        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500/20 border-2 border-emerald-400/50 mb-2">
+                            <Icons.Trophy size={28} className="text-emerald-400" />
                         </div>
                         <h2 className="text-xl font-bold text-white mb-1">Round Complete!</h2>
                         <p className="text-sm text-slate-400">{roundName || 'Round'}</p>
                     </div>
                 </div>
 
-                <div className="p-5 space-y-5">
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     
-                    {/* Winner Spotlight */}
-                    <div className="text-center">
-                        <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Winner</p>
-                        <div className="inline-flex items-center space-x-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
-                            {winner?.photoUrl ? (
-                                <img src={winner.photoUrl} alt="" className="w-10 h-10 rounded-full border-2 border-amber-400/50" />
-                            ) : (
-                                <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center border-2 border-amber-400/50">
-                                    <Icons.User size={20} className="text-slate-400" />
-                                </div>
-                            )}
-                            <div className="text-left">
-                                <p className="font-bold text-white">{winner?.name || 'Unknown'}</p>
-                                <p className="text-sm text-amber-400 font-mono">
-                                    {winner ? formatScore(getTotalStrokes(winner), par) : '0'}
-                                </p>
-                            </div>
-                            {winner?.isCurrentUser && (
-                                <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full font-medium">You!</span>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Standings */}
+                    {/* Full Roster - All players sorted by score */}
                     <div>
                         <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Final Standings</p>
-                        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 divide-y divide-slate-700/50">
-                            {standings.slice(0, 5).map((player, idx) => {
-                                const strokes = getTotalStrokes(player);
-                                const diff = strokes - par;
-                                return (
-                                    <div key={player.id} className="flex items-center justify-between px-3 py-2">
-                                        <div className="flex items-center space-x-3">
-                                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                                idx === 0 ? 'bg-amber-500/20 text-amber-400' :
-                                                idx === 1 ? 'bg-slate-400/20 text-slate-300' :
-                                                idx === 2 ? 'bg-orange-700/20 text-orange-400' :
-                                                'bg-slate-700/50 text-slate-500'
-                                            }`}>
-                                                {idx + 1}
-                                            </span>
-                                            <span className={`font-medium ${player.isCurrentUser ? 'text-emerald-400' : 'text-slate-300'}`}>
-                                                {player.name}
-                                                {player.isCurrentUser && <span className="text-xs ml-1 opacity-60">(you)</span>}
-                                            </span>
+                        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+                            {/* Header Row */}
+                            <div className="grid grid-cols-12 gap-1 px-3 py-2 bg-slate-800/80 border-b border-slate-700/50 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                                <div className="col-span-1">#</div>
+                                <div className="col-span-5">Player</div>
+                                <div className="col-span-3 text-right">Score</div>
+                                {hasPayouts && <div className="col-span-3 text-right">Payout</div>}
+                            </div>
+                            
+                            {/* Player Rows */}
+                            <div className="divide-y divide-slate-700/30">
+                                {standings.map((player, idx) => {
+                                    const strokes = getTotalStrokes(player);
+                                    const scoreInfo = formatScore(strokes, par);
+                                    const payout = getPlayerPayout(player.name);
+                                    const isWinner = idx === 0;
+                                    
+                                    return (
+                                        <div 
+                                            key={player.id} 
+                                            className={`grid grid-cols-12 gap-1 px-3 py-2.5 items-center ${
+                                                isWinner ? 'bg-amber-500/10' : ''
+                                            } ${player.isCurrentUser ? 'bg-emerald-500/5' : ''}`}
+                                        >
+                                            {/* Rank */}
+                                            <div className="col-span-1">
+                                                <span className={`w-5 h-5 inline-flex items-center justify-center rounded-full text-[10px] font-bold ${
+                                                    idx === 0 ? 'bg-amber-500/30 text-amber-400' :
+                                                    idx === 1 ? 'bg-slate-400/20 text-slate-300' :
+                                                    idx === 2 ? 'bg-orange-700/30 text-orange-400' :
+                                                    'bg-slate-700/50 text-slate-500'
+                                                }`}>
+                                                    {idx + 1}
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Player Name */}
+                                            <div className="col-span-5 flex items-center space-x-2 min-w-0">
+                                                {isWinner && <span className="shrink-0">🏆</span>}
+                                                <span className={`font-medium truncate ${
+                                                    player.isCurrentUser ? 'text-emerald-400' : 
+                                                    isWinner ? 'text-amber-400' : 'text-slate-300'
+                                                }`}>
+                                                    {player.name}
+                                                </span>
+                                                {player.isCurrentUser && (
+                                                    <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1 py-0.5 rounded shrink-0">YOU</span>
+                                                )}
+                                            </div>
+                                            
+                                            {/* Score */}
+                                            <div className="col-span-3 text-right">
+                                                <div className={`font-mono text-sm font-bold ${
+                                                    scoreInfo.diffNum < 0 ? 'text-emerald-400' : 
+                                                    scoreInfo.diffNum === 0 ? 'text-slate-300' : 
+                                                    'text-orange-400'
+                                                }`}>
+                                                    {scoreInfo.diff}
+                                                </div>
+                                                <div className="text-[10px] text-slate-500">
+                                                    {scoreInfo.total} strokes
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Payout */}
+                                            {hasPayouts && (
+                                                <div className="col-span-3 text-right">
+                                                    {payout > 0 ? (
+                                                        <span className="font-mono text-sm font-bold text-emerald-400">
+                                                            {payout.toLocaleString()} <span className="text-[10px] text-emerald-500">sats</span>
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-600 text-xs">—</span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
-                                        <span className={`font-mono text-sm ${
-                                            diff < 0 ? 'text-emerald-400' : 
-                                            diff === 0 ? 'text-slate-400' : 
-                                            'text-orange-400'
-                                        }`}>
-                                            {formatScore(strokes, par)}
-                                        </span>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Payouts */}
-                    <div>
-                        <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">
-                            <Icons.Zap size={12} className="inline mr-1 text-amber-400" />
-                            {isProcessingPayments ? 'Sending Payouts...' : 'Payouts'}
-                        </p>
-                        {isProcessingPayments && payouts.length === 0 ? (
-                            <div className="flex items-center justify-center bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-3">
-                                <div className="animate-pulse flex items-center space-x-2">
-                                    <Icons.Zap size={16} className="text-amber-400 animate-bounce" />
-                                    <span className="text-sm text-amber-300">Processing payment...</span>
-                                </div>
+                    {/* Processing Payments Indicator */}
+                    {isProcessingPayments && (
+                        <div className="flex items-center justify-center bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-3">
+                            <div className="animate-pulse flex items-center space-x-2">
+                                <Icons.Zap size={16} className="text-amber-400 animate-bounce" />
+                                <span className="text-sm text-amber-300">Processing payments...</span>
                             </div>
-                        ) : payouts.length > 0 ? (
-                            <div className="space-y-2">
-                                {payouts.map((payout, idx) => (
-                                    <div key={idx} className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
-                                        <span className={`text-sm ${payout.isCurrentUser ? 'text-emerald-400 font-medium' : 'text-slate-300'}`}>
-                                            {payout.isCurrentUser ? 'You kept' : `→ ${payout.playerName}`}
-                                        </span>
-                                        <span className="font-bold text-emerald-400 font-mono">
-                                            {payout.amount} sats
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-2 text-slate-500 text-sm">
-                                No payouts for this round
-                            </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     {/* Ace Pot */}
                     {hasAces && acePotAmount > 0 && (
@@ -177,7 +192,7 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
                                     ))}
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-lg font-bold text-purple-400 font-mono">{acePotAmount}</p>
+                                    <p className="text-lg font-bold text-purple-400 font-mono">{acePotAmount?.toLocaleString()}</p>
                                     <p className="text-xs text-slate-500">sats</p>
                                 </div>
                             </div>
@@ -190,9 +205,11 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
                             <p className="text-xs text-slate-500">No aces this round • Ace pot rolls over</p>
                         </div>
                     )}
+                </div>
 
-                    {/* Close Button */}
-                    <Button fullWidth onClick={onClose} variant="primary" className="mt-2">
+                {/* Fixed Footer */}
+                <div className="p-4 border-t border-slate-700/50 shrink-0">
+                    <Button fullWidth onClick={() => { onClose(); onDone?.(); }} variant="primary">
                         Done
                     </Button>
                 </div>

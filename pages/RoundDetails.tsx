@@ -175,7 +175,7 @@ export const RoundDetails: React.FC = () => {
                     {entryFee > 0 && (
                         <div className="flex items-center justify-between">
                             <span className="text-slate-400 text-sm">Entry Fee</span>
-                            <span className="text-white font-bold">{entryFee} sats</span>
+                            <span className="text-white font-bold">{entryFee.toLocaleString()} sats</span>
                         </div>
                     )}
 

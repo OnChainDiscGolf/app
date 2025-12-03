@@ -439,6 +439,33 @@ const WalletModeSwitcher: React.FC<{
     onExpandToggle: () => void;
     onWalletSelect: (mode: 'breez' | 'cashu' | 'nwc') => void;
 }> = ({ activeMode, viewMode, isExpanded, onModeChange, onViewModeChange, onExpandToggle, onWalletSelect }) => {
+    // Track animation state for smooth open/close
+    const [animationState, setAnimationState] = useState<'collapsed' | 'expanding' | 'expanded' | 'collapsing'>('collapsed');
+    const [shouldRender, setShouldRender] = useState(false);
+
+    // Handle expand/collapse transitions
+    useEffect(() => {
+        if (isExpanded && animationState === 'collapsed') {
+            setShouldRender(true);
+            // Small delay to ensure DOM is ready before animation starts
+            requestAnimationFrame(() => {
+                setAnimationState('expanding');
+            });
+        } else if (!isExpanded && (animationState === 'expanded' || animationState === 'expanding')) {
+            setAnimationState('collapsing');
+        }
+    }, [isExpanded]);
+
+    // Handle animation end
+    const handleAnimationEnd = () => {
+        if (animationState === 'expanding') {
+            setAnimationState('expanded');
+        } else if (animationState === 'collapsing') {
+            setAnimationState('collapsed');
+            setShouldRender(false);
+        }
+    };
+
     const modes = [
         { id: 'breez' as const, label: 'Lightning', icon: Icons.Zap, color: 'blue' },
         { id: 'cashu' as const, label: 'Cashu', icon: Icons.Cashew, color: 'emerald' },
@@ -478,6 +505,7 @@ const WalletModeSwitcher: React.FC<{
     const isAllActive = viewMode === 'all';
     const allColors = getColorClasses('orange');
     const ICON_SIZE = 16; // Consistent icon size across all buttons
+    const isClosing = animationState === 'collapsing';
 
     return (
         <div className="flex flex-col gap-1.5 bg-black/30 rounded-xl p-1.5 border border-white/10 backdrop-blur-sm">
@@ -494,57 +522,77 @@ const WalletModeSwitcher: React.FC<{
                 `}
             >
                 <Icons.Bitcoin 
-                    size={ICON_SIZE} 
+                    size={24} 
                     className={`${allColors.text} transition-all duration-300`} 
                 />
             </button>
             
-            {/* Individual wallet buttons - shown when expanded */}
-            {isExpanded && (
+            {/* Individual wallet buttons - shown when expanded or animating */}
+            {shouldRender && (
                 <div 
-                    className="flex items-center justify-center origin-center"
+                    className="flex items-center justify-center origin-center overflow-hidden"
                     style={{
-                        animation: 'wallet-expand 300ms ease-out forwards'
+                        animation: isClosing 
+                            ? 'wallet-collapse 350ms ease-in forwards'
+                            : 'wallet-expand 300ms ease-out forwards',
+                        // Fixed width: big enough to fit 3 icons + 1 label ("Lightning" is longest)
+                        width: '175px',
+                        minWidth: '175px',
+                        maxWidth: '175px'
                     }}
+                    onAnimationEnd={handleAnimationEnd}
                 >
                     {modes.map((mode, index) => {
                         const isActive = viewMode === mode.id;
                         const colors = getColorClasses(mode.color);
                         const IconComponent = mode.icon;
+                        // Reverse the index for closing animation
+                        const animationDelay = isClosing 
+                            ? (modes.length - 1 - index) * 50 
+                            : index * 50;
 
+                        // When no wallet is selected (viewMode === 'all'), all buttons share space equally
+                        // When a wallet IS selected, selected one expands for label, others stay compact
+                        const hasSelection = viewMode !== 'all';
+                        
                         return (
                             <button
                                 key={mode.id}
                                 onClick={() => onWalletSelect(mode.id)}
                                 className={`
-                                    relative flex items-center justify-center rounded-lg transition-all duration-300 ease-out
-                                    min-h-[36px]
+                                    relative flex items-center justify-center rounded-lg transition-colors duration-200
+                                    min-h-[36px] py-1.5 px-2
                                     ${isActive 
-                                        ? `${colors.active} ${colors.border} border px-3 py-1.5 min-w-[100px]` 
-                                        : `${colors.inactive} px-2.5 py-1.5 border border-transparent`
+                                        ? `${colors.active} ${colors.border} border` 
+                                        : `${colors.inactive} border border-transparent`
                                     }
                                 `}
                                 style={{
-                                    flex: isActive ? '1 1 auto' : '0 0 auto',
-                                    animation: `wallet-item-appear 300ms ease-out ${index * 50}ms forwards`,
+                                    // No selection: all equal. Has selection: active expands, others compact
+                                    flex: hasSelection ? (isActive ? '1 1 auto' : '0 0 auto') : '1 1 0',
+                                    // Use 'both' fill mode so items stay visible during delay before disappear animation starts
+                                    animation: isClosing
+                                        ? `wallet-item-disappear 200ms ease-in ${animationDelay}ms both`
+                                        : `wallet-item-appear 300ms ease-out ${animationDelay}ms forwards`,
                                     opacity: 0,
                                     transform: 'scale(0.8) translateY(-8px)'
                                 }}
                             >
                                 <IconComponent 
                                     size={ICON_SIZE} 
-                                    className={`${colors.text} transition-all duration-300 ${isActive ? 'mr-1.5' : ''}`} 
+                                    className={`${colors.text} flex-shrink-0 ${isActive ? 'mr-1' : ''}`} 
                                 />
-                                <span 
-                                    className={`
-                                        text-xs font-bold uppercase tracking-wide overflow-hidden whitespace-nowrap
-                                        transition-all duration-300 ease-out
-                                        ${isActive ? 'max-w-[80px] opacity-100' : 'max-w-0 opacity-0'}
-                                        ${colors.text}
-                                    `}
-                                >
-                                    {mode.label}
-                                </span>
+                                {/* Only show label when this wallet is selected */}
+                                {isActive && (
+                                    <span 
+                                        className={`
+                                            text-xs font-bold uppercase tracking-wide whitespace-nowrap
+                                            ${colors.text}
+                                        `}
+                                    >
+                                        {mode.label}
+                                    </span>
+                                )}
                             </button>
                         );
                     })}
@@ -563,6 +611,20 @@ const WalletModeSwitcher: React.FC<{
                         transform: scaleX(1) scaleY(1);
                     }
                 }
+                @keyframes wallet-collapse {
+                    0% {
+                        opacity: 1;
+                        transform: scaleX(1) scaleY(1);
+                    }
+                    70% {
+                        opacity: 0.8;
+                        transform: scaleX(0.9) scaleY(0.95);
+                    }
+                    100% {
+                        opacity: 0;
+                        transform: scaleX(0.5) scaleY(0.8);
+                    }
+                }
                 @keyframes wallet-item-appear {
                     0% {
                         opacity: 0;
@@ -571,6 +633,16 @@ const WalletModeSwitcher: React.FC<{
                     100% {
                         opacity: 1;
                         transform: scale(1) translateY(0);
+                    }
+                }
+                @keyframes wallet-item-disappear {
+                    0% {
+                        opacity: 1;
+                        transform: scale(1) translateY(0);
+                    }
+                    100% {
+                        opacity: 0;
+                        transform: scale(0.85) translateY(-6px);
                     }
                 }
             `}</style>
@@ -739,6 +811,11 @@ export const Wallet: React.FC = () => {
         const saved = localStorage.getItem('cdg_default_receive_wallet');
         return saved as 'cashu' | 'nwc' | 'breez' | null;
     });
+    // Default quick-send wallet preference ('auto' means smart selection based on balance)
+    const [defaultQuickSendWallet, setDefaultQuickSendWallet] = useState<'auto' | 'cashu' | 'nwc' | 'breez'>(() => {
+        const saved = localStorage.getItem('cdg_default_quick_send_wallet');
+        return (saved as 'auto' | 'cashu' | 'nwc' | 'breez') || 'auto';
+    });
     
     // Persist default wallet preferences
     useEffect(() => {
@@ -756,6 +833,47 @@ export const Wallet: React.FC = () => {
             localStorage.removeItem('cdg_default_receive_wallet');
         }
     }, [defaultReceiveWallet]);
+    
+    // Persist quick-send wallet preference
+    useEffect(() => {
+        localStorage.setItem('cdg_default_quick_send_wallet', defaultQuickSendWallet);
+    }, [defaultQuickSendWallet]);
+    
+    // Smart wallet selection - picks the best wallet to send from based on balance
+    // Priority: NWC (if connected & funded) > Breez (if available & funded) > Cashu (default)
+    const getPreferredSendWallet = (): 'breez' | 'nwc' | 'cashu' => {
+        // If user has set a specific preference, use it (if that wallet has balance)
+        if (defaultQuickSendWallet !== 'auto') {
+            const preferredBalance = walletBalances[defaultQuickSendWallet];
+            // Check if preferred wallet is available and has balance
+            if (defaultQuickSendWallet === 'nwc' && nwcString && preferredBalance > 0) return 'nwc';
+            if (defaultQuickSendWallet === 'breez' && hasBreezWallet && preferredBalance > 0) return 'breez';
+            if (defaultQuickSendWallet === 'cashu' && preferredBalance > 0) return 'cashu';
+            // If preferred wallet has no balance, fall through to auto-selection
+        }
+        
+        // Auto-selection: Priority 1 - NWC (if connected and has balance)
+        if (nwcString && walletBalances.nwc > 0) {
+            return 'nwc';
+        }
+        
+        // Priority 2: Breez - if wallet exists and has balance
+        if (hasBreezWallet && walletBalances.breez > 0) {
+            return 'breez';
+        }
+        
+        // Priority 3: Cashu - if has balance
+        if (walletBalances.cashu > 0) {
+            return 'cashu';
+        }
+        
+        // Fallback: Check for any wallet with balance (handles edge cases)
+        if (walletBalances.nwc > 0 && nwcString) return 'nwc';
+        if (walletBalances.breez > 0 && hasBreezWallet) return 'breez';
+        
+        // Default to Cashu (built-in wallet, always available)
+        return 'cashu';
+    };
     
     // Helper to use default wallet or show selection modal
     const handleAllWalletsSend = () => {
@@ -916,7 +1034,7 @@ export const Wallet: React.FC = () => {
         };
     }, []);
 
-    const [view, setView] = useState<'main' | 'receive' | 'deposit' | 'send-input' | 'send-contacts' | 'send-details' | 'settings'>('main');
+    const [view, setView] = useState<'main' | 'receive' | 'deposit' | 'send-input' | 'send-contacts' | 'send-details' | 'send-scan' | 'settings'>('main');
     const [sendAmount, setSendAmount] = useState('');
     const [sendInput, setSendInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
@@ -1192,7 +1310,7 @@ export const Wallet: React.FC = () => {
             if (data.callback) {
                 const millisats = amountSats * 1000;
                 if (millisats < data.minSendable || millisats > data.maxSendable) {
-                    alert(`Amount must be between ${data.minSendable / 1000} and ${data.maxSendable / 1000} sats`);
+                    alert(`Amount must be between ${(data.minSendable / 1000).toLocaleString()} and ${(data.maxSendable / 1000).toLocaleString()} sats`);
                     return null;
                 }
                 const callbackUrl = `${data.callback}${data.callback.includes('?') ? '&' : '?'}amount=${millisats}`;
@@ -1435,6 +1553,73 @@ export const Wallet: React.FC = () => {
                                 Please save a connection or switch to another wallet.
                             </p>
                         </div>
+                    )}
+                </div>
+
+                {/* Quick Scan Default Wallet */}
+                <div className="mb-8">
+                    <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Quick Scan Default</h3>
+                    <p className="text-xs text-slate-500 mb-3">Choose which wallet to use when tapping the QR scan button</p>
+                    <div className="grid grid-cols-4 gap-2">
+                        {/* Auto (Smart Selection) */}
+                        <button
+                            onClick={() => setDefaultQuickSendWallet('auto')}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${
+                                defaultQuickSendWallet === 'auto' 
+                                    ? 'bg-orange-500/20 border-orange-500' 
+                                    : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
+                            }`}
+                        >
+                            <Icons.Zap size={18} className={`mb-1 ${defaultQuickSendWallet === 'auto' ? 'text-orange-400' : 'text-slate-400'}`} />
+                            <span className="font-bold text-[10px]">Auto</span>
+                        </button>
+                        {/* NWC */}
+                        <button
+                            onClick={() => setDefaultQuickSendWallet('nwc')}
+                            disabled={!nwcString}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${
+                                defaultQuickSendWallet === 'nwc' 
+                                    ? 'bg-purple-500/20 border-purple-500' 
+                                    : !nwcString 
+                                        ? 'bg-slate-800/50 border-slate-700/50 opacity-30 cursor-not-allowed'
+                                        : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
+                            }`}
+                        >
+                            <Icons.Link size={18} className={`mb-1 ${defaultQuickSendWallet === 'nwc' ? 'text-purple-400' : 'text-slate-400'}`} />
+                            <span className="font-bold text-[10px]">NWC</span>
+                        </button>
+                        {/* Breez */}
+                        <button
+                            onClick={() => setDefaultQuickSendWallet('breez')}
+                            disabled={!hasBreezWallet}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${
+                                defaultQuickSendWallet === 'breez' 
+                                    ? 'bg-blue-500/20 border-blue-500' 
+                                    : !hasBreezWallet 
+                                        ? 'bg-slate-800/50 border-slate-700/50 opacity-30 cursor-not-allowed'
+                                        : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
+                            }`}
+                        >
+                            <Icons.Zap size={18} className={`mb-1 ${defaultQuickSendWallet === 'breez' ? 'text-blue-400' : 'text-slate-400'}`} />
+                            <span className="font-bold text-[10px]">Breez</span>
+                        </button>
+                        {/* Cashu */}
+                        <button
+                            onClick={() => setDefaultQuickSendWallet('cashu')}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${
+                                defaultQuickSendWallet === 'cashu' 
+                                    ? 'bg-emerald-500/20 border-emerald-500' 
+                                    : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
+                            }`}
+                        >
+                            <Icons.Cashew size={18} className={`mb-1 ${defaultQuickSendWallet === 'cashu' ? 'text-emerald-400' : 'text-slate-400'}`} />
+                            <span className="font-bold text-[10px]">Cashu</span>
+                        </button>
+                    </div>
+                    {defaultQuickSendWallet === 'auto' && (
+                        <p className="text-[10px] text-slate-500 mt-2 text-center">
+                            Auto mode prioritizes: NWC → Breez → Cashu (based on available balance)
+                        </p>
                     )}
                 </div>
 
@@ -2430,19 +2615,16 @@ export const Wallet: React.FC = () => {
                         <span className="text-slate-400 text-xs text-center">From your device</span>
                     </button>
 
-                    {/* Scan with Camera (Placeholder) */}
+                    {/* Scan with Camera */}
                     <button
-                        disabled
-                        className="flex flex-col items-center justify-center bg-slate-900/50 border-2 border-slate-700/50 rounded-2xl p-6 opacity-50 cursor-not-allowed relative"
+                        onClick={() => setView('send-scan')}
+                        className="flex flex-col items-center justify-center bg-gradient-to-br from-cyan-500/10 to-emerald-500/10 hover:from-cyan-500/20 hover:to-emerald-500/20 border-2 border-cyan-500/40 hover:border-cyan-500/60 rounded-2xl p-6 transition-all active:scale-95 group"
                     >
-                        <div className="absolute top-2 right-2 px-2 py-0.5 bg-brand-accent/20 border border-brand-accent/40 rounded-full">
-                            <span className="text-[10px] font-bold text-brand-accent">Soon</span>
+                        <div className="bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 p-4 rounded-full mb-3 group-hover:scale-110 transition-transform">
+                            <Icons.Camera size={32} className="text-cyan-400" />
                         </div>
-                        <div className="bg-slate-800/50 p-4 rounded-full mb-3">
-                            <Icons.Camera size={32} className="text-slate-600" />
-                        </div>
-                        <span className="text-slate-500 font-bold text-sm mb-1">Scan QR Code</span>
-                        <span className="text-slate-600 text-xs text-center">Coming soon</span>
+                        <span className="text-white font-bold text-sm mb-1">Scan QR Code</span>
+                        <span className="text-slate-400 text-xs text-center">Use your camera</span>
                     </button>
                 </div>
 
@@ -2538,13 +2720,106 @@ export const Wallet: React.FC = () => {
         );
     }
 
+    if (view === 'send-scan') {
+        return (
+            <div className="p-6 h-full flex flex-col">
+                <div className="flex items-center mb-6">
+                    <button onClick={() => setView('send-input')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors">
+                        <Icons.Prev />
+                    </button>
+                    <h2 className="text-xl font-bold">Scan QR Code</h2>
+                </div>
+
+                <div className="flex-1 flex flex-col items-center justify-center">
+                    <div className="relative w-full max-w-sm aspect-square rounded-2xl overflow-hidden bg-black">
+                        {/* Camera Preview */}
+                        <video
+                            ref={videoRef}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            autoPlay
+                            playsInline
+                            muted
+                        />
+                        <canvas ref={canvasRef} className="hidden" />
+
+                        {/* Scanning overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-64 h-64 border-2 border-cyan-400/50 rounded-2xl relative">
+                                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-cyan-400 rounded-tl-xl"></div>
+                                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-cyan-400 rounded-tr-xl"></div>
+                                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-cyan-400 rounded-bl-xl"></div>
+                                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-cyan-400 rounded-br-xl"></div>
+                                
+                                {/* Scanning line animation */}
+                                <div className="absolute left-2 right-2 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse top-1/2"></div>
+                            </div>
+                        </div>
+
+                        {/* Loading state */}
+                        {isCameraLoading && (
+                            <div className="absolute inset-0 bg-slate-900 flex items-center justify-center">
+                                <div className="text-center">
+                                    <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4 mx-auto"></div>
+                                    <p className="text-slate-400 text-sm">Starting camera...</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Error state */}
+                        {cameraError && (
+                            <div className="absolute inset-0 bg-slate-900 flex items-center justify-center p-6">
+                                <div className="text-center">
+                                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4 mx-auto">
+                                        <Icons.Camera size={32} className="text-red-500" />
+                                    </div>
+                                    <h3 className="text-white font-bold mb-2">Camera Error</h3>
+                                    <p className="text-slate-400 text-sm mb-4">{cameraError}</p>
+                                    <Button onClick={restart} variant="secondary">
+                                        Try Again
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <p className="text-slate-400 text-sm mt-6 text-center">
+                        Point your camera at a Lightning invoice or Bitcoin address QR code
+                    </p>
+
+                    {/* Alternative options */}
+                    <div className="flex space-x-3 mt-6">
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="flex items-center space-x-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
+                        >
+                            <Icons.QrCode size={18} className="text-purple-400" />
+                            <span className="text-sm text-white">Upload Image</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                setSendInput('');
+                                setView('send-details');
+                            }}
+                            className="flex items-center space-x-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
+                        >
+                            <Icons.Copy size={18} className="text-slate-400" />
+                            <span className="text-sm text-white">Paste Manually</span>
+                        </button>
+                    </div>
+                </div>
+
+                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+            </div>
+        );
+    }
+
     if (view === 'send-details') {
         return (
             <div className="p-6 h-full flex flex-col relative">
                 {isProcessing && <ProcessingOverlay message="Processing..." />}
 
                 <div className="flex items-center mb-6">
-                    <button onClick={() => setView('send-scan')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors">
+                    <button onClick={() => setView('send-input')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors">
                         <Icons.Prev />
                     </button>
                     <h2 className="text-xl font-bold">Transaction Details</h2>
@@ -2569,8 +2844,8 @@ export const Wallet: React.FC = () => {
                             <div>
                                 <h3 className="text-red-500 font-bold">Insufficient Funds</h3>
                                 <p className="text-xs text-red-400 mt-1">
-                                    Wallet Balance: {walletBalance} Sats<br />
-                                    Required: {parseInt(sendAmount || '0') + (quoteFee || 0)} Sats
+                                    Wallet Balance: {walletBalance.toLocaleString()} Sats<br />
+                                    Required: {(parseInt(sendAmount || '0') + (quoteFee || 0)).toLocaleString()} Sats
                                 </p>
                             </div>
                         </div>
@@ -2782,7 +3057,7 @@ export const Wallet: React.FC = () => {
                 )}
 
                 {/* Wallet Mode Switcher */}
-                <div className="relative z-10 flex items-center justify-between mb-6">
+                <div className="relative z-10 flex items-center justify-between mb-4">
                     <WalletModeSwitcher 
                         activeMode={walletMode}
                         viewMode={viewMode}
@@ -2857,15 +3132,11 @@ export const Wallet: React.FC = () => {
                 </div>
 
                 <div className="relative z-10">
-                    <div className="mb-1">
-                        <p className="text-slate-400 text-xs font-medium uppercase tracking-wide">Available Balance</p>
-                    </div>
-
                     {/* Tappable Balance - toggles between SATS and USD */}
                     <button 
                         onClick={handleBalanceTap}
                         disabled={isBalanceLoading}
-                        className="flex items-baseline space-x-1 mb-8 cursor-pointer active:scale-95 transition-transform select-none"
+                        className="flex items-baseline space-x-1 mb-3 cursor-pointer active:scale-95 transition-transform select-none"
                     >
                         <div className="relative overflow-hidden">
                             {/* SATS display */}
@@ -2908,7 +3179,7 @@ export const Wallet: React.FC = () => {
                     {displayBalance === 0 && (
                         <button
                             onClick={() => setShowFundModal(true)}
-                            className="w-full mb-4 p-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-orange-500/30 rounded-xl transition-all group"
+                            className="w-full mb-3 p-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-orange-500/30 rounded-xl transition-all group"
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
@@ -2925,77 +3196,115 @@ export const Wallet: React.FC = () => {
                         </button>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <button 
-                            onClick={() => {
-                                if (viewMode === 'all') {
-                                    handleAllWalletsSend();
-                                } else {
-                                    setView('send-input');
-                                }
-                            }} 
-                            className={`flex flex-col items-center justify-center bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl py-3 transition-all active:scale-95`}
-                        >
-                            <div className={`p-2 rounded-full mb-1 ${
-                                viewMode === 'all'
-                                    ? 'bg-orange-500/20'
-                                    : viewMode === 'breez' 
-                                        ? 'bg-blue-500/20' 
-                                        : viewMode === 'nwc' 
-                                            ? 'bg-purple-500/20' 
-                                            : 'bg-emerald-500/20'
-                            }`}>
-                                <Icons.Send size={20} className={
+                    <div className="relative">
+                        <div className="grid grid-cols-2 gap-3">
+                            <button 
+                                onClick={() => {
+                                    if (viewMode === 'all') {
+                                        handleAllWalletsSend();
+                                    } else {
+                                        setView('send-input');
+                                    }
+                                }} 
+                                className={`flex flex-col items-center justify-center bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl py-2.5 transition-all active:scale-95`}
+                            >
+                                <div className={`p-2 rounded-full mb-1 ${
                                     viewMode === 'all'
-                                        ? 'text-orange-400'
+                                        ? 'bg-orange-500/20'
                                         : viewMode === 'breez' 
-                                            ? 'text-blue-400' 
+                                            ? 'bg-blue-500/20' 
                                             : viewMode === 'nwc' 
-                                                ? 'text-purple-400' 
-                                                : 'text-emerald-400'
-                                } />
-                            </div>
-                            <span className="text-sm font-bold text-white">Send</span>
-                        </button>
+                                                ? 'bg-purple-500/20' 
+                                                : 'bg-emerald-500/20'
+                                }`}>
+                                    <Icons.Send size={20} className={
+                                        viewMode === 'all'
+                                            ? 'text-orange-400'
+                                            : viewMode === 'breez' 
+                                                ? 'text-blue-400' 
+                                                : viewMode === 'nwc' 
+                                                    ? 'text-purple-400' 
+                                                    : 'text-emerald-400'
+                                    } />
+                                </div>
+                                <span className="text-sm font-bold text-white">Send</span>
+                            </button>
 
-                        <button 
+                            <button 
+                                onClick={() => {
+                                    if (viewMode === 'all') {
+                                        handleAllWalletsReceive();
+                                    } else {
+                                        walletMode === 'nwc' ? setView('deposit') : setView('receive');
+                                    }
+                                }} 
+                                className={`flex flex-col items-center justify-center rounded-xl py-2.5 transition-all active:scale-95 ${
+                                    viewMode === 'all'
+                                        ? 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 hover:border-orange-500'
+                                        : viewMode === 'breez' 
+                                            ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 hover:border-blue-500' 
+                                            : viewMode === 'nwc' 
+                                                ? 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 hover:border-purple-500' 
+                                                : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 hover:border-emerald-500'
+                                }`}
+                            >
+                                <div className={`p-2 rounded-full mb-1 ${
+                                    viewMode === 'all'
+                                        ? 'bg-orange-500/20'
+                                        : viewMode === 'breez' 
+                                            ? 'bg-blue-500/20' 
+                                            : viewMode === 'nwc' 
+                                                ? 'bg-purple-500/20' 
+                                                : 'bg-emerald-500/20'
+                                }`}>
+                                    <Icons.Receive size={20} className={
+                                        viewMode === 'all'
+                                            ? 'text-orange-400'
+                                            : viewMode === 'breez' 
+                                                ? 'text-blue-400' 
+                                                : viewMode === 'nwc' 
+                                                    ? 'text-purple-400' 
+                                                    : 'text-emerald-400'
+                                    } />
+                                </div>
+                                <span className="text-sm font-bold text-white">Receive</span>
+                            </button>
+                        </div>
+                        
+                        {/* Quick QR Scan Button - Centered overlay (Frosted Glass) */}
+                        <button
                             onClick={() => {
                                 if (viewMode === 'all') {
-                                    handleAllWalletsReceive();
+                                    // Smart auto-select: pick wallet with funds
+                                    const preferredWallet = getPreferredSendWallet();
+                                    setViewMode(preferredWallet);
+                                    setWalletMode(preferredWallet);
+                                    setIsWalletSelectorExpanded(true);
+                                    setView('send-scan');
                                 } else {
-                                    walletMode === 'nwc' ? setView('deposit') : setView('receive');
+                                    // Specific wallet already selected
+                                    setView('send-scan');
                                 }
-                            }} 
-                            className={`flex flex-col items-center justify-center rounded-xl py-3 transition-all active:scale-95 ${
+                            }}
+                            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-95 backdrop-blur-sm border hover:brightness-110 ${
                                 viewMode === 'all'
-                                    ? 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 hover:border-orange-500'
+                                    ? 'bg-slate-800/70 border-orange-500/30 hover:border-orange-500/50'
                                     : viewMode === 'breez' 
-                                        ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 hover:border-blue-500' 
+                                        ? 'bg-blue-900/40 border-blue-500/30 hover:border-blue-500/50' 
                                         : viewMode === 'nwc' 
-                                            ? 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 hover:border-purple-500' 
-                                            : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 hover:border-emerald-500'
+                                            ? 'bg-purple-900/40 border-purple-500/30 hover:border-purple-500/50' 
+                                            : 'bg-emerald-900/40 border-emerald-500/30 hover:border-emerald-500/50'
                             }`}
                         >
-                            <div className={`p-2 rounded-full mb-1 ${
+                            <Icons.QrCode size={20} className={
                                 viewMode === 'all'
-                                    ? 'bg-orange-500/20'
+                                    ? 'text-orange-400'
                                     : viewMode === 'breez' 
-                                        ? 'bg-blue-500/20' 
+                                        ? 'text-blue-400' 
                                         : viewMode === 'nwc' 
-                                            ? 'bg-purple-500/20' 
-                                            : 'bg-emerald-500/20'
-                            }`}>
-                                <Icons.Receive size={20} className={
-                                    viewMode === 'all'
-                                        ? 'text-orange-400'
-                                        : viewMode === 'breez' 
-                                            ? 'text-blue-400' 
-                                            : viewMode === 'nwc' 
-                                                ? 'text-purple-400' 
-                                                : 'text-emerald-400'
-                                } />
-                            </div>
-                            <span className="text-sm font-bold text-white">Receive</span>
+                                            ? 'text-purple-400' 
+                                            : 'text-emerald-400'
+                            } />
                         </button>
                     </div>
                 </div>

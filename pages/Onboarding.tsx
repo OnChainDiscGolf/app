@@ -21,7 +21,6 @@ import { useApp } from '../context/AppContext';
 import { Icons } from '../components/Icons';
 import { MnemonicBackup, MnemonicRecoveryInput } from '../components/MnemonicBackup';
 import { generateNewProfileFromMnemonic, loginWithMnemonic, loginWithNsec } from '../services/nostrService';
-import { isNative, getPlatform } from '../services/capacitorService';
 
 type OnboardingStep = 
     | 'welcome'           // Initial screen with options
@@ -58,8 +57,6 @@ export const Onboarding: React.FC = () => {
         }
     }, [step]);
 
-    // Check if user is on Android (for Amber option)
-    const showAmberOption = isNative() && getPlatform() === 'android';
 
     // =========================================================================
     // ACTION HANDLERS
@@ -144,10 +141,10 @@ export const Onboarding: React.FC = () => {
                 <div className="max-w-md mx-auto text-center">
                     <p className="golden-shimmer text-base mb-2 font-semibold">Welcome to..</p>
                     <h1 className="font-extrabold tracking-tight leading-tight">
-                        <div className="text-7xl mb-1">
+                        <div className="text-6xl mb-1">
                             <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">On-Chain</span>
                         </div>
-                        <div className="text-6xl">
+                        <div className="text-4xl">
                             <span className="text-white">Disc Golf</span>
                         </div>
                     </h1>
@@ -182,7 +179,7 @@ export const Onboarding: React.FC = () => {
 
                         {/* Tagline */}
                         <div className="space-y-2 mb-6">
-                                <p className="text-slate-300 text-sm font-medium">This app uses</p>
+                                <p className="text-slate-300 text-sm font-medium">Play with</p>
                                 <p className="text-lg font-bold">
                                 <span className={`text-brand-primary transition-all duration-500 ${activeIcon === 0 ? 'drop-shadow-[0_0_12px_rgba(45,212,191,0.8)] scale-110 inline-block' : ''}`}>
                                         Disc Golf
@@ -253,7 +250,6 @@ export const Onboarding: React.FC = () => {
                             setShowExistingOptionsModal(false);
                             handleAmberConnect();
                         }}
-                        showAmber={showAmberOption}
                     />,
                     document.body
                 )}
@@ -289,8 +285,7 @@ export const Onboarding: React.FC = () => {
                     onComplete={handleBackupComplete}
                     onBack={() => setStep('welcome')}
                     title="Save Your Recovery Phrase"
-                    subtitle="These 12 words are the ONLY way to recover your account AND Bitcoin wallet. Write them down and keep them safe."
-                    showVerification={true}
+                    subtitle="This recovery phrase is the only way to recover your account and Bitcoin wallet."
                 />
             </div>
         );
@@ -420,8 +415,7 @@ const ExistingAccountModal: React.FC<{
     onSelectRecovery: () => void;
     onSelectNsec: () => void;
     onSelectAmber: () => void;
-    showAmber: boolean;
-}> = ({ onClose, onSelectRecovery, onSelectNsec, onSelectAmber, showAmber }) => (
+}> = ({ onClose, onSelectRecovery, onSelectNsec, onSelectAmber }) => (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
                         <div className="p-6 space-y-4">
@@ -469,23 +463,21 @@ const ExistingAccountModal: React.FC<{
                                     </div>
                     </button>
 
-                    {/* Amber (Android only) */}
-                    {showAmber && (
-                        <button
-                            onClick={onSelectAmber}
-                            className="w-full p-4 bg-orange-500/10 border border-orange-500/30 rounded-xl hover:bg-orange-500/20 transition-colors text-left"
-                        >
-                            <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center">
-                                    <Icons.Android className="text-orange-500" size={20} />
-                                </div>
-                                <div>
-                                    <p className="font-bold text-white">Amber Signer</p>
-                                    <p className="text-xs text-slate-400">Android key manager</p>
-                                </div>
+                    {/* Amber (Android - Always shown) */}
+                    <button
+                        onClick={onSelectAmber}
+                        className="w-full p-4 bg-orange-500/10 border border-orange-500/30 rounded-xl hover:bg-orange-500/20 transition-colors text-left"
+                    >
+                        <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center">
+                                <Icons.Diamond className="text-orange-500" size={20} />
                             </div>
-                        </button>
-                    )}
+                            <div>
+                                <p className="font-bold text-white">Amber Signer</p>
+                                <p className="text-xs text-slate-400">Android key manager</p>
+                            </div>
+                        </div>
+                    </button>
                 </div>
 
                             <button

@@ -197,7 +197,7 @@ export const RoundHistory: React.FC = () => {
                         <div>
                           <p className="text-xs text-slate-500 mb-0.5">Entry</p>
                           <p className="text-sm font-bold text-emerald-400">
-                            {round.entryFeeSats > 0 ? `${round.entryFeeSats} sats` : 'Free'}
+                            {round.entryFeeSats > 0 ? `${round.entryFeeSats.toLocaleString()} sats` : 'Free'}
                           </p>
                         </div>
                       </div>

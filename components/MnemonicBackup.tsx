@@ -11,7 +11,7 @@
  * NO VERIFICATION STEP - Users may be on the disc golf course ready to play!
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Icons } from './Icons';
 import { splitMnemonicToWords } from '../services/mnemonicService';
 import { 
@@ -33,11 +33,9 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
     onComplete,
     onBack,
     title = "Save Your Recovery Phrase",
-    subtitle = "These 12 words are the ONLY way to recover your account and wallet."
+    subtitle = "This recovery phrase is the only way to recover your account and Bitcoin wallet."
 }) => {
     const [copied, setCopied] = useState(false);
-    const [showWords, setShowWords] = useState(false);
-    const [showBackupOptions, setShowBackupOptions] = useState(false);
     
     // Backup option states
     const [showNostrModal, setShowNostrModal] = useState(false);
@@ -46,8 +44,6 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
     const [nostrBackupSuccess, setNostrBackupSuccess] = useState(false);
     const [nostrBackupError, setNostrBackupError] = useState('');
     const [isBackingUp, setIsBackingUp] = useState(false);
-
-    const words = useMemo(() => splitMnemonicToWords(mnemonic), [mnemonic]);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(mnemonic);
@@ -115,6 +111,9 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
 
                 <h2 className="text-xl font-bold text-white mb-2">{title}</h2>
                 <p className="text-slate-400 text-sm px-4">{subtitle}</p>
+                <p className="text-slate-500 text-xs px-4 mt-2">
+                    You can access your recovery phrase later in <span className="text-teal-400">Wallet settings</span>
+                </p>
             </div>
 
             {/* Warning Banner */}
@@ -122,140 +121,83 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                 <div className="flex items-start space-x-2">
                     <Icons.Shield className="text-red-400 shrink-0 mt-0.5" size={18} />
                     <div className="text-xs text-red-300">
-                        <strong className="block mb-1">Never share these words!</strong>
+                        <strong className="block mb-1">Never share these words with anyone!</strong>
                         Anyone with these words can steal your funds. We will NEVER ask for them.
                     </div>
                 </div>
             </div>
 
-            {/* Word Grid */}
+            {/* Backup Options - Shown directly */}
             <div className="flex-1 mx-4 overflow-y-auto">
-                <div className="relative">
-                    {/* Blur overlay when hidden */}
-                    {!showWords && (
-                        <div
-                            className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-md rounded-xl z-10 cursor-pointer"
-                            onClick={() => setShowWords(true)}
-                        >
-                            <div className="text-center p-4">
-                                <Icons.Eye className="mx-auto text-slate-400 mb-2" size={32} />
-                                <p className="text-slate-300 font-medium text-sm">Tap to reveal words</p>
-                                <p className="text-slate-500 text-xs mt-1">Make sure no one is watching</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Word Grid */}
-                    <div className="grid grid-cols-3 gap-2 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-                        {words.map((word, index) => (
-                            <div
-                                key={index}
-                                className="flex items-center bg-slate-900/50 rounded-lg p-2 border border-slate-700"
-                            >
-                                <span className="text-slate-500 text-xs font-mono w-5 shrink-0">
-                                    {index + 1}.
-                                </span>
-                                <span className="text-white font-mono text-sm">
-                                    {showWords ? word : '•••••'}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Copy Button - Always visible directly under word grid */}
-                <button
-                    onClick={handleCopy}
-                    className="mt-3 w-full py-2 flex items-center justify-center space-x-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-sm"
-                >
-                    {copied ? (
-                        <>
-                            <Icons.CheckMark size={16} className="text-green-400" />
-                            <span className="text-green-400">Copied!</span>
-                        </>
-                    ) : (
-                        <>
-                            <Icons.Copy size={16} className="text-slate-400" />
-                            <span className="text-slate-300">Copy to clipboard</span>
-                        </>
-                    )}
-                </button>
-
-                {/* More Ways to Save - Accordion (always visible) */}
-                <div className="mt-4">
+                <p className="text-slate-400 text-sm mb-4 text-center">
+                    Choose how you'd like to save your recovery phrase:
+                </p>
+                
+                <div className="space-y-3">
+                    {/* 1. Copy to Clipboard */}
                     <button
-                        onClick={() => setShowBackupOptions(!showBackupOptions)}
-                        className="w-full py-3 px-4 flex items-center justify-between bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-xl transition-colors"
+                        onClick={handleCopy}
+                        className="w-full p-4 flex items-center space-x-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-xl transition-colors text-left"
                     >
-                        <div className="flex items-center space-x-2">
-                            <Icons.Shield className="text-teal-400" size={18} />
-                            <span className="text-slate-300 font-medium">More Ways to Save</span>
+                        <div className="w-12 h-12 bg-slate-700/50 rounded-lg flex items-center justify-center">
+                            {copied ? (
+                                <Icons.CheckMark className="text-green-400" size={24} />
+                            ) : (
+                                <Icons.Copy className="text-slate-400" size={24} />
+                            )}
                         </div>
-                        <Icons.ChevronDown 
-                            size={20} 
-                            className={`text-slate-400 transition-transform duration-200 ${showBackupOptions ? 'rotate-180' : ''}`}
-                        />
+                        <div className="flex-1">
+                            <p className="text-white font-medium">{copied ? 'Copied!' : 'Copy to Clipboard'}</p>
+                            <p className="text-slate-500 text-xs">Paste into a secure note or password manager</p>
+                        </div>
                     </button>
 
-                    <div 
-                        className={`overflow-hidden transition-all duration-300 ease-out ${
-                            showBackupOptions ? 'max-h-96 opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0'
-                        }`}
+                    {/* 2. Download Card (PDF) */}
+                    <button
+                        onClick={handleDownloadPDF}
+                        className="w-full p-4 flex items-center space-x-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-xl transition-colors text-left"
                     >
-                        <div className="space-y-2 pt-1">
-                            {/* 1. Download Card (PDF) - First */}
-                            <button
-                                onClick={handleDownloadPDF}
-                                className="w-full p-3 flex items-center space-x-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl transition-colors text-left"
-                            >
-                                <div className="w-10 h-10 bg-teal-500/20 rounded-lg flex items-center justify-center">
-                                    <Icons.CreditCard className="text-teal-400" size={20} />
-                                </div>
-                                <div>
-                                    <p className="text-white font-medium text-sm">Download Card</p>
-                                    <p className="text-slate-500 text-xs">PDF with story + QR</p>
-                                </div>
-                            </button>
-
-                            {/* 2. Download QR - Second */}
-                            <button
-                                onClick={handleDownloadQR}
-                                className="w-full p-3 flex items-center space-x-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl transition-colors text-left"
-                            >
-                                <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                                    <Icons.QrCode className="text-orange-400" size={20} />
-                                </div>
-                                <div>
-                                    <p className="text-white font-medium text-sm">Download QR</p>
-                                    <p className="text-slate-500 text-xs">Scannable image</p>
-                                </div>
-                            </button>
-
-                            {/* 3. Save to Nostr - Third (Purple) */}
-                            <button
-                                onClick={() => setShowNostrModal(true)}
-                                className="w-full p-3 flex items-center space-x-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-xl transition-colors text-left"
-                            >
-                                <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                                    <Icons.Key className="text-purple-400" size={20} />
-                                </div>
-                                <div>
-                                    <p className="text-white font-medium text-sm">Save to Nostr</p>
-                                    <p className="text-slate-500 text-xs">Encrypted cloud sync</p>
-                                </div>
-                            </button>
+                        <div className="w-12 h-12 bg-teal-500/20 rounded-lg flex items-center justify-center">
+                            <Icons.CreditCard className="text-teal-400" size={24} />
                         </div>
-                    </div>
+                        <div className="flex-1">
+                            <p className="text-white font-medium">Download Card</p>
+                            <p className="text-slate-500 text-xs">PDF card with story memory aid + QR code</p>
+                        </div>
+                    </button>
+
+                    {/* 3. Download QR */}
+                    <button
+                        onClick={handleDownloadQR}
+                        className="w-full p-4 flex items-center space-x-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-xl transition-colors text-left"
+                    >
+                        <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                            <Icons.QrCode className="text-orange-400" size={24} />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-white font-medium">Download QR</p>
+                            <p className="text-slate-500 text-xs">Scannable QR code image for easy recovery</p>
+                        </div>
+                    </button>
+
+                    {/* 4. Save to Nostr */}
+                    <button
+                        onClick={() => setShowNostrModal(true)}
+                        className="w-full p-4 flex items-center space-x-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-xl transition-colors text-left"
+                    >
+                        <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                            <Icons.Key className="text-purple-400" size={24} />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-white font-medium">Save to Nostr</p>
+                            <p className="text-slate-500 text-xs">Encrypted backup synced to Nostr relays</p>
+                        </div>
+                    </button>
                 </div>
             </div>
 
-            {/* Continue Section - Minimal friction */}
-            <div className="p-4 space-y-2">
-                {/* Reassurance note */}
-                <p className="text-center text-slate-500 text-xs">
-                    You can view these words anytime in your <span className="text-teal-400">Wallet settings</span>
-                </p>
-
+            {/* Continue Section */}
+            <div className="p-4 space-y-3">
                 <button
                     onClick={onComplete}
                     className="w-full py-3.5 bg-gradient-to-r from-brand-primary to-cyan-400 text-black font-bold rounded-xl hover:opacity-90 transition-all flex items-center justify-center space-x-2 shadow-lg shadow-brand-primary/20"

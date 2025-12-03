@@ -9,9 +9,9 @@ export const BottomNav: React.FC = () => {
   const isActive = (path: string) => location.pathname === path;
 
   const navItems = [
-    { path: '/', icon: Icons.Trophy, label: 'Play' },
-    { path: '/wallet', icon: Icons.Wallet, label: 'Wallet' },
-    { path: '/profile', icon: Icons.Users, label: 'Profile' },
+    { path: '/', icon: Icons.Trophy, label: 'Play', tourId: 'tour-nav-play' },
+    { path: '/wallet', icon: Icons.Wallet, label: 'Wallet', tourId: 'tour-nav-wallet' },
+    { path: '/profile', icon: Icons.Users, label: 'Profile', tourId: 'tour-nav-profile' },
   ];
 
   const handleNavClick = (path: string) => {
@@ -31,6 +31,7 @@ export const BottomNav: React.FC = () => {
         {navItems.map((item) => (
           <button
             key={item.path}
+            id={item.tourId}
             onClick={() => handleNavClick(item.path)}
             className={`flex flex-col items-center space-y-1 w-16 transition-colors ${isActive(item.path) ? 'text-brand-primary' : 'text-slate-400 hover:text-slate-200'
               }`}

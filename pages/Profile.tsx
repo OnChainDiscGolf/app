@@ -1921,7 +1921,7 @@ export const Profile: React.FC = () => {
                 {/* Total Wins - Emerald theme */}
                 <div className="bg-emerald-500/5 backdrop-blur-sm p-4 rounded-xl text-center border border-emerald-500/20 hover:border-emerald-500/40 transition-all group">
                     <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
-                        <Icons.Trophy size={16} className="text-emerald-400" />
+                        <Icons.TrophyMedal size={16} className="text-emerald-400" />
                     </div>
                     <p className="text-3xl font-bold text-emerald-400">{userStats.totalWins || 0}</p>
                     <p className="text-[10px] uppercase tracking-wider text-emerald-400/70 font-bold">Total Wins</p>

@@ -2,30 +2,16 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Icons } from '../components/Icons';
-import { nip19 } from 'nostr-tools';
-import { getSession, uploadProfileImage } from '../services/nostrService';
+import { uploadProfileImage } from '../services/nostrService';
 
 export const ProfileSetup: React.FC = () => {
-    const { userProfile, updateUserProfile, currentUserPubkey, activeRound, createAccount, isGuest } = useApp();
+    const { userProfile, updateUserProfile, createAccount, isGuest } = useApp();
     const [name, setName] = useState(userProfile.name || 'Disc Golfer');
     const [picture, setPicture] = useState(userProfile.picture || '');
     const [pdga, setPdga] = useState(userProfile.pdga || '');
-    const [showKeyInfo, setShowKeyInfo] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
-    const [copiedKeyType, setCopiedKeyType] = useState<'npub' | 'nsec' | null>(null);
+    const [isTransitioning, setIsTransitioning] = useState(false);
     const navigate = useNavigate();
-
-    const npub = currentUserPubkey ? nip19.npubEncode(currentUserPubkey) : '';
-
-    const getPrivateString = () => {
-        const session = getSession();
-        if (session && session.sk) {
-            return nip19.nsecEncode(session.sk);
-        }
-        return '';
-    };
-
-    const nsec = getPrivateString();
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -43,19 +29,10 @@ export const ProfileSetup: React.FC = () => {
         }
     };
 
-    const handleCopyNpub = () => {
-        navigator.clipboard.writeText(npub);
-        setCopiedKeyType('npub');
-        setTimeout(() => setCopiedKeyType(null), 2000);
-    };
-
-    const handleCopyNsec = () => {
-        navigator.clipboard.writeText(nsec);
-        setCopiedKeyType('nsec');
-        setTimeout(() => setCopiedKeyType(null), 2000);
-    };
-
     const handleContinue = async () => {
+        // Show transition state first
+        setIsTransitioning(true);
+
         // If user is still a guest, convert them to a full user first
         if (isGuest) {
             await createAccount();
@@ -69,9 +46,28 @@ export const ProfileSetup: React.FC = () => {
             pdga: pdga || undefined  // Only include if set
         });
 
+        // Small delay to ensure state is settled before navigation
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Clear any saved round creation state so user lands on home screen, not Players screen
+        localStorage.removeItem('cdg_round_creation');
+
         // Navigate to root - HomeOrOnboarding will show Home (Play tab) for authenticated users
         navigate('/');
     };
+
+    // Show transition screen while navigating
+    if (isTransitioning) {
+        return (
+            <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center">
+                <div className="w-20 h-20 bg-brand-primary/20 rounded-full flex items-center justify-center border-2 border-brand-primary shadow-[0_0_30px_rgba(45,212,191,0.3)] animate-pulse">
+                    <Icons.Play className="text-brand-primary" size={40} />
+                </div>
+                <h2 className="text-xl font-bold text-white mt-6">Let's Play!</h2>
+                <p className="text-slate-400 text-sm mt-2">Setting up your profile...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-brand-dark flex flex-col">
@@ -160,107 +156,6 @@ export const ProfileSetup: React.FC = () => {
                     <p className="text-xs text-slate-500">
                         Your PDGA membership number. Other players can find you by searching this number.
                     </p>
-                </div>
-
-                {/* Key Explanation */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                    <button
-                        onClick={() => setShowKeyInfo(!showKeyInfo)}
-                        className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors"
-                    >
-                        <div className="flex items-center space-x-2">
-                            <Icons.Key className="text-purple-500" size={20} />
-                            <h3 className="font-bold text-white">Your Keys</h3>
-                        </div>
-                        <Icons.ChevronDown
-                            size={20}
-                            className={`transition-transform duration-200 text-slate-400 ${showKeyInfo ? 'rotate-180' : ''}`}
-                        />
-                    </button>
-
-                    {showKeyInfo && (
-                        <div className="px-4 pb-4 space-y-4 text-sm animate-in slide-in-from-top duration-200">
-                            <p className="text-slate-300 leading-relaxed">
-                                <strong className="text-white">Your identity, your control.</strong> Think of Nostr like having your own house key instead of renting an apartment from a landlord who can kick you out anytime.
-                            </p>
-
-                            <p className="text-slate-300 leading-relaxed">
-                                <strong className="text-purple-400">With Nostr, YOU own your identity.</strong> You have a private key (like a master password) that proves you're you. No company can take it away.
-                            </p>
-
-                            {/* Public Key */}
-                            <div className="bg-black/30 rounded-lg p-3 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wide">Public Key</p>
-                                    <span className="text-[10px] text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">SAFE TO SHARE</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <code className="flex-1 font-mono text-xs text-brand-primary break-all">{npub.slice(0, 40)}...</code>
-                                    <button
-                                        onClick={handleCopyNpub}
-                                        className="p-2 hover:bg-slate-800 rounded transition-colors text-brand-primary shrink-0"
-                                    >
-                                        {copiedKeyType === 'npub' ? <Icons.CheckMark size={14} /> : <Icons.Copy size={14} />}
-                                    </button>
-                                </div>
-                                <p className="text-slate-400 text-xs italic">
-                                    Like your email address - anyone can use this to find you or send you sats!
-                                </p>
-                            </div>
-
-                            {/* Private Key */}
-                            <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-3 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-orange-300 text-xs font-bold uppercase tracking-wide">Private Key</p>
-                                    <span className="text-[10px] text-orange-400 bg-orange-500/20 px-2 py-0.5 rounded-full">KEEP SECRET</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <code className="flex-1 font-mono text-xs text-orange-300 break-all">{nsec.slice(0, 40)}...</code>
-                                    <button
-                                        onClick={handleCopyNsec}
-                                        className="p-2 hover:bg-orange-900/30 rounded transition-colors text-orange-400 shrink-0"
-                                    >
-                                        {copiedKeyType === 'nsec' ? <Icons.CheckMark size={14} /> : <Icons.Copy size={14} />}
-                                    </button>
-                                </div>
-                                <p className="text-orange-200/80 text-xs">
-                                    <strong>This controls your funds.</strong> Losing it means losing your money forever. Save it somewhere safe!
-                                </p>
-                            </div>
-
-                            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 space-y-2">
-                                <p className="text-purple-300 text-xs leading-relaxed">
-                                    💡 <strong>One key, infinite apps.</strong> Your identity travels with you across any Nostr app:
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    <a
-                                        href="https://damus.io"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full hover:bg-purple-500/30 transition-colors text-xs font-bold border border-purple-500/30"
-                                    >
-                                        Damus
-                                    </a>
-                                    <a
-                                        href="https://primal.net"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full hover:bg-purple-500/30 transition-colors text-xs font-bold border border-purple-500/30"
-                                    >
-                                        Primal
-                                    </a>
-                                    <a
-                                        href="https://fountain.fm"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full hover:bg-purple-500/30 transition-colors text-xs font-bold border border-purple-500/30"
-                                    >
-                                        Fountain
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 {/* Continue Button */}

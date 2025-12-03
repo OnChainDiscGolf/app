@@ -9,6 +9,7 @@ import { Logo, LogoChainDisc, LogoMinimal } from '../components/Logo';
 const ActiveLogo = Logo;
 import { InfoModal } from '../components/InfoModal';
 import { FeedbackModal, FeedbackButton } from '../components/FeedbackModal';
+import { GuidedTour, TourStep, useTourStatus } from '../components/GuidedTour';
 import { useNavigate } from 'react-router-dom';
 import { getPool, getRelays, listEvents, lookupUser, lookupByPDGA, publishProfileWithKey, getMagicLightningAddress, updateContactList } from '../services/nostrService';
 import { NOSTR_KIND_ROUND, DisplayProfile } from '../types';
@@ -147,10 +148,57 @@ export const Home: React.FC = () => {
     const [showInfoModal, setShowInfoModal] = useState(false);
     const [expandedTopic, setExpandedTopic] = useState<string | null>(null);
 
+    // Guided Tour State
+    const shouldShowTour = useTourStatus('play-tab');
+    const [showTour, setShowTour] = useState(false);
+
+    // Tour steps for first-time users
+    const tourSteps: TourStep[] = [
+        {
+            targetId: 'tour-create-round',
+            title: 'Create Round',
+            content: "Start here to host a round. Set your course and invite cardmates. Entry fees are optional!",
+        },
+        {
+            targetId: 'tour-join-round',
+            title: 'Join Round',
+            content: "Show your QR code so friends can scan you into their round. They scan YOU!",
+        },
+        {
+            targetId: 'tour-help',
+            title: 'Need Help?',
+            content: "This guide is always here if you get stuck.",
+        },
+        {
+            targetId: 'tour-nav-wallet',
+            title: 'Wallet',
+            content: "Manage your sats here. Deposit via Lightning, view transactions, and withdraw anytime.",
+            position: 'top',
+        },
+        {
+            targetId: 'tour-nav-profile',
+            title: 'Profile',
+            content: "Your identity, player stats, and key backup all live here. Now go play!",
+            position: 'top',
+        },
+    ];
+
+    // Show tour for authenticated non-guest users who haven't seen it
+    useEffect(() => {
+        if (shouldShowTour && isAuthenticated && !isGuest) {
+            // Small delay to let the page render first
+            const timer = setTimeout(() => setShowTour(true), 500);
+            return () => clearTimeout(timer);
+        }
+    }, [shouldShowTour, isAuthenticated, isGuest]);
+
     // Player QR Modal State
     const [showPlayerQr, setShowPlayerQr] = useState(false);
     const [inviteQrData, setInviteQrData] = useState('');
     const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+    
+    // League Coming Soon Modal State
+    const [showLeagueComingSoon, setShowLeagueComingSoon] = useState(false);
 
     // Instant Invite State
     const [showInstantInviteModal, setShowInstantInviteModal] = useState(false);
@@ -817,7 +865,7 @@ export const Home: React.FC = () => {
         setPaymentError(null);
 
         if (walletBalance < totalAmount) {
-            setPaymentError(`Insufficient balance. Need ${totalAmount} sats.`);
+            setPaymentError(`Insufficient balance. Need ${totalAmount.toLocaleString()} sats.`);
             // Auto-dismiss error after 5 seconds
             setTimeout(() => setPaymentError(null), 5000);
             return;
@@ -861,13 +909,13 @@ export const Home: React.FC = () => {
 
         // Double-check balance
         if (walletBalance < totalAmount) {
-            setPaymentError(`Insufficient balance. Need ${totalAmount} sats.`);
+            setPaymentError(`Insufficient balance. Need ${totalAmount.toLocaleString()} sats.`);
             // Auto-dismiss error after 5 seconds
             setTimeout(() => setPaymentError(null), 5000);
             return;
         }
 
-        if (confirm(`Pay ${totalAmount} sats from your wallet to cover ${paymentTarget.name}'s entry fee? You can collect cash from them later.`)) {
+        if (confirm(`Pay ${totalAmount.toLocaleString()} sats from your wallet to cover ${paymentTarget.name}'s entry fee? You can collect cash from them later.`)) {
             setIsPayingWallet(true);
             try {
                 // Pay the invoice using the host's wallet
@@ -1721,7 +1769,7 @@ export const Home: React.FC = () => {
                         return (
                             <Button
                                 fullWidth
-                                onClick={() => allPaid ? setShowStartConfirm(true) : undefined}
+                                onClick={() => allPaid ? handleStartRound() : undefined}
                                 disabled={!allPaid}
                                 className={`font-bold py-4 rounded-full shadow-lg transition-all ${allPaid
                                     ? 'bg-brand-accent text-black shadow-[0_0_30px_rgba(251,191,36,0.6)] animate-pulse'
@@ -1785,20 +1833,22 @@ export const Home: React.FC = () => {
                                         </div>
                                     )}
 
-                                    {/* QR Code Block with Pulse */}
-                                    <div className={`bg-white p-4 rounded-xl inline-block mx-auto relative min-h-[200px] min-w-[200px] flex items-center justify-center ${!isGeneratingInvoice && !paymentSuccess ? 'qr-pulse' : ''}`}>
-                                        {isGeneratingInvoice ? (
-                                            <div className="flex flex-col items-center">
-                                                <Icons.Zap className="text-brand-accent animate-bounce mb-2" size={32} />
-                                                <span className="text-slate-900 text-xs font-bold">Generating Invoice...</span>
-                                            </div>
-                                        ) : (
-                                            <img
-                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentInvoice)}`}
-                                                className="w-48 h-48"
-                                                alt="Payment QR"
-                                            />
-                                        )}
+                                    {/* QR Code Block with Pulse and Colorful Border */}
+                                    <div className={`bg-gradient-to-br from-emerald-400 via-cyan-500 to-teal-600 p-1 rounded-2xl shadow-2xl shadow-cyan-500/30 inline-block mx-auto ${!isGeneratingInvoice && !paymentSuccess ? 'qr-pulse' : ''}`}>
+                                        <div className="bg-white p-3 rounded-xl relative min-h-[200px] min-w-[200px] flex items-center justify-center">
+                                            {isGeneratingInvoice ? (
+                                                <div className="flex flex-col items-center">
+                                                    <Icons.Zap className="text-brand-accent animate-bounce mb-2" size={32} />
+                                                    <span className="text-slate-900 text-xs font-bold">Generating Invoice...</span>
+                                                </div>
+                                            ) : (
+                                                <img
+                                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentInvoice)}`}
+                                                    className="w-48 h-48"
+                                                    alt="Payment QR"
+                                                />
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Listening Indicator - Moved Closer */}
@@ -1819,7 +1869,7 @@ export const Home: React.FC = () => {
                                             disabled={isPayingWallet}
                                         >
                                             <div className="flex items-center justify-center space-x-2">
-                                                <span>{isPayingWallet ? 'Processing...' : `Pay ${entryFee + acePot} SATS with App Wallet`}</span>
+                                                <span>{isPayingWallet ? 'Processing...' : `Pay ${(entryFee + acePot).toLocaleString()} SATS with App Wallet`}</span>
                                                 <Icons.Wallet size={18} />
                                             </div>
                                         </Button>
@@ -1840,46 +1890,6 @@ export const Home: React.FC = () => {
                     )
                 }
 
-                {/* START ROUND CONFIRMATION MODAL */}
-                {showStartConfirm && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/90 backdrop-blur-sm">
-                        <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
-                            <div className="text-center space-y-4">
-                                {/* Warning Icon and Title */}
-                                <div className="flex flex-col items-center space-y-2">
-                                    <div className="w-16 h-16 rounded-full bg-amber-500/20 border-2 border-amber-500/50 flex items-center justify-center">
-                                        <span className="text-4xl">⚠️</span>
-                                    </div>
-                                    <h3 className="text-xl font-bold text-white">Ready to Start?</h3>
-                                </div>
-
-                                {/* Warning Message */}
-                                <p className="text-slate-300 text-sm leading-relaxed">
-                                    Once you start the round, you won't be able to edit any round details (players, fees, settings, etc.). Make sure everything is correct before proceeding.
-                                </p>
-
-                                {/* Action Buttons */}
-                                <div className="flex space-x-3 pt-2">
-                                    <Button
-                                        fullWidth
-                                        variant="secondary"
-                                        onClick={() => setShowStartConfirm(false)}
-                                        className="py-3"
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        fullWidth
-                                        onClick={handleStartRound}
-                                        className="bg-brand-accent text-black font-bold py-3 hover:bg-brand-accent/90"
-                                    >
-                                        Continue
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div >
         );
     }
@@ -2238,12 +2248,14 @@ export const Home: React.FC = () => {
                                     Have your friend scan this code to instantly join the game with a new account.
                                 </p>
 
-                                <div className="bg-white p-4 rounded-xl inline-block mx-auto">
-                                    <img
-                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(inviteQrData)}`}
-                                        className="w-48 h-48"
-                                        alt="Invite QR"
-                                    />
+                                <div className="bg-gradient-to-br from-emerald-400 via-cyan-500 to-teal-600 p-1 rounded-2xl shadow-2xl shadow-cyan-500/30 inline-block mx-auto">
+                                    <div className="bg-white p-3 rounded-xl">
+                                        <img
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(inviteQrData)}`}
+                                            className="w-48 h-48"
+                                            alt="Invite QR"
+                                        />
+                                    </div>
                                 </div>
 
                                 <p className="text-xs text-slate-500">
@@ -2430,107 +2442,104 @@ export const Home: React.FC = () => {
     // --- STEP 1: ROUND SETUP ---
     if (view === 'setup') {
         return (
-            <div className="flex flex-col h-full p-6 pb-24">
-                {/* Header - Wallet style */}
-                <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col h-full p-4 pb-20">
+                {/* Header - Compact */}
+                <div className="flex justify-between items-center mb-3">
                     <div className="flex items-center">
                         <button 
                             onClick={() => setView('menu')} 
-                            className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors"
+                            className="mr-3 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors"
                         >
-                            <Icons.Prev />
+                            <Icons.Prev size={18} />
                         </button>
-                        <h1 className="text-2xl font-bold flex items-center">
-                            <Icons.Trophy className="mr-2 text-emerald-400" /> Round Setup
+                        <h1 className="text-xl font-bold flex items-center">
+                            <Icons.Trophy className="mr-2 text-emerald-400" size={20} /> Round Setup
                         </h1>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-1.5">
                         <button
                             onClick={() => setShowSetupHelp(true)}
                             className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                         >
-                            <Icons.Help size={20} />
+                            <Icons.Help size={18} />
                         </button>
                         <button
                             onClick={goToSettings}
                             className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                         >
-                            <Icons.Settings size={20} />
+                            <Icons.Settings size={18} />
                         </button>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-3">
+                <div className="flex-1 flex flex-col space-y-2.5 min-h-0">
 
-                    {/* Course Name Section */}
-                    <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-2xl p-5 border border-white/10 backdrop-blur-sm">
-                        <div className="flex items-center text-slate-400 space-x-2 mb-3">
-                            <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                                <Icons.Location size={16} className="text-emerald-400" />
+                    {/* Course Name Section - Compact */}
+                    <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-xl p-3.5 border border-white/10 backdrop-blur-sm">
+                        <div className="flex items-center text-slate-400 space-x-2 mb-2">
+                            <div className="w-6 h-6 bg-emerald-500/20 rounded-md flex items-center justify-center">
+                                <Icons.Location size={14} className="text-emerald-400" />
                             </div>
-                            <span className="text-sm font-bold uppercase tracking-wider">Course</span>
+                            <span className="text-xs font-bold uppercase tracking-wider">Course</span>
                         </div>
                         <input
                             type="text"
                             value={courseName}
                             onChange={(e) => setCourseName(e.target.value)}
-                            className="text-xl font-bold bg-black/30 border border-white/10 rounded-xl w-full p-3 placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                            className="text-lg font-bold bg-black/30 border border-white/10 rounded-lg w-full p-2.5 placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                             placeholder="Enter Course Name"
                         />
 
-                        {/* Recent Courses Quick Select */}
+                        {/* Recent Courses Quick Select - More compact */}
                         {recentCourses.length > 0 && (
-                            <div className="space-y-2 mt-3">
-                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Recent</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {recentCourses.slice(0, 6).map((course) => (
-                                        <button
-                                            key={course}
-                                            onClick={() => setCourseName(course)}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${courseName === course
-                                                ? 'bg-gradient-to-r from-emerald-500/70 to-teal-500/70 text-white shadow-lg shadow-emerald-500/15'
-                                                : 'bg-black/30 text-slate-300 hover:bg-slate-700 border border-white/10 hover:border-emerald-500/30'
-                                                }`}
-                                        >
-                                            {course}
-                                        </button>
-                                    ))}
-                                </div>
+                            <div className="flex flex-wrap gap-1.5 mt-2.5">
+                                {recentCourses.slice(0, 4).map((course) => (
+                                    <button
+                                        key={course}
+                                        onClick={() => setCourseName(course)}
+                                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${courseName === course
+                                            ? 'bg-gradient-to-r from-emerald-500/70 to-teal-500/70 text-white shadow-lg shadow-emerald-500/15'
+                                            : 'bg-black/30 text-slate-300 hover:bg-slate-700 border border-white/10 hover:border-emerald-500/30'
+                                            }`}
+                                    >
+                                        {course}
+                                    </button>
+                                ))}
                             </div>
                         )}
                     </div>
 
-                    {/* Holes Section */}
-                    <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-2xl p-5 border border-white/10 backdrop-blur-sm">
-                        <div className="flex items-center text-slate-400 space-x-2 mb-3">
-                            <div className="w-8 h-8 bg-blue-500/15 rounded-lg flex items-center justify-center">
-                                <Icons.Trophy size={16} className="text-blue-400/80" />
+                    {/* Holes Section - Compact */}
+                    <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-xl p-3.5 border border-white/10 backdrop-blur-sm">
+                        <div className="flex items-center text-slate-400 space-x-2 mb-2">
+                            <div className="w-6 h-6 bg-blue-500/15 rounded-md flex items-center justify-center">
+                                <Icons.Trophy size={14} className="text-blue-400/80" />
                             </div>
-                            <span className="text-sm font-bold uppercase tracking-wider">Holes</span>
+                            <span className="text-xs font-bold uppercase tracking-wider">Holes</span>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-0 bg-black/30 rounded-xl p-1 border border-white/10">
+                        <div className="grid grid-cols-3 gap-0 bg-black/30 rounded-lg p-1 border border-white/10">
                             <button
                                 onClick={() => setLayout('9')}
-                                className={`py-2.5 rounded-lg text-sm font-bold transition-all ${layout === '9' ? 'bg-gradient-to-r from-blue-500/70 to-purple-500/70 text-white shadow-lg shadow-blue-500/15' : 'text-slate-400 hover:text-white'}`}
+                                className={`py-2 rounded-md text-sm font-bold transition-all ${layout === '9' ? 'bg-gradient-to-r from-blue-500/70 to-purple-500/70 text-white shadow-lg shadow-blue-500/15' : 'text-slate-400 hover:text-white'}`}
                             >
                                 9
                             </button>
                             <button
                                 onClick={() => setLayout('18')}
-                                className={`py-2.5 rounded-lg text-sm font-bold transition-all ${layout === '18' ? 'bg-gradient-to-r from-blue-500/70 to-purple-500/70 text-white shadow-lg shadow-blue-500/15' : 'text-slate-400 hover:text-white'}`}
+                                className={`py-2 rounded-md text-sm font-bold transition-all ${layout === '18' ? 'bg-gradient-to-r from-blue-500/70 to-purple-500/70 text-white shadow-lg shadow-blue-500/15' : 'text-slate-400 hover:text-white'}`}
                             >
                                 18
                             </button>
                             <button
                                 onClick={() => setLayout('custom')}
-                                className={`py-2.5 rounded-lg text-sm font-bold transition-all ${layout === 'custom' ? 'bg-gradient-to-r from-blue-500/70 to-purple-500/70 text-white shadow-lg shadow-blue-500/15' : 'text-slate-400 hover:text-white'}`}
+                                className={`py-2 rounded-md text-sm font-bold transition-all ${layout === 'custom' ? 'bg-gradient-to-r from-blue-500/70 to-purple-500/70 text-white shadow-lg shadow-blue-500/15' : 'text-slate-400 hover:text-white'}`}
                             >
                                 Custom
                             </button>
                         </div>
                         {layout === 'custom' && (
-                            <div className="flex items-center justify-between bg-black/30 p-3 rounded-xl border border-white/10 mt-3">
+                            <div className="flex items-center justify-between bg-black/30 p-2.5 rounded-lg border border-white/10 mt-2">
                                 <span className="text-sm text-slate-400">Holes</span>
                                 <input
                                     type="number"
@@ -2542,34 +2551,34 @@ export const Home: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Entry Fee & Stakes Section */}
-                    <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-2xl p-5 border border-white/10 backdrop-blur-sm">
-                        <div className="flex items-center text-slate-400 space-x-2 mb-3">
-                            <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                                <Icons.Zap size={16} className="text-orange-400" />
+                    {/* Entry Fee & Stakes Section - Compact */}
+                    <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-xl p-3.5 border border-white/10 backdrop-blur-sm flex-1 min-h-0 overflow-y-auto">
+                        <div className="flex items-center text-slate-400 space-x-2 mb-2">
+                            <div className="w-6 h-6 bg-orange-500/20 rounded-md flex items-center justify-center">
+                                <Icons.Zap size={14} className="text-orange-400" />
                             </div>
-                            <span className="text-sm font-bold uppercase tracking-wider">Entry Fee & Stakes</span>
+                            <span className="text-xs font-bold uppercase tracking-wider">Entry Fee & Stakes</span>
                         </div>
 
                         {/* Entry Fee Toggle */}
-                        <div className="bg-black/30 rounded-xl p-1 border border-white/10 flex mb-4">
+                        <div className="bg-black/30 rounded-lg p-1 border border-white/10 flex mb-3">
                             <button
                                 onClick={() => setHasEntryFee(true)}
-                                className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${hasEntryFee ? 'bg-gradient-to-r from-orange-500/70 to-amber-500/70 text-white shadow-lg shadow-orange-500/15' : 'text-slate-400 hover:text-white'}`}
+                                className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${hasEntryFee ? 'bg-gradient-to-r from-orange-500/70 to-amber-500/70 text-white shadow-lg shadow-orange-500/15' : 'text-slate-400 hover:text-white'}`}
                             >
                                 Entry Fee
                             </button>
                             <button
                                 onClick={() => setHasEntryFee(false)}
-                                className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${!hasEntryFee ? 'bg-slate-700 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${!hasEntryFee ? 'bg-slate-700 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                             >
                                 No Entry Fee
                             </button>
                         </div>
 
                         {hasEntryFee && (
-                            <div className="space-y-4">
-                                <div className="space-y-2">
+                            <div className="space-y-3">
+                                <div className="space-y-1.5">
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Entry Fee (Sats)</label>
                                     <input
                                         type="text"
@@ -2581,7 +2590,7 @@ export const Home: React.FC = () => {
                                         }}
                                         onFocus={(e) => e.target.select()}
                                         placeholder="0"
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
+                                        className="w-full bg-black/30 border border-white/10 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
                                     />
 
                                     {/* Preset Entry Fee Buttons */}
@@ -2670,7 +2679,7 @@ export const Home: React.FC = () => {
                                     )}
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ace Pot (Sats)</label>
                                     <input
                                         type="text"
@@ -2682,7 +2691,7 @@ export const Home: React.FC = () => {
                                         }}
                                         onFocus={(e) => e.target.select()}
                                         placeholder="0"
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
+                                        className="w-full bg-black/30 border border-white/10 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
                                     />
 
                                     {/* Ace Pot Quick Select */}
@@ -2776,11 +2785,11 @@ export const Home: React.FC = () => {
 
                 </div>
 
-                {/* Next Button */}
-                <div className="mt-6">
+                {/* Next Button - Fixed at bottom */}
+                <div className="mt-3 pt-2 shrink-0">
                     <button
                         onClick={() => setView('select_players')}
-                        className="w-full bg-gradient-to-r from-emerald-500/70 via-teal-500/70 to-cyan-500/70 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/35 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        className="w-full bg-gradient-to-r from-emerald-500/70 via-teal-500/70 to-cyan-500/70 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/35 transition-all hover:scale-[1.02] active:scale-[0.98]"
                     >
                         Next
                     </button>
@@ -2915,6 +2924,7 @@ export const Home: React.FC = () => {
             {/* Header Icons - Top Right */}
             <div className="absolute top-6 right-6 z-10 flex space-x-3">
                 <button
+                    id="tour-help"
                     onClick={() => setShowInfoModal(true)}
                     className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                 >
@@ -2933,8 +2943,14 @@ export const Home: React.FC = () => {
                 <div className="text-center space-y-2">
                     {/* Logo */}
                     <div className="inline-flex items-center justify-center mb-4 relative">
-                        <ActiveLogo size={80} />
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse" />
+                        <div className="p-[2px] rounded-2xl bg-gradient-to-br from-emerald-500/50 to-cyan-500/50 shadow-lg shadow-emerald-500/20">
+                            <img 
+                                src="/icons/icon-512x512.png" 
+                                alt="On-Chain Disc Golf" 
+                                className="w-20 h-20 rounded-xl"
+                            />
+                        </div>
+                        <div className="absolute -top-0 -right-0 w-4 h-4 bg-green-500 rounded-full animate-pulse" />
                     </div>
                     
                     {/* Title - Original styling */}
@@ -2946,9 +2962,6 @@ export const Home: React.FC = () => {
                             <span className="text-white">Disc Golf</span>
                         </div>
                     </h1>
-                    
-                    {/* Original Tagline */}
-                    <p className="text-slate-200 text-base font-medium mt-3">Unstoppable Disc Golf Powered by Unstoppable Money</p>
                 </div>
 
                 <div className="w-full max-w-sm space-y-4 px-4">
@@ -3019,8 +3032,9 @@ export const Home: React.FC = () => {
                     )}
 
                     <button 
+                        id="tour-create-round"
                         onClick={handleCreateRoundClick}
-                        className="w-full bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 text-white font-bold py-4 rounded-xl border border-white/10 backdrop-blur-sm hover:border-emerald-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+                        className="w-full bg-gradient-to-br from-slate-800/90 via-emerald-900/20 to-slate-900/95 text-white font-bold py-4 rounded-xl border border-emerald-500/20 backdrop-blur-sm hover:border-emerald-500/40 hover:from-slate-800/95 hover:via-emerald-900/30 hover:to-slate-900 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-emerald-900/10"
                     >
                         <div className="flex items-center justify-center space-x-2">
                             <Icons.Plus className="text-emerald-400" />
@@ -3028,16 +3042,27 @@ export const Home: React.FC = () => {
                         </div>
                     </button>
 
+                    <button 
+                        onClick={() => setShowLeagueComingSoon(true)}
+                        className="w-full bg-gradient-to-br from-slate-800/90 via-cyan-900/20 to-slate-900/95 text-white font-bold py-4 rounded-xl border border-cyan-500/20 backdrop-blur-sm hover:border-cyan-500/40 hover:from-slate-800/95 hover:via-cyan-900/30 hover:to-slate-900 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-cyan-900/10"
+                    >
+                        <div className="flex items-center justify-center space-x-2">
+                            <Icons.League className="text-cyan-400" />
+                            <span>Join League</span>
+                        </div>
+                    </button>
+
                     <button
+                        id="tour-join-round"
                         onClick={() => {
                             if (handleGuestActionAttempt()) return;
                             setShowPlayerQr(true);
                         }}
-                        className="w-full py-4 px-4 rounded-xl border border-white/10 bg-black/30 backdrop-blur-sm text-white hover:border-emerald-500/30 font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        className="w-full py-4 px-4 rounded-xl bg-gradient-to-br from-slate-800/90 via-amber-900/15 to-slate-900/95 border border-amber-500/20 backdrop-blur-sm text-white hover:border-amber-500/40 hover:from-slate-800/95 hover:via-amber-900/25 hover:to-slate-900 font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-amber-900/10"
                     >
                         <div className="flex items-center justify-center space-x-2">
-                            <Icons.QrCode className="text-emerald-400" />
-                            <span>Scan to Join</span>
+                            <Icons.QrCode className="text-amber-400" />
+                            <span>Join Round</span>
                         </div>
                     </button>
 
@@ -3369,12 +3394,14 @@ export const Home: React.FC = () => {
                         <div className="text-center space-y-4 pt-2">
                             <h3 className="text-xl font-bold text-white">Join My Round</h3>
 
-                            <div className="bg-white p-4 rounded-xl inline-block mx-auto">
-                                <img
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(getPlayerQrData())}`}
-                                    className="w-48 h-48"
-                                    alt="Player QR"
-                                />
+                            <div className="bg-gradient-to-br from-emerald-400 via-cyan-500 to-teal-600 p-1 rounded-2xl shadow-2xl shadow-cyan-500/30 inline-block mx-auto">
+                                <div className="bg-white p-3 rounded-xl">
+                                    <img
+                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(getPlayerQrData())}`}
+                                        className="w-48 h-48"
+                                        alt="Player QR"
+                                    />
+                                </div>
                             </div>
 
                             <div className="flex flex-col items-center justify-center">
@@ -3441,6 +3468,82 @@ export const Home: React.FC = () => {
             )}
             {/* INFO MODAL */}
             <InfoModal isOpen={showInfoModal} onClose={() => setShowInfoModal(false)} />
+
+            {/* GUIDED TOUR */}
+            {showTour && (
+                <GuidedTour
+                    tourId="play-tab"
+                    steps={tourSteps}
+                    onComplete={() => setShowTour(false)}
+                    onSkip={() => setShowTour(false)}
+                />
+            )}
+
+            {/* League Coming Soon Modal */}
+            {showLeagueComingSoon && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 pb-24 bg-black/85 backdrop-blur-md">
+                    <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-cyan-500/20 rounded-3xl shadow-2xl shadow-cyan-500/10 max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
+                        {/* Decorative gradient header */}
+                        <div className="relative bg-gradient-to-br from-cyan-500/20 via-emerald-500/10 to-transparent p-8 pb-6">
+                            <button
+                                onClick={() => setShowLeagueComingSoon(false)}
+                                className="absolute top-4 right-4 p-1.5 rounded-full bg-slate-800/60 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                            >
+                                <Icons.Close size={18} />
+                            </button>
+                            
+                            <div className="flex flex-col items-center text-center">
+                                <div className="w-20 h-20 bg-gradient-to-br from-cyan-500/30 to-emerald-500/30 rounded-2xl flex items-center justify-center mb-4 border border-cyan-500/30 shadow-lg shadow-cyan-500/20">
+                                    <Icons.League size={40} className="text-cyan-400" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-white mb-1">League Play</h2>
+                                <div className="inline-flex items-center px-3 py-1 bg-cyan-500/20 rounded-full border border-cyan-500/30">
+                                    <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Coming Soon</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="px-6 py-5">
+                            <p className="text-slate-300 text-center text-sm leading-relaxed mb-5">
+                                Create and join leagues, track standings, and compete with players across multiple rounds with automated payouts.
+                            </p>
+                            
+                            {/* Feature preview */}
+                            <div className="space-y-2.5 mb-5">
+                                <div className="flex items-center space-x-3 p-2.5 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                                    <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center shrink-0">
+                                        <Icons.Trophy size={16} className="text-emerald-400" />
+                                    </div>
+                                    <span className="text-slate-300 text-sm">Season-long standings</span>
+                                </div>
+                                <div className="flex items-center space-x-3 p-2.5 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                                    <div className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center shrink-0">
+                                        <Icons.Zap size={16} className="text-amber-400" />
+                                    </div>
+                                    <span className="text-slate-300 text-sm">Auto Bitcoin payouts</span>
+                                </div>
+                                <div className="flex items-center space-x-3 p-2.5 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                                    <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center shrink-0">
+                                        <Icons.Users size={16} className="text-purple-400" />
+                                    </div>
+                                    <span className="text-slate-300 text-sm">Invite friends to compete</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 pb-6">
+                            <button 
+                                onClick={() => setShowLeagueComingSoon(false)}
+                                className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-emerald-500 text-white font-bold rounded-xl hover:from-cyan-400 hover:to-emerald-400 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-cyan-500/25"
+                            >
+                                Got it!
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -87,6 +87,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <RoundSummaryModal
             isOpen={roundSummary.isOpen}
             onClose={() => setRoundSummary(null)}
+            onDone={() => navigate('/')}
             roundName={roundSummary.roundName}
             standings={roundSummary.standings}
             payouts={roundSummary.payouts}

@@ -189,13 +189,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [contacts, setContacts] = useState<DisplayProfile[]>([]);
 
-  // Nostr Data
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    name: 'Disc Golfer',
-    about: '',
-    picture: '',
-    lud16: '',
-    nip05: ''
+  // Nostr Data - Load from localStorage first, then fetch from Nostr
+  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
+    const saved = localStorage.getItem('cdg_user_profile');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.warn("Failed to parse saved profile", e);
+      }
+    }
+    return {
+      name: 'Disc Golfer',
+      about: '',
+      picture: '',
+      lud16: '',
+      nip05: ''
+    };
   });
   const [activeRound, setActiveRound] = useState<RoundSettings | null>(() => {
     const saved = localStorage.getItem('cdg_active_round');
@@ -446,13 +456,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.log(`⚡ Your Lightning Address: ${lightningAddress}`);
       console.log(`📡 Your Pubkey: ${currentUserPubkey}`);
 
-      // 1. Fetch Profile
+      // 1. Fetch Profile (remote fetch may update local cache)
       fetchProfile(currentUserPubkey).then(profile => {
         if (profile) {
-          console.log("Profile loaded:", profile);
+          console.log("Profile loaded from Nostr:", profile);
           setUserProfile(profile);
+          // Update localStorage with the latest from Nostr
+          localStorage.setItem('cdg_user_profile', JSON.stringify(profile));
         } else {
-          setUserProfile(prev => ({ ...prev, name: 'Nostr User', picture: '', lud16: '', nip05: '' }));
+          // Only set default if we don't have a local profile
+          const savedProfile = localStorage.getItem('cdg_user_profile');
+          if (!savedProfile) {
+            setUserProfile(prev => ({ ...prev, name: 'Nostr User', picture: '', lud16: '', nip05: '' }));
+          }
         }
       }).catch(e => {
         console.error("Error fetching profile in effect:", e);
@@ -1156,11 +1172,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('cdg_auth_method');
     localStorage.removeItem('cdg_wallet_mode');
     localStorage.removeItem('cdg_nwc_string');
+    localStorage.removeItem('cdg_user_profile');
 
     setIsAuthenticated(false);
     setAuthMethod(null);
     setCurrentUserPubkey('');
-    setUserProfile({ name: 'Guest', picture: '' });
+    setUserProfile({ name: 'Guest', picture: '', about: '', lud16: '', nip05: '' });
 
     // Reset Wallet Mode
     setWalletMode('cashu');
@@ -1279,6 +1296,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateUserProfile = async (profile: UserProfile) => {
     setUserProfile(profile);
+    // Persist to localStorage immediately for instant access on page navigation
+    localStorage.setItem('cdg_user_profile', JSON.stringify(profile));
     try {
       await publishProfile(profile);
     } catch (e) {
@@ -1486,10 +1505,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const finalizeRound = async () => {
     if (!activeRound) return;
+    if (players.length === 0) {
+      console.warn('Cannot finalize round with no players');
+      return;
+    }
 
-    const sortedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
+    const sortedPlayers = [...players].sort((a, b) => (a.totalScore || 0) - (b.totalScore || 0));
     const winner = sortedPlayers[0];
-    const potSize = activeRound.entryFeeSats * players.length;
+    const potSize = (activeRound.entryFeeSats || 0) * players.length;
     const prize = Math.floor(potSize * 0.8); // 80% payout
     const acePotAmount = activeRound.acePotFeeSats ? activeRound.acePotFeeSats * players.length : 0;
     // Calculate par dynamically: 3 strokes per hole
@@ -1498,7 +1521,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Detect aces (score of 1 on any hole)
     const aceWinners: { name: string; hole: number }[] = [];
     players.forEach(player => {
-      Object.entries(player.scores).forEach(([hole, score]) => {
+      Object.entries(player.scores || {}).forEach(([hole, score]) => {
         if (score === 1) {
           aceWinners.push({ name: player.name, hole: parseInt(hole) });
         }
@@ -1508,21 +1531,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Show the round summary modal IMMEDIATELY with processing state
     setRoundSummary({
       isOpen: true,
-      roundName: activeRound.name,
+      roundName: activeRound.name || 'Round',
       standings: sortedPlayers,
       payouts: [], // Empty initially
       aceWinners,
       acePotAmount,
       totalPot: potSize,
       par,
-      isProcessingPayments: prize > 0 && !winner.isCurrentUser
+      isProcessingPayments: prize > 0 && winner && !winner.isCurrentUser
     });
 
     // Track payouts for summary
     const payoutsMade: { playerName: string; amount: number; isCurrentUser: boolean }[] = [];
 
     // Pay main pot (async, modal already showing)
-    if (prize > 0) {
+    if (prize > 0 && winner) {
       if (winner.isCurrentUser) {
         // I won, I keep the pot (which I already hold as host)
         addTransaction('payout', prize, `Won Round: ${activeRound.name}`);
@@ -1579,7 +1602,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Pay ace pot if someone got an ace
     if (aceWinners.length > 0 && acePotAmount > 0) {
       const aceWinner = players.find(p => 
-        Object.values(p.scores).includes(1)
+        p.scores && Object.values(p.scores).includes(1)
       );
       if (aceWinner) {
         const aceShare = Math.floor(acePotAmount / aceWinners.length);

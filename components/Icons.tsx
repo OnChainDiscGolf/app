@@ -41,7 +41,10 @@ import {
   MessageSquare,
   Send,
   CreditCard,
-  Link2
+  Link2,
+  Gem,
+  Trophy as LucideTrophy,
+  UsersRound
 } from 'lucide-react';
 
 // Custom Disc Golf Basket Icon matching Lucide style
@@ -210,7 +213,8 @@ const Cashew = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number,
 );
 
 export const Icons = {
-  Trophy: Basket, // Replaced Trophy with Basket
+  Trophy: Basket, // Basket icon for disc golf context
+  TrophyMedal: LucideTrophy, // Actual trophy icon for wins
   Wallet,
   Plus: PlusCircle,
   PlusIcon: Plus,
@@ -259,4 +263,6 @@ export const Icons = {
   Link: Link2,
   Cashew,
   AlertTriangle,
+  Diamond: Gem,
+  League: UsersRound,
 };
