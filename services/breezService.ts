@@ -645,6 +645,10 @@ export const createInvoice = async (
 /**
  * Pay a Bolt11 invoice
  * 
+ * Uses the two-step Breez SDK Spark payment flow:
+ * 1. prepareSendPayment() - validates and prepares the payment
+ * 2. sendPayment() - executes the prepared payment
+ * 
  * @param bolt11 - Lightning invoice string
  */
 export const payInvoice = async (bolt11: string): Promise<BreezPaymentResult> => {
@@ -658,9 +662,22 @@ export const payInvoice = async (bolt11: string): Promise<BreezPaymentResult> =>
     try {
         console.log(`⚡ Paying invoice: ${bolt11.substring(0, 30)}...`);
         
-        const result = await sdkInstance.sendPayment({
-            bolt11
+        // Step 1: Prepare the payment (required by Breez SDK Spark)
+        // This validates the invoice and calculates fees
+        // Note: Breez SDK Spark uses 'paymentRequest' field name for bolt11 invoices
+        console.log('📋 Preparing payment...');
+        const prepareResponse = await sdkInstance.prepareSendPayment({
+            paymentRequest: bolt11
         });
+        
+        console.log('✅ Payment prepared, executing...');
+        
+        // Step 2: Execute the payment with the prepare response
+        const result = await sdkInstance.sendPayment({
+            prepareResponse
+        });
+        
+        console.log('✅ Payment sent successfully');
         
         return {
             success: true,
@@ -679,6 +696,9 @@ export const payInvoice = async (bolt11: string): Promise<BreezPaymentResult> =>
 
 /**
  * Pay to a Lightning address (LNURL-pay)
+ * 
+ * Uses HTTP-based LNURL resolution since sdkInstance.parseInput() is not available
+ * in the Breez SDK Spark. Flow: resolve address -> get invoice -> pay invoice.
  * 
  * @param lightningAddress - Address like user@domain.com
  * @param amountSats - Amount in satoshis
@@ -699,29 +719,41 @@ export const payLightningAddress = async (
     try {
         console.log(`⚡ Paying ${amountSats} sats to ${lightningAddress}`);
         
-        // First resolve the lightning address to get LNURL data
-        const lnurlData = await sdkInstance.parseInput(lightningAddress);
-        
-        if (!lnurlData || lnurlData.type !== 'lnUrlPay') {
+        // Step 1: Resolve lightning address to get LNURL callback
+        const resolved = await resolveLightningAddress(lightningAddress);
+        if (!resolved) {
             return {
                 success: false,
-                error: 'Invalid lightning address'
+                error: 'Failed to resolve lightning address'
             };
         }
         
-        // Pay via LNURL
-        const result = await sdkInstance.lnurlPay({
-            data: lnurlData.data,
-            amountMsat: amountSats * 1000,
-            comment: comment || undefined
-        });
+        // Step 2: Validate amount bounds
+        if (amountSats < resolved.minSendable) {
+            return {
+                success: false,
+                error: `Amount ${amountSats} below minimum ${resolved.minSendable} sats`
+            };
+        }
+        if (amountSats > resolved.maxSendable) {
+            return {
+                success: false,
+                error: `Amount ${amountSats} above maximum ${resolved.maxSendable} sats`
+            };
+        }
         
-        return {
-            success: true,
-            paymentHash: result.data?.paymentHash,
-            preimage: result.data?.preimage,
-            feeSats: Math.floor((result.data?.feeMsat || 0) / 1000)
-        };
+        // Step 3: Get bolt11 invoice from LNURL callback
+        const bolt11 = await getInvoiceFromLnurl(resolved.callback, amountSats, comment);
+        if (!bolt11) {
+            return {
+                success: false,
+                error: 'Failed to get invoice from lightning address'
+            };
+        }
+        
+        // Step 4: Pay the invoice using SDK
+        return payInvoice(bolt11);
+        
     } catch (error) {
         console.error('Lightning address payment failed:', error);
         return {
