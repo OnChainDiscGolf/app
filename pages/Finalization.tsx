@@ -9,15 +9,15 @@
  * 5. Sync with Nostr network
  * 6. Initialize Breez Lightning wallet (background, non-blocking)
  * 
- * Shows KeypairFormingAnimation while tasks complete.
- * If tasks take longer than animation, shows sparkle overlay.
+ * Shows AccountCreatedAnimation (reverse of logout animation) while tasks complete.
+ * Animation is quick (~2s) to match the faster initialization process.
  */
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useApp } from '../context/AppContext';
-import { KeypairFormingWithSparkles } from '../KeypairAnimations';
+import { AccountCreatedAnimation } from '../KeypairAnimations';
 import { 
     storeMnemonicEncrypted, 
     setAuthSource, 
@@ -25,11 +25,6 @@ import {
 } from '../services/mnemonicService';
 import { 
     publishProfileWithKey,
-    fetchContactList,
-    fetchProfilesBatch,
-    fetchRecentPlayers,
-    fetchWalletBackup,
-    fetchHistoricalGiftWraps,
     publishWalletBackup
 } from '../services/nostrService';
 import { registerWithAllGateways } from '../services/npubCashService';
@@ -39,9 +34,6 @@ import {
     registerLightningAddress
 } from '../services/breezService';
 import { UserProfile } from '../types';
-
-// Animation duration before sparkles appear (ms)
-const ANIMATION_DURATION = 2500;
 
 export const Finalization: React.FC = () => {
     const navigate = useNavigate();
@@ -55,22 +47,9 @@ export const Finalization: React.FC = () => {
         initializeSubscriptions
     } = useApp();
     
-    const [showSparkles, setShowSparkles] = useState(false);
     const [isComplete, setIsComplete] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const hasStarted = useRef(false);
-    const tasksComplete = useRef(false);
-
-    // Show sparkles if animation ends but tasks aren't done
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (!tasksComplete.current) {
-                setShowSparkles(true);
-            }
-        }, ANIMATION_DURATION);
-
-        return () => clearTimeout(timer);
-    }, []);
 
     useEffect(() => {
         if (!identity || hasStarted.current) return;
@@ -140,57 +119,22 @@ export const Finalization: React.FC = () => {
                 // =====================================================
                 console.log('💰 [Finalization] Initializing wallet...');
 
-                // Check for existing backup (unlikely for new user, but handle recovery)
-                const existingBackup = await fetchWalletBackup(identity.publicKey);
-                if (existingBackup) {
-                    console.log('📦 [Finalization] Found existing wallet backup, restoring...');
-                    restoreWalletFromBackup(existingBackup);
-                } else {
-                    // Create initial empty backup
-                    console.log('📦 [Finalization] Creating initial wallet backup...');
-                    await publishWalletBackup([], [], [], []);
-                }
+                // New user flow - no existing backup possible, publish empty backup directly
+                console.log('📦 [Finalization] Creating initial wallet backup...');
+                await publishWalletBackup([], [], [], []);
 
                 console.log('✅ [Finalization] Wallet initialized');
 
                 // =====================================================
-                // TASK 5: Sync with Nostr Network
+                // TASK 5: Initialize Real-time Subscriptions
                 // =====================================================
-                console.log('🔄 [Finalization] Syncing with network...');
-
-                // Fetch contacts
-                try {
-                    const contactPubkeys = await fetchContactList(identity.publicKey);
-                    if (contactPubkeys.length > 0) {
-                        const profiles = await fetchProfilesBatch(contactPubkeys);
-                        setContactsState(profiles);
-                    }
-                } catch (e) {
-                    console.warn('⚠️ [Finalization] Contact fetch failed:', e);
-                }
-
-                // Fetch recent players
-                try {
-                    const recentPlayers = await fetchRecentPlayers(identity.publicKey);
-                    if (recentPlayers && recentPlayers.length > 0) {
-                        setRecentPlayersState(recentPlayers);
-                    }
-                } catch (e) {
-                    console.warn('⚠️ [Finalization] Recent players fetch failed:', e);
-                }
-
-                // Check for missed payments (last 7 days)
-                try {
-                    const sevenDaysAgo = Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60);
-                    await fetchHistoricalGiftWraps(identity.publicKey, sevenDaysAgo);
-                } catch (e) {
-                    console.warn('⚠️ [Finalization] Historical payment check failed:', e);
-                }
-
-                // Initialize real-time subscriptions
+                // Note: We skip fetching contacts, recent players, and historical payments
+                // because this is a brand new keypair - there's nothing to fetch.
+                // These will be populated naturally as the user plays rounds and adds contacts.
+                console.log('🔄 [Finalization] Setting up real-time subscriptions...');
                 initializeSubscriptions(identity.publicKey);
 
-                console.log('✅ [Finalization] Network sync complete');
+                console.log('✅ [Finalization] Subscriptions initialized');
 
                 // =====================================================
                 // TASK 6: Initialize Breez Lightning Wallet (Background)
@@ -235,7 +179,6 @@ export const Finalization: React.FC = () => {
                 // =====================================================
                 // COMPLETE: Update Auth State and Navigate
                 // =====================================================
-                tasksComplete.current = true;
                 
                 // Update app auth state
                 setAuthState({
@@ -260,7 +203,6 @@ export const Finalization: React.FC = () => {
             } catch (e) {
                 console.error('❌ [Finalization] Error:', e);
                 setError(e instanceof Error ? e.message : 'An unexpected error occurred');
-                tasksComplete.current = true;
             }
         };
 
@@ -268,7 +210,8 @@ export const Finalization: React.FC = () => {
     }, [identity, profile, navigate, clearOnboarding, setAuthState, setUserProfileState, setContactsState, setRecentPlayersState, restoreWalletFromBackup, initializeSubscriptions]);
 
     // Redirect if no identity (shouldn't happen in normal flow)
-    if (!identity) {
+    // Don't show error if finalization has already started - identity may be cleared by clearOnboarding()
+    if (!identity && !hasStarted.current) {
         return (
             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-b from-brand-dark via-slate-900 to-black">
                 <div className="text-red-400 text-center p-6">
@@ -308,8 +251,8 @@ export const Finalization: React.FC = () => {
         );
     }
 
-    // Show the keypair forming animation with optional sparkles
-    return <KeypairFormingWithSparkles showSparkles={showSparkles} isComplete={isComplete} />;
+    // Show the account created animation (reverse of logout animation)
+    return <AccountCreatedAnimation isComplete={isComplete} />;
 };
 
 export default Finalization;

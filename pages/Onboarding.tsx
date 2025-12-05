@@ -150,7 +150,7 @@ export const Onboarding: React.FC = () => {
     return (
         <div className="min-h-screen bg-brand-dark flex flex-col">
                 {/* Header */}
-            <div className="bg-slate-900/80 backdrop-blur-md border-b border-white/5 p-4">
+            <div className="bg-slate-900/80 backdrop-blur-md p-4">
                 <div className="max-w-md mx-auto text-center">
                     <p className="golden-shimmer text-base mb-2 font-semibold">Welcome to..</p>
                     <h1 className="font-extrabold tracking-tight leading-tight">
@@ -171,7 +171,7 @@ export const Onboarding: React.FC = () => {
                             {/* Disc Golf */}
                                 <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ${activeIcon === 0 ? 'opacity-100' : 'opacity-0'}`}>
                                     <div className="w-24 h-24 bg-brand-primary/20 rounded-full flex items-center justify-center border-2 border-brand-primary shadow-[0_0_30px_rgba(45,212,191,0.3)]">
-                                        <Icons.Trophy className="text-brand-primary" size={48} strokeWidth={2} />
+                                        <Icons.Trophy className="text-brand-primary" size={60} strokeWidth={1.5} />
                                     </div>
                                 </div>
 
