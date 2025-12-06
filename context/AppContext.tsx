@@ -10,7 +10,9 @@ import {
     isBreezInitialized, 
     getBreezBalance, 
     subscribeToPayments as subscribeToBreezEvents,
-    disconnectBreez 
+    disconnectBreez,
+    getPaymentHistory,
+    syncBreez
 } from '../services/breezService';
 import { checkPendingPayments, NpubCashQuote, subscribeToQuoteUpdates, unsubscribeFromQuoteUpdates, getQuoteById, registerWithAllGateways, checkGatewayRegistration, subscribeToAllGatewayUpdates } from '../services/npubCashService';
 import { checkGatewayRegistration as getGatewayRegistrations } from '../services/npubCashService';
@@ -120,6 +122,9 @@ interface AppContextType extends AppState {
   setRecentPlayersState: (players: DisplayProfile[]) => void;
   restoreWalletFromBackup: (backup: { proofs: Proof[]; mints: Mint[]; transactions: WalletTransaction[] }) => void;
   initializeSubscriptions: (pubkey: string) => void;
+  
+  // Resume/foreground reconciliation
+  reconcileOnResume: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -678,18 +683,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   (payment) => {
                     const amountSats = payment.amountSats;
                     console.log(`⚡ Received ${amountSats} sats via Breez!`);
-                    
-                    // Show lightning strike animation
-                    setLightningStrike({ amount: amountSats, show: true });
-                    
-                    // Refresh balances
-                    refreshAllBalances();
+                    handleIncomingPayment('breez', amountSats, 'Received via Breez Lightning');
                   },
                   // On payment sent
                   (payment) => {
-                    console.log(`⚡ Sent ${payment.amountSats} sats via Breez`);
-                    // Refresh balances after sending
-                    refreshAllBalances();
+                    const amountSats = payment.amountSats;
+                    console.log(`⚡ Sent ${amountSats} sats via Breez`);
+                    
+                    if (amountSats && amountSats > 0) {
+                      // Record transaction in history
+                      addTransaction('send', amountSats, 'Sent via Breez Lightning', 'breez');
+                      
+                      // Refresh balances after sending
+                      refreshAllBalances();
+                    }
                   }
                 );
                 
@@ -817,7 +824,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 if (success) {
                   console.log("Auto-redeemed token from Gift Wrap!");
                   // Notify user (could add a toast here later)
-                  addTransaction('receive', 0, 'Received via Lightning Bridge', 'cashu'); // Amount will be updated by receiveEcash logic if we tracked it better, but for now this logs the event.
+                  handleIncomingPayment('cashu', 0, 'Received via Lightning Bridge'); // Guarded against zero in handler
                   // Actually receiveEcash updates the proofs, so balance updates automatically.
                 }
               } catch (e) {
@@ -855,7 +862,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               console.log(`⚡ Lightning nutzap received: ${amount} sats`);
 
               // Add transaction and show notification
-              addTransaction('receive', amount, 'Received via Lightning Zap', 'cashu');
+              handleIncomingPayment('cashu', amount, 'Received via Lightning Zap');
               setPaymentNotification({ amount, context: 'wallet_receive' });
               setLightningStrike({ amount, show: true });
 
@@ -900,7 +907,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     console.log("Auto-redeemed token from Lightning gift-wrap!");
                     // Extract amount from token if possible
                     const amount = 0; // TODO: Extract amount from token
-                    addTransaction('receive', amount, 'Received via Lightning Gateway', 'cashu');
+                    handleIncomingPayment('cashu', amount, 'Received via Lightning Gateway');
                     setPaymentNotification({ amount: amount || 0, context: 'wallet_receive' });
                   }
                 } catch (e) {
@@ -1025,7 +1032,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.setItem(processedKey, Date.now().toString());
 
             // Add transaction record
-            addTransaction('receive', quote.amount, `Received via ${gateway}`, 'cashu');
+            handleIncomingPayment('cashu', quote.amount, `Received via ${gateway}`);
 
             // Trigger lightning strike notification
             setLightningStrike({ amount: quote.amount, show: true });
@@ -1372,16 +1379,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     console.log('🔄 [Finalization] Subscriptions will be initialized by existing effects');
   }, []);
 
-  const addTransaction = (type: WalletTransaction['type'], amount: number, description: string, walletType?: 'cashu' | 'nwc') => {
+  const addTransaction = (
+    type: WalletTransaction['type'],
+    amount: number,
+    description: string,
+    walletType?: 'cashu' | 'nwc' | 'breez',
+    options?: { id?: string; timestamp?: number; status?: 'pending' | 'complete' | 'failed' }
+  ) => {
+    if (!amount || amount <= 0) return;
+
+    const txId = options?.id || Date.now().toString();
+    const ts = options?.timestamp || Date.now();
+    const status = options?.status || 'complete';
+
     const tx: WalletTransaction = {
-      id: Date.now().toString(),
+      id: txId,
       type,
       amountSats: amount,
       description,
-      timestamp: Date.now(),
-      walletType: walletType || walletMode // Default to current mode if not specified
+      timestamp: ts,
+      walletType: walletType || walletMode, // Default to current mode if not specified
+      status
     };
-    setTransactions(prev => [tx, ...prev]);
+    setTransactions(prev => {
+      // Dedupe by id
+      if (prev.some(t => t.id === txId)) return prev;
+      return [tx, ...prev];
+    });
   };
 
   const refreshStats = async () => {
@@ -1866,7 +1890,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               console.log(`Auto-claimed npub.cash payment!`);
 
               // Add transaction record
-              addTransaction('receive', quote.amount, 'Received via npub.cash', 'cashu');
+              handleIncomingPayment('cashu', quote.amount, 'Received via npub.cash');
               alert(`Successfully received ${quote.amount} sats from npub.cash!`);
             }
           } catch (e) {
@@ -2074,7 +2098,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Refresh all wallet balances (for cumulative "All Wallets" view)
-  const refreshAllBalances = async () => {
+  const refreshAllBalances = useCallback(async () => {
     setIsBalanceLoading(true);
     console.log("🔄 Refreshing all wallet balances...");
     
@@ -2127,7 +2151,104 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     console.log(`📊 Total balance across all wallets: ${total} sats`);
     
     setIsBalanceLoading(false);
-  };
+  }, [walletMode, nwcString, proofs]);
+
+  /**
+   * Central handler for incoming payments across wallets.
+   * Adds transaction, triggers animation/notification, refreshes balances.
+   */
+  const handleIncomingPayment = useCallback((walletType: 'cashu' | 'nwc' | 'breez', amount: number, description: string) => {
+    if (!amount || amount <= 0) return;
+    addTransaction('receive', amount, description, walletType);
+    setLightningStrike({ amount, show: true });
+    setPaymentNotification({ amount, context: 'wallet_receive' });
+    refreshAllBalances();
+  }, [refreshAllBalances]);
+
+  /**
+   * Reconcile Breez payments by syncing, listing payments, and backfilling any
+   * missing transactions. Triggers lightning animation for newly detected
+   * incoming payments.
+   */
+  const reconcileBreezPayments = useCallback(async () => {
+    if (!isBreezInitialized()) return;
+
+    try {
+      await syncBreez();
+      const history = await getPaymentHistory();
+      if (!history || history.length === 0) return;
+
+      let latestReceive: { amount: number; timestamp: number } | null = null;
+
+      setTransactions(prev => {
+        const existingIds = new Set(prev.map(t => t.id));
+        const toAdd: WalletTransaction[] = [];
+
+        for (const p of history) {
+          if (!p) continue;
+          if (p.status === 'failed') continue;
+          if (!p.amountSats || p.amountSats <= 0) continue;
+
+          const txId = `breez-${p.id}`;
+          if (existingIds.has(txId)) continue;
+
+          const ts = Math.floor(p.timestamp || Date.now() / 1000);
+          const tx: WalletTransaction = {
+            id: txId,
+            type: p.paymentType === 'receive' ? 'receive' : 'send',
+            amountSats: p.amountSats,
+            description: p.paymentType === 'receive' ? 'Received via Breez Lightning' : 'Sent via Breez Lightning',
+            timestamp: ts,
+            walletType: 'breez' as const
+          };
+
+          toAdd.push(tx);
+
+          if (tx.type === 'receive') {
+            if (!latestReceive || ts > latestReceive.timestamp) {
+              latestReceive = { amount: tx.amountSats, timestamp: ts };
+            }
+          }
+        }
+
+        if (toAdd.length === 0) return prev;
+
+        const next = [...toAdd, ...prev];
+        next.sort((a, b) => b.timestamp - a.timestamp);
+        return next;
+      });
+
+      if (latestReceive) {
+        setLightningStrike({ amount: latestReceive.amount, show: true });
+        setPaymentNotification({ amount: latestReceive.amount, context: 'wallet_receive' });
+        await refreshAllBalances();
+      }
+    } catch (e) {
+      console.warn("Breez reconciliation failed:", e);
+    }
+  }, [refreshAllBalances]);
+
+  // Run Breez reconciliation on mount and whenever Breez balance changes
+  useEffect(() => {
+    reconcileBreezPayments();
+  }, [walletBalances.breez, reconcileBreezPayments]);
+
+  /**
+   * Full reconciliation on app resume/foreground.
+   * Syncs Breez, backfills missed payments, and refreshes all balances.
+   */
+  const reconcileOnResume = useCallback(async () => {
+    console.log('🔄 [Resume] Running full wallet reconciliation...');
+    try {
+      // Refresh all wallet balances first
+      await refreshAllBalances();
+      // Reconcile Breez payments (sync + diff)
+      await reconcileBreezPayments();
+      console.log('✅ [Resume] Reconciliation complete');
+    } catch (e) {
+      console.warn('⚠️ [Resume] Reconciliation error:', e);
+    }
+  }, [refreshAllBalances, reconcileBreezPayments]);
 
   const depositFunds = async (amount: number): Promise<{ request: string, quote: string }> => {
     if (walletMode === 'nwc') {
@@ -2160,7 +2281,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (walletMode === 'nwc') {
       // For NWC, if confirmed, we just refresh balance and add tx
       await refreshWalletBalance();
-      addTransaction('receive', amount, 'Received via NWC');
+      handleIncomingPayment('nwc', amount, 'Received via NWC');
       return true;
     }
 
@@ -2196,6 +2317,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const sendFunds = async (amount: number, invoice: string): Promise<boolean> => {
+    // Guard: Breez wallet should use its own send functions in Wallet.tsx
+    if (walletMode === 'breez') {
+      console.error('sendFunds called while in Breez mode - this should use Breez-specific functions');
+      throw new Error('Use Breez wallet send functions when in Breez mode');
+    }
+
     if (walletMode === 'nwc') {
       if (!nwcServiceRef.current) throw new Error("NWC not connected");
       try {
@@ -2510,7 +2637,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setContactsState,
       setRecentPlayersState,
       restoreWalletFromBackup,
-      initializeSubscriptions
+      initializeSubscriptions,
+      reconcileOnResume
     }}>
       {children}
     </AppContext.Provider>

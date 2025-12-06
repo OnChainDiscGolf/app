@@ -905,6 +905,14 @@ export const getInvoiceFromLnurl = async (
 
 /**
  * Get payment history
+ * 
+ * Note: listPayments() may return different structures depending on SDK version.
+ * We handle both array and object ({ payments: [...] }) responses.
+ * 
+ * Breez SDK Spark Payment object has:
+ * - direction: 'incoming' | 'outgoing'
+ * - amountMsat: number
+ * - paymentHash or id: string
  */
 export const getPaymentHistory = async (): Promise<BreezPayment[]> => {
     if (!isInitialized || !sdkInstance) {
@@ -913,18 +921,115 @@ export const getPaymentHistory = async (): Promise<BreezPayment[]> => {
     }
 
     try {
-        const payments = await sdkInstance.listPayments({});
-        return payments.map((p: any) => ({
-            id: p.id || p.paymentHash,
-            paymentType: p.paymentType === 'sent' ? 'send' : 'receive',
-            amountSats: Math.floor((p.amountMsat || 0) / 1000),
-            feeSats: Math.floor((p.feeMsat || 0) / 1000),
-            timestamp: p.paymentTime || Date.now() / 1000,
-            description: p.description,
-            bolt11: p.bolt11,
-            preimage: p.preimage,
-            status: p.status === 'complete' ? 'complete' : p.status === 'failed' ? 'failed' : 'pending'
-        }));
+        console.log('📜 [Breez] Fetching payment history...');
+        const result = await sdkInstance.listPayments({});
+        
+        // Handle different response structures from Breez Spark SDK
+        const payments = Array.isArray(result) 
+            ? result 
+            : (result?.payments || result?.data || []);
+        
+        if (!Array.isArray(payments)) {
+            console.warn('listPayments returned unexpected format:', typeof result, result);
+            return [];
+        }
+        
+        console.log(`📜 [Breez] Found ${payments.length} payments in history`);
+        
+        // Log first payment for debugging structure (handle BigInt)
+        if (payments.length > 0) {
+            const sample = payments[0];
+            // Log all keys to understand the structure
+            console.log('📜 [Breez] Sample payment keys:', Object.keys(sample));
+            // Breez SDK Spark uses: id, paymentType, status, amount, fees, timestamp, method, details
+            const amountVal = typeof sample.amount === 'bigint' ? sample.amount.toString() : sample.amount;
+            const feesVal = typeof sample.fees === 'bigint' ? sample.fees.toString() : sample.fees;
+            console.log('📜 [Breez] Sample payment:', {
+                id: sample.id,
+                paymentType: sample.paymentType,
+                status: sample.status,
+                amount: amountVal,
+                fees: feesVal,
+                timestamp: sample.timestamp,
+                method: sample.method
+            });
+        }
+        
+        return payments.map((p: any) => {
+            // Breez SDK Spark uses 'paymentType' field: 'sent' or 'received'
+            const paymentTypeRaw = (p.paymentType || '').toLowerCase();
+            const isReceive = paymentTypeRaw === 'received' || paymentTypeRaw === 'receive' || paymentTypeRaw === 'incoming';
+            
+            // Breez SDK Spark uses 'amount' (in sats) not 'amountMsat'
+            // Handle BigInt values
+            const rawAmount = p.amount ?? p.amountMsat ?? 0;
+            const rawFees = p.fees ?? p.feeMsat ?? 0;
+            
+            // Convert BigInt to number if needed
+            let amountSats: number;
+            let feeSats: number;
+            
+            if (typeof rawAmount === 'bigint') {
+                // If it's BigInt, it might be in msats or sats - check magnitude
+                // If > 1 million, probably msats
+                if (rawAmount > BigInt(1000000)) {
+                    amountSats = Number(rawAmount / BigInt(1000));
+                } else {
+                    amountSats = Number(rawAmount);
+                }
+            } else {
+                // If it's a regular number
+                const numAmount = Number(rawAmount) || 0;
+                // If > 1 million, probably msats
+                if (numAmount > 1000000) {
+                    amountSats = Math.floor(numAmount / 1000);
+                } else {
+                    amountSats = numAmount;
+                }
+            }
+            
+            if (typeof rawFees === 'bigint') {
+                if (rawFees > BigInt(1000000)) {
+                    feeSats = Number(rawFees / BigInt(1000));
+                } else {
+                    feeSats = Number(rawFees);
+                }
+            } else {
+                const numFees = Number(rawFees) || 0;
+                if (numFees > 1000000) {
+                    feeSats = Math.floor(numFees / 1000);
+                } else {
+                    feeSats = numFees;
+                }
+            }
+            
+            // Handle timestamp (may also be BigInt)
+            const rawTimestamp = p.timestamp || p.paymentTime || Date.now() / 1000;
+            const timestamp = typeof rawTimestamp === 'bigint' 
+                ? Number(rawTimestamp) 
+                : rawTimestamp;
+            
+            // Status mapping
+            const statusRaw = (p.status || '').toLowerCase();
+            let status: 'pending' | 'complete' | 'failed' = 'complete';
+            if (statusRaw.includes('pend')) {
+                status = 'pending';
+            } else if (statusRaw.includes('fail')) {
+                status = 'failed';
+            }
+            
+            return {
+                id: p.id || p.paymentHash || `payment-${Date.now()}`,
+                paymentType: isReceive ? 'receive' : 'send',
+                amountSats,
+                feeSats,
+                timestamp,
+                description: p.description || p.memo || p.details?.description,
+                bolt11: p.bolt11 || p.invoice || p.details?.bolt11,
+                preimage: p.preimage || p.details?.preimage,
+                status
+            };
+        });
     } catch (error) {
         console.error('Failed to get payment history:', error);
         return [];
@@ -938,6 +1043,10 @@ export const getPaymentHistory = async (): Promise<BreezPayment[]> => {
 /**
  * Sync wallet state
  * Call this when app comes to foreground
+ * 
+ * Note: Breez Spark SDK doesn't have a standalone .sync() method.
+ * Syncing is done via getInfo({ ensureSynced: true }) per the docs:
+ * https://sdk-doc-spark.breez.technology/guide/get_info.html
  */
 export const syncBreez = async (): Promise<void> => {
     if (!isInitialized || !sdkInstance) {
@@ -945,7 +1054,8 @@ export const syncBreez = async (): Promise<void> => {
     }
 
     try {
-        await sdkInstance.sync();
+        // Breez Spark SDK syncs via getInfo with ensureSynced flag
+        await sdkInstance.getInfo({ ensureSynced: true });
         console.log('🔄 Breez wallet synced');
     } catch (error) {
         console.warn('Failed to sync Breez wallet:', error);
@@ -954,6 +1064,20 @@ export const syncBreez = async (): Promise<void> => {
 
 /**
  * Subscribe to payment events
+ * 
+ * Breez SDK Spark event types (per documentation):
+ * - 'synced': Wallet synchronized with network
+ * - 'dataSynced': Data pushed/pulled to/from real-time sync storage
+ * - 'unclaimedDeposits': SDK unable to claim some deposits
+ * - 'claimedDeposits': Deposits successfully claimed
+ * - 'paymentSucceeded': Payment completed successfully
+ * - 'paymentPending': Payment is pending
+ * - 'paymentFailed': Payment failed
+ * 
+ * Payment object has:
+ * - amountMsat: Amount in millisatoshis
+ * - direction: 'incoming' or 'outgoing'
+ * - paymentType: Type of payment
  * 
  * @param onPaymentReceived - Callback when payment is received
  * @param onPaymentSent - Callback when payment is sent
@@ -967,41 +1091,212 @@ export const subscribeToPayments = (
         return () => { };
     }
 
+    console.log('🔔 Setting up Breez SDK event listener...');
+
+    /**
+     * Map Breez SDK Spark payment object to our BreezPayment shape.
+     * Handles BigInt values from the SDK.
+     * 
+     * Breez SDK Spark payment structure:
+     * - id, paymentType, status, amount, fees, timestamp, method, details
+     */
+    const mapPaymentToBreezPayment = (payment: any, eventType: string): BreezPayment | null => {
+        if (!payment) {
+            console.warn('⚠️ [Breez Event] No payment object in event');
+            return null;
+        }
+
+        // Get amount - Breez SDK Spark uses 'amount' (may be BigInt)
+        // May be in sats or msats depending on context
+        const rawAmount = payment.amount ?? payment.amountMsat ?? 0;
+        
+        // Handle BigInt comparison
+        const amountIsZero = typeof rawAmount === 'bigint' 
+            ? rawAmount <= BigInt(0)
+            : !rawAmount || rawAmount <= 0;
+            
+        if (amountIsZero) {
+            console.warn('⚠️ [Breez Event] Payment has zero/invalid amount:', typeof rawAmount === 'bigint' ? rawAmount.toString() : rawAmount);
+            return null;
+        }
+
+        // Handle BigInt conversion for amounts
+        const rawFees = payment.fees ?? payment.feeMsat ?? 0;
+        
+        // Determine if amount is in msats or sats
+        let amountSats: number;
+        let feeSats: number;
+        
+        if (typeof rawAmount === 'bigint') {
+            // If > 1 million, probably msats
+            if (rawAmount > BigInt(1000000)) {
+                amountSats = Number(rawAmount / BigInt(1000));
+            } else {
+                amountSats = Number(rawAmount);
+            }
+        } else {
+            const numAmount = Number(rawAmount) || 0;
+            if (numAmount > 1000000) {
+                amountSats = Math.floor(numAmount / 1000);
+            } else {
+                amountSats = numAmount;
+            }
+        }
+        
+        if (typeof rawFees === 'bigint') {
+            if (rawFees > BigInt(1000000)) {
+                feeSats = Number(rawFees / BigInt(1000));
+            } else {
+                feeSats = Number(rawFees);
+            }
+        } else {
+            const numFees = Number(rawFees) || 0;
+            if (numFees > 1000000) {
+                feeSats = Math.floor(numFees / 1000);
+            } else {
+                feeSats = numFees;
+            }
+        }
+
+        // Breez SDK Spark uses 'paymentType': 'sent' or 'received'
+        // Also check 'direction' as fallback
+        const paymentTypeRaw = (payment.paymentType || payment.direction || '').toLowerCase();
+        const isIncoming = paymentTypeRaw === 'received' || paymentTypeRaw === 'receive' || paymentTypeRaw === 'incoming';
+
+        // Normalize id/hash
+        const id = payment.id || payment.paymentHash || payment.hash || `breez-${Date.now()}`;
+
+        // Timestamps - normalize to seconds (may be BigInt)
+        const rawTs = payment.timestamp ?? payment.paymentTime ?? Date.now() / 1000;
+        let timestamp: number;
+        if (typeof rawTs === 'bigint') {
+            timestamp = Number(rawTs);
+        } else {
+            timestamp = rawTs > 1e12 ? Math.floor(rawTs / 1000) : Math.floor(rawTs);
+        }
+
+        // Determine status from event type
+        let status: 'pending' | 'complete' | 'failed' = 'complete';
+        if (eventType === 'paymentPending') {
+            status = 'pending';
+        } else if (eventType === 'paymentFailed') {
+            status = 'failed';
+        }
+
+        return {
+            id,
+            paymentType: isIncoming ? 'receive' : 'send',
+            amountSats,
+            feeSats,
+            timestamp,
+            description: payment.description || payment.memo || `Breez ${isIncoming ? 'received' : 'sent'}`,
+            bolt11: payment.bolt11 || payment.invoice,
+            preimage: payment.preimage,
+            status
+        };
+    };
+
     try {
-        // Breez SDK uses event listeners
+        // Breez SDK Spark event listener per documentation
         const listener = {
             onEvent: (event: any) => {
-                if (event.type === 'invoicePaid' || event.type === 'paymentSucceeded') {
-                    const payment: BreezPayment = {
-                        id: event.details?.paymentHash || 'unknown',
-                        paymentType: event.type === 'invoicePaid' ? 'receive' : 'send',
-                        amountSats: Math.floor((event.details?.amountMsat || 0) / 1000),
-                        feeSats: Math.floor((event.details?.feeMsat || 0) / 1000),
-                        timestamp: Date.now() / 1000,
-                        status: 'complete'
-                    };
+                const eventType = event?.type || 'unknown';
+                
+                // Log ALL events for debugging
+                console.log(`📨 [Breez Event] Type: ${eventType}`, event);
+
+                // Handle payment events
+                if (eventType === 'paymentSucceeded' || eventType === 'paymentPending') {
+                    const payment = event.payment;
                     
-                    if (payment.paymentType === 'receive') {
-                        onPaymentReceived(payment);
-                    } else {
-                        onPaymentSent(payment);
+                    if (!payment) {
+                        console.warn(`⚠️ [Breez Event] ${eventType} but no payment object`);
+                        return;
                     }
+
+                    // Log with BigInt handling
+                    const logAmount = typeof payment.amount === 'bigint' ? payment.amount.toString() : payment.amount;
+                    console.log(`💰 [Breez Event] Payment ${eventType}:`, {
+                        id: payment.id,
+                        paymentType: payment.paymentType,
+                        amount: logAmount,
+                        status: payment.status
+                    });
+
+                    const mapped = mapPaymentToBreezPayment(payment, eventType);
+                    if (!mapped) {
+                        console.warn('⚠️ [Breez Event] Failed to map payment');
+                        return;
+                    }
+
+                    // Use paymentType to determine incoming vs outgoing
+                    // Breez SDK Spark uses 'sent' or 'received'
+                    const paymentTypeRaw = (payment.paymentType || '').toLowerCase();
+                    const isIncoming = paymentTypeRaw === 'received' || paymentTypeRaw === 'receive' || paymentTypeRaw === 'incoming';
+                    
+                    if (isIncoming) {
+                        console.log(`⚡ [Breez Event] INCOMING payment: ${mapped.amountSats} sats`);
+                        onPaymentReceived(mapped);
+                    } else {
+                        console.log(`📤 [Breez Event] OUTGOING payment: ${mapped.amountSats} sats`);
+                        onPaymentSent(mapped);
+                    }
+                } else if (eventType === 'paymentFailed') {
+                    console.warn('❌ [Breez Event] Payment failed:', event.payment);
+                } else if (eventType === 'claimedDeposits') {
+                    // Deposits claimed - this might also indicate received funds
+                    console.log('✅ [Breez Event] Deposits claimed');
+                    
+                    // If claimedDeposits contains payment info, process it
+                    const deposits = event.claimedDeposits;
+                    if (Array.isArray(deposits)) {
+                        deposits.forEach((deposit: any) => {
+                            const rawAmount = deposit.amountMsat;
+                            const hasAmount = typeof rawAmount === 'bigint' 
+                                ? rawAmount > BigInt(0)
+                                : rawAmount && rawAmount > 0;
+                            
+                            if (hasAmount) {
+                                const amountSats = typeof rawAmount === 'bigint'
+                                    ? Number(rawAmount / BigInt(1000))
+                                    : Math.floor(Number(rawAmount) / 1000);
+                                console.log(`⚡ [Breez Event] Claimed deposit: ${amountSats} sats`);
+                                onPaymentReceived({
+                                    id: deposit.id || `deposit-${Date.now()}`,
+                                    paymentType: 'receive',
+                                    amountSats,
+                                    feeSats: 0,
+                                    timestamp: Math.floor(Date.now() / 1000),
+                                    description: 'Claimed deposit',
+                                    status: 'complete'
+                                });
+                            }
+                        });
+                    }
+                } else if (eventType === 'synced') {
+                    console.log('🔄 [Breez Event] Wallet synced');
+                } else if (eventType === 'dataSynced') {
+                    console.log('📊 [Breez Event] Data synced, didPullNewRecords:', event.didPullNewRecords);
                 }
             }
         };
         
+        // Add event listener - note: this returns a listener ID but we don't need to await it
+        // per the Breez SDK Spark web implementation
         sdkInstance.addEventListener(listener);
+        console.log('✅ [Breez] Event listener registered successfully');
         
         // Return cleanup function
         return () => {
             try {
                 sdkInstance.removeEventListener(listener);
+                console.log('🔌 [Breez] Event listener removed');
             } catch (e) {
                 // Ignore cleanup errors
             }
         };
     } catch (error) {
-        console.warn('Failed to subscribe to Breez payments:', error);
+        console.error('❌ Failed to subscribe to Breez payments:', error);
         return () => { };
     }
 };

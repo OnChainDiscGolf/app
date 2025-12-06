@@ -71,7 +71,8 @@ export interface WalletTransaction {
   amountSats: number;
   description: string;
   timestamp: number;
-  walletType?: 'cashu' | 'nwc';
+  walletType?: 'cashu' | 'nwc' | 'breez';
+  status?: 'pending' | 'complete' | 'failed';
 }
 
 export interface Mint {
@@ -128,7 +129,7 @@ export interface AppState {
   isAuthenticated: boolean;
   isGuest: boolean;
   authMethod: 'local' | 'nip46' | null;
-  walletMode: 'cashu' | 'nwc';
+  walletMode: 'cashu' | 'nwc' | 'breez';
   nwcString: string;
 }
 

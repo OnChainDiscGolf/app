@@ -19,6 +19,7 @@ import {
     parseInput as parseBreezInput,
     getBreezBalance,
     payInvoice as payBreezInvoice,
+    payLightningAddress as payBreezLightningAddress,
     getLightningAddress as getBreezLightningAddress,
     formatSats
 } from '../services/breezService';
@@ -3247,7 +3248,52 @@ export const Wallet: React.FC = () => {
                         <Button fullWidth variant="secondary" onClick={() => setView('main')} className="bg-slate-800 hover:bg-slate-700 border-slate-600">Cancel</Button>
                         <Button
                             fullWidth
-                            onClick={handleSend}
+                            onClick={async () => {
+                                if (walletMode === 'breez') {
+                                    // Route to Breez-specific send logic
+                                    const amount = parseInt(sendAmount);
+                                    const input = sendInput.trim();
+                                    
+                                    if (!input) {
+                                        setTransactionError("Missing invoice or address");
+                                        return;
+                                    }
+                                    
+                                    setIsProcessing(true);
+                                    setTransactionError(null);
+                                    
+                                    try {
+                                        let result;
+                                        
+                                        // Check if it's a lightning address (contains @)
+                                        if (input.includes('@') && !input.toLowerCase().startsWith('lnurl')) {
+                                            if (isNaN(amount) || amount <= 0) {
+                                                setTransactionError("Please enter a valid amount for Lightning address");
+                                                setIsProcessing(false);
+                                                return;
+                                            }
+                                            result = await payBreezLightningAddress(input, amount);
+                                        } else {
+                                            // Assume it's a bolt11 invoice
+                                            result = await payBreezInvoice(input);
+                                        }
+                                        
+                                        if (result.success) {
+                                            setSuccessMode('sent');
+                                        } else {
+                                            setTransactionError(result.error || "Breez payment failed");
+                                        }
+                                    } catch (e) {
+                                        console.error("Breez send error:", e);
+                                        setTransactionError(e instanceof Error ? e.message : "Breez payment failed");
+                                    } finally {
+                                        setIsProcessing(false);
+                                    }
+                                } else {
+                                    // Use existing Cashu/NWC send logic
+                                    await handleSend();
+                                }
+                            }}
                             disabled={isProcessing || insufficientFunds || !sendAmount}
                             className={`shadow-lg shadow-brand-primary/20 ${insufficientFunds ? 'opacity-50 cursor-not-allowed' : 'bg-gradient-to-r from-brand-primary to-brand-accent hover:opacity-90'}`}
                         >
@@ -3653,28 +3699,51 @@ export const Wallet: React.FC = () => {
                 ) : (
                     transactions
                         .filter(tx => viewMode === 'all' || (tx.walletType || 'cashu') === viewMode)
-                        .map((tx) => (
-                            <div key={tx.id} className="flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                                <div className="flex items-center space-x-3">
-                                    <div className={`p-2 rounded-full ${['deposit', 'receive'].includes(tx.type) ? 'bg-green-500/20 text-green-400' :
-                                        ['payout', 'ace_pot'].includes(tx.type) ? 'bg-brand-primary/20 text-brand-primary' :
-                                            ['send', 'payment'].includes(tx.type) ? 'bg-brand-accent/20 text-brand-accent' :
-                                                'bg-slate-600/30 text-slate-300'
-                                        }`}>
-                                        {['deposit', 'receive'].includes(tx.type) && <Icons.Zap size={16} />}
-                                        {(tx.type === 'payout' || tx.type === 'ace_pot') && <Icons.Trophy size={16} />}
-                                        {(tx.type === 'payment' || tx.type === 'send') && <Icons.Send size={16} />}
+                        .sort((a, b) => b.timestamp - a.timestamp) // Chronological sort (newest first)
+                        .map((tx) => {
+                            // Wallet color coding: Breez=blue, Cashu=emerald, NWC=purple
+                            const walletColors = {
+                                breez: { border: 'border-l-blue-500', text: 'text-blue-400', bg: 'bg-blue-500/10' },
+                                cashu: { border: 'border-l-emerald-500', text: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+                                nwc: { border: 'border-l-purple-500', text: 'text-purple-400', bg: 'bg-purple-500/10' },
+                            };
+                            const txWallet = (tx.walletType || 'cashu') as 'breez' | 'cashu' | 'nwc';
+                            const walletStyle = walletColors[txWallet] || walletColors.cashu;
+                            
+                            return (
+                                <div 
+                                    key={tx.id} 
+                                    className={`flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 ${viewMode === 'all' ? `border-l-4 ${walletStyle.border}` : ''}`}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <div className={`p-2 rounded-full ${['deposit', 'receive'].includes(tx.type) ? 'bg-green-500/20 text-green-400' :
+                                            ['payout', 'ace_pot'].includes(tx.type) ? 'bg-brand-primary/20 text-brand-primary' :
+                                                ['send', 'payment'].includes(tx.type) ? 'bg-brand-accent/20 text-brand-accent' :
+                                                    'bg-slate-600/30 text-slate-300'
+                                            }`}>
+                                            {['deposit', 'receive'].includes(tx.type) && <Icons.Zap size={16} />}
+                                            {(tx.type === 'payout' || tx.type === 'ace_pot') && <Icons.Trophy size={16} />}
+                                            {(tx.type === 'payment' || tx.type === 'send') && <Icons.Send size={16} />}
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center space-x-2">
+                                                <p className="font-medium text-sm text-white">{tx.description}</p>
+                                                {/* Wallet badge in combined view */}
+                                                {viewMode === 'all' && (
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${walletStyle.bg} ${walletStyle.text} font-medium uppercase`}>
+                                                        {txWallet === 'breez' ? '⚡' : txWallet === 'nwc' ? '🔗' : '🥜'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-slate-500">{new Date(tx.timestamp).toLocaleDateString()}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="font-medium text-sm text-white">{tx.description}</p>
-                                        <p className="text-xs text-slate-500">{new Date(tx.timestamp).toLocaleDateString()}</p>
-                                    </div>
+                                    <span className={`font-mono font-bold ${['deposit', 'payout', 'ace_pot', 'receive'].includes(tx.type) ? 'text-green-400' : 'text-white'}`}>
+                                        {['payment', 'send'].includes(tx.type) ? '-' : '+'}{tx.amountSats}
+                                    </span>
                                 </div>
-                                <span className={`font-mono font-bold ${['deposit', 'payout', 'ace_pot', 'receive'].includes(tx.type) ? 'text-green-400' : 'text-white'}`}>
-                                    {['payment', 'send'].includes(tx.type) ? '-' : '+'}{tx.amountSats}
-                                </span>
-                            </div>
-                        ))
+                            );
+                        })
                 )}
             </div>
             {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => { 

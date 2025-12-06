@@ -24,10 +24,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useSwipeBack(); // Enable global swipe-to-back
   const navigate = useNavigate();
   const location = useLocation();
-  const { paymentNotification, setPaymentNotification, lightningStrike, isAuthenticated, roundSummary, setRoundSummary } = useApp();
+  const { paymentNotification, setPaymentNotification, lightningStrike, isAuthenticated, roundSummary, setRoundSummary, reconcileOnResume } = useApp();
+  const { isOnboarding } = useOnboarding();
 
   // Hide nav during onboarding, finalization, and profile-setup for new users
-  const hideNav = !isAuthenticated || location.pathname === '/finalization' || location.pathname === '/profile-setup';
+  const hideNav = !isAuthenticated || isOnboarding || location.pathname === '/finalization' || location.pathname === '/profile-setup';
 
   // Track navigation for feedback logs
   useEffect(() => {
@@ -46,6 +47,30 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     window.addEventListener('npubcash-payment-received', handlePayment as EventListener);
     return () => window.removeEventListener('npubcash-payment-received', handlePayment as EventListener);
   }, [setPaymentNotification]);
+
+  // Reconcile wallets when app resumes (visibility change or focus)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated) {
+        console.log('📱 App visible - running reconciliation');
+        reconcileOnResume();
+      }
+    };
+
+    const handleFocus = () => {
+      if (isAuthenticated) {
+        console.log('📱 Window focused - running reconciliation');
+        reconcileOnResume();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isAuthenticated, reconcileOnResume]);
 
   return (
     <div className="min-h-screen bg-brand-dark text-white font-sans antialiased selection:bg-brand-primary selection:text-black pb-safe">
@@ -105,19 +130,19 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 // Conditional Route Component for / route
-// Show Onboarding if not authenticated or in onboarding flow, Home otherwise
+// Show Onboarding if not authenticated, Home otherwise
 const HomeOrOnboarding: React.FC = () => {
   const { isAuthenticated } = useApp();
   const { isOnboarding } = useOnboarding();
   
+  // If authenticated, always show Home (never show onboarding to logged-in users)
+  if (isAuthenticated) {
+    return <Home />;
+  }
+  
   // If actively onboarding (started the new user flow), show Onboarding
   if (isOnboarding) {
     return <Onboarding />;
-  }
-  
-  // If authenticated, show Home
-  if (isAuthenticated) {
-    return <Home />;
   }
   
   // Not authenticated, show Onboarding
