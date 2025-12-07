@@ -70,7 +70,7 @@ const clearRoundCreationState = () => {
 
 
 export const Home: React.FC = () => {
-    const { activeRound, players, createRound, joinRoundAndPay, recentPlayers, contacts, userProfile, resetRound, isAuthenticated, isGuest, currentUserPubkey, addRecentPlayer, depositFunds, checkDepositStatus, confirmDeposit, sendFunds, walletBalance } = useApp();
+    const { activeRound, players, createRound, joinRoundAndPay, recentPlayers, contacts, userProfile, resetRound, isAuthenticated, isGuest, currentUserPubkey, addRecentPlayer, depositFunds, checkDepositStatus, confirmDeposit, sendFunds, walletBalance, walletBalances, refreshAllBalances, isBalanceLoading } = useApp();
     const navigate = useNavigate();
 
     // Local UI state for the creation wizard
@@ -196,7 +196,7 @@ export const Home: React.FC = () => {
     const [showPlayerQr, setShowPlayerQr] = useState(false);
     const [inviteQrData, setInviteQrData] = useState('');
     const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
-    
+
     // League Coming Soon Modal State
     const [showLeagueComingSoon, setShowLeagueComingSoon] = useState(false);
 
@@ -206,7 +206,7 @@ export const Home: React.FC = () => {
 
     // Wallet pill - subtle color drift animation (orange, blue, emerald, purple)
     const [walletPillColorIndex, setWalletPillColorIndex] = useState(0);
-    
+
     // Very subtle colors - barely there
     const walletPillColors = [
         { r: 249, g: 115, b: 22 },  // orange
@@ -214,7 +214,7 @@ export const Home: React.FC = () => {
         { r: 16, g: 185, b: 129 },  // emerald
         { r: 168, g: 85, b: 247 },  // purple
     ];
-    
+
     // Cycle colors every 3 seconds
     useEffect(() => {
         const interval = setInterval(() => {
@@ -222,7 +222,17 @@ export const Home: React.FC = () => {
         }, 3000);
         return () => clearInterval(interval);
     }, []);
-    
+
+    // Refresh all wallet balances on mount when authenticated
+    useEffect(() => {
+        if (isAuthenticated && !isGuest) {
+            refreshAllBalances();
+        }
+    }, [isAuthenticated, isGuest]);
+
+    // Calculate total balance across all wallet types for the pill display
+    const totalWalletBalance = walletBalances.cashu + walletBalances.nwc + walletBalances.breez;
+
     // Get current color with very low opacity for subtle effect
     const currentColor = walletPillColors[walletPillColorIndex];
     const pillBgColor = `rgba(${currentColor.r}, ${currentColor.g}, ${currentColor.b}, 0.15)`;
@@ -539,15 +549,15 @@ export const Home: React.FC = () => {
     }, [view, playerInvoices, paidStatus, checkDepositStatus]);
 
     // Scanner Logic for Adding Players
-    const { 
-        isCameraLoading, 
-        logs, 
-        restart, 
-        isNativeScanner, 
-        startNativeScan, 
+    const {
+        isCameraLoading,
+        logs,
+        restart,
+        isNativeScanner,
+        startNativeScan,
         cameraError,
         permissionStatus,
-        openAppSettings 
+        openAppSettings
     } = useQrScanner({
         videoRef,
         canvasRef,
@@ -621,21 +631,21 @@ export const Home: React.FC = () => {
         if (!searchQuery) return;
         setIsSearching(true);
         setFoundUser(null);
-        
+
         let user = null;
         const cleanQuery = searchQuery.trim().replace(/^#/, ''); // Remove leading # if present
-        
+
         // Check if query looks like a PDGA number (4-7 digits)
         if (/^\d{4,7}$/.test(cleanQuery)) {
             // Try PDGA lookup first
             user = await lookupByPDGA(cleanQuery);
         }
-        
+
         // If not found via PDGA (or wasn't a PDGA number), try standard lookup
         if (!user) {
             user = await lookupUser(searchQuery);
         }
-        
+
         setFoundUser(user);
         setIsSearching(false);
     };
@@ -754,7 +764,7 @@ export const Home: React.FC = () => {
             const entryPot = entryPayers.length * activeRound.entryFeeSats;
             const acePot = acePayers.length * activeRound.acePotFeeSats;
             const totalPot = entryPot + acePot;
-            
+
             if (totalPot > 0) {
                 // Check for any aces
                 const aceWinners: { playerId: string; name: string; hole: number }[] = [];
@@ -765,7 +775,7 @@ export const Home: React.FC = () => {
                         }
                     });
                 });
-                
+
                 switch (cancelFundOption) {
                     case 'pay-winner':
                         // Pay the current leader the entry pot
@@ -781,7 +791,7 @@ export const Home: React.FC = () => {
                             console.log(`[Cancel Round] Paying ace winner ${aceWinner.name}: ${acePot} sats`);
                         }
                         break;
-                        
+
                     case 'redistribute':
                         // Refund each player what they paid
                         players.forEach(player => {
@@ -793,7 +803,7 @@ export const Home: React.FC = () => {
                             }
                         });
                         break;
-                        
+
                     case 'host-keeps':
                         // No action needed - funds stay with host
                         console.log(`[Cancel Round] Host keeps pot: ${totalPot} sats`);
@@ -801,7 +811,7 @@ export const Home: React.FC = () => {
                 }
             }
         }
-        
+
         resetRound();
         clearRoundCreationState(); // Clear persisted state
         setShowResetConfirm(false);
@@ -1156,8 +1166,8 @@ export const Home: React.FC = () => {
             all.forEach(p => uniqueMap.set(p.pubkey, p));
             list = Array.from(uniqueMap.values());
 
-            list = list.filter(p => 
-                p.name.toLowerCase().includes(q) || 
+            list = list.filter(p =>
+                p.name.toLowerCase().includes(q) ||
                 (p.nip05 && p.nip05.toLowerCase().includes(q)) ||
                 (p.pdga && p.pdga.includes(q))
             );
@@ -1378,8 +1388,8 @@ export const Home: React.FC = () => {
                 {/* Header - Wallet style */}
                 <div className="flex justify-between items-center mb-4">
                     <div className="flex items-center">
-                        <button 
-                            onClick={() => setView('select_players')} 
+                        <button
+                            onClick={() => setView('select_players')}
                             className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors"
                         >
                             <Icons.Prev />
@@ -1901,8 +1911,8 @@ export const Home: React.FC = () => {
                 {/* Header - Wallet style */}
                 <div className="flex justify-between items-center mb-4">
                     <div className="flex items-center">
-                        <button 
-                            onClick={() => setView('setup')} 
+                        <button
+                            onClick={() => setView('setup')}
                             className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors"
                         >
                             <Icons.Prev />
@@ -2446,8 +2456,8 @@ export const Home: React.FC = () => {
                 {/* Header - Compact */}
                 <div className="flex justify-between items-center mb-3">
                     <div className="flex items-center">
-                        <button 
-                            onClick={() => setView('menu')} 
+                        <button
+                            onClick={() => setView('menu')}
                             className="mr-3 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors"
                         >
                             <Icons.Prev size={18} />
@@ -2602,7 +2612,7 @@ export const Home: React.FC = () => {
                                                 ...defaultPresets.map(amount => ({ amount, id: `default-${amount}`, isCustom: false })),
                                                 ...customPresets.map(preset => ({ ...preset, isCustom: true }))
                                             ].sort((a, b) => a.amount - b.amount);
-                                            
+
                                             return allPresets.map(preset => (
                                                 preset.isCustom ? (
                                                     <div key={preset.id} className="relative group">
@@ -2703,7 +2713,7 @@ export const Home: React.FC = () => {
                                                 ...defaultAcePresets.map(amount => ({ amount, id: `default-${amount}`, isCustom: false })),
                                                 ...customAcePresets.map(preset => ({ ...preset, isCustom: true }))
                                             ].sort((a, b) => a.amount - b.amount);
-                                            
+
                                             return allAcePresets.map(preset => (
                                                 preset.isCustom ? (
                                                     <div key={preset.id} className="relative group">
@@ -2909,14 +2919,16 @@ export const Home: React.FC = () => {
                     }}
                 >
                     <div className="flex items-center space-x-2">
-                        <Icons.Wallet 
-                            size={16} 
+                        <Icons.Wallet
+                            size={16}
                             style={{
                                 color: pillIconColor,
                                 transition: 'color 2s ease-in-out',
                             }}
                         />
-                        <span className="text-sm font-bold text-white">{walletBalance.toLocaleString()} Sats</span>
+                        <span className={`text-sm font-bold text-white ${isBalanceLoading ? 'balance-shimmer' : ''}`}>
+                            {totalWalletBalance.toLocaleString()} Sats
+                        </span>
                     </div>
                 </button>
             </div>
@@ -2944,15 +2956,15 @@ export const Home: React.FC = () => {
                     {/* Logo */}
                     <div className="inline-flex items-center justify-center mb-4 relative">
                         <div className="p-[2px] rounded-2xl bg-gradient-to-br from-emerald-500/50 to-cyan-500/50 shadow-lg shadow-emerald-500/20">
-                            <img 
-                                src="/icons/icon-512x512.png" 
-                                alt="On-Chain Disc Golf" 
+                            <img
+                                src="/icons/icon-512x512.png"
+                                alt="On-Chain Disc Golf"
                                 className="w-20 h-20 rounded-xl"
                             />
                         </div>
                         <div className="absolute -top-0 -right-0 w-4 h-4 bg-green-500 rounded-full animate-pulse" />
                     </div>
-                    
+
                     {/* Title - Original styling */}
                     <h1 className="font-extrabold tracking-tight leading-tight">
                         <div className="text-6xl mb-1">
@@ -2967,8 +2979,8 @@ export const Home: React.FC = () => {
                 <div className="w-full max-w-sm space-y-4 px-4">
                     {/* Only show Continue Round for active, non-finalized rounds */}
                     {activeRound && !activeRound.isFinalized && (
-                        <button 
-                            onClick={() => navigate('/play')} 
+                        <button
+                            onClick={() => navigate('/play')}
                             className="w-full bg-gradient-to-r from-emerald-500/70 via-teal-500/70 to-cyan-500/70 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/35 transition-all hover:scale-[1.02] active:scale-[0.98]"
                         >
                             <div className="flex items-center justify-center space-x-2">
@@ -3031,7 +3043,7 @@ export const Home: React.FC = () => {
                         </div>
                     )}
 
-                    <button 
+                    <button
                         id="tour-create-round"
                         onClick={handleCreateRoundClick}
                         className="w-full bg-gradient-to-br from-slate-800/90 via-emerald-900/20 to-slate-900/95 text-white font-bold py-4 rounded-xl border border-emerald-500/20 backdrop-blur-sm hover:border-emerald-500/40 hover:from-slate-800/95 hover:via-emerald-900/30 hover:to-slate-900 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-emerald-900/10"
@@ -3042,7 +3054,7 @@ export const Home: React.FC = () => {
                         </div>
                     </button>
 
-                    <button 
+                    <button
                         onClick={() => setShowLeagueComingSoon(true)}
                         className="w-full bg-gradient-to-br from-slate-800/90 via-cyan-900/20 to-slate-900/95 text-white font-bold py-4 rounded-xl border border-cyan-500/20 backdrop-blur-sm hover:border-cyan-500/40 hover:from-slate-800/95 hover:via-cyan-900/30 hover:to-slate-900 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-cyan-900/10"
                     >
@@ -3093,11 +3105,11 @@ export const Home: React.FC = () => {
                 const acePot = acePayers.length * activeRound.acePotFeeSats;
                 const totalPot = entryPot + acePot;
                 const hasMoney = totalPot > 0;
-                
+
                 // Determine current leader
                 const sortedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
                 const currentLeader = sortedPlayers[0];
-                
+
                 // Check for any aces
                 const aceWinners: { name: string; hole: number }[] = [];
                 players.forEach(player => {
@@ -3107,7 +3119,7 @@ export const Home: React.FC = () => {
                         }
                     });
                 });
-                
+
                 return (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm">
                         <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full space-y-4 animate-in zoom-in-95 duration-200">
@@ -3118,7 +3130,7 @@ export const Home: React.FC = () => {
                                 </div>
                                 <h3 className="text-xl font-bold text-white">Quit Current Round?</h3>
                             </div>
-                            
+
                             {/* Round Info */}
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <div className="flex items-center justify-between">
@@ -3150,24 +3162,22 @@ export const Home: React.FC = () => {
                                     </>
                                 )}
                             </div>
-                            
+
                             {/* Fund Distribution Options - Only shown if there's money */}
                             {hasMoney && (
                                 <div className="space-y-2">
                                     <p className="text-slate-400 text-xs text-center mb-3">What happens to the pot?</p>
-                                    
+
                                     {/* Pay Winner Option */}
                                     <button
                                         onClick={() => setCancelFundOption('pay-winner')}
-                                        className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 ${
-                                            cancelFundOption === 'pay-winner'
-                                                ? 'bg-amber-500/10 border-amber-500 text-amber-400'
-                                                : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
-                                        }`}
+                                        className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 ${cancelFundOption === 'pay-winner'
+                                            ? 'bg-amber-500/10 border-amber-500 text-amber-400'
+                                            : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
+                                            }`}
                                     >
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                            cancelFundOption === 'pay-winner' ? 'bg-amber-500/20' : 'bg-slate-700'
-                                        }`}>
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${cancelFundOption === 'pay-winner' ? 'bg-amber-500/20' : 'bg-slate-700'
+                                            }`}>
                                             <Icons.Trophy size={16} />
                                         </div>
                                         <div className="text-left flex-1">
@@ -3180,19 +3190,17 @@ export const Home: React.FC = () => {
                                             <Icons.CheckMark size={18} className="text-amber-500" />
                                         )}
                                     </button>
-                                    
+
                                     {/* Redistribute Option */}
                                     <button
                                         onClick={() => setCancelFundOption('redistribute')}
-                                        className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 ${
-                                            cancelFundOption === 'redistribute'
-                                                ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
-                                                : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
-                                        }`}
+                                        className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 ${cancelFundOption === 'redistribute'
+                                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                                            : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
+                                            }`}
                                     >
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                            cancelFundOption === 'redistribute' ? 'bg-emerald-500/20' : 'bg-slate-700'
-                                        }`}>
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${cancelFundOption === 'redistribute' ? 'bg-emerald-500/20' : 'bg-slate-700'
+                                            }`}>
                                             <Icons.Users size={16} />
                                         </div>
                                         <div className="text-left flex-1">
@@ -3203,19 +3211,17 @@ export const Home: React.FC = () => {
                                             <Icons.CheckMark size={18} className="text-emerald-500" />
                                         )}
                                     </button>
-                                    
+
                                     {/* Host Keeps Option */}
                                     <button
                                         onClick={() => setCancelFundOption('host-keeps')}
-                                        className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 ${
-                                            cancelFundOption === 'host-keeps'
-                                                ? 'bg-slate-500/10 border-slate-500 text-slate-300'
-                                                : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
-                                        }`}
+                                        className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 ${cancelFundOption === 'host-keeps'
+                                            ? 'bg-slate-500/10 border-slate-500 text-slate-300'
+                                            : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-600'
+                                            }`}
                                     >
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                            cancelFundOption === 'host-keeps' ? 'bg-slate-500/20' : 'bg-slate-700'
-                                        }`}>
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${cancelFundOption === 'host-keeps' ? 'bg-slate-500/20' : 'bg-slate-700'
+                                            }`}>
                                             <Icons.Wallet size={16} />
                                         </div>
                                         <div className="text-left flex-1">
@@ -3228,11 +3234,11 @@ export const Home: React.FC = () => {
                                     </button>
                                 </div>
                             )}
-                            
+
                             {/* Action Buttons */}
                             <div className="grid grid-cols-2 gap-3 pt-2">
-                                <Button 
-                                    variant="secondary" 
+                                <Button
+                                    variant="secondary"
                                     onClick={() => {
                                         setShowResetConfirm(false);
                                         setCancelFundOption('pay-winner');
@@ -3272,7 +3278,7 @@ export const Home: React.FC = () => {
                         </p>
 
                         <div className="flex gap-3">
-                            <Button 
+                            <Button
                                 fullWidth
                                 variant="secondary"
                                 onClick={handleDiscardDraft}
@@ -3280,7 +3286,7 @@ export const Home: React.FC = () => {
                             >
                                 Start New
                             </Button>
-                            <Button 
+                            <Button
                                 fullWidth
                                 onClick={handleResumeDraft}
                                 className="bg-amber-500 text-black hover:bg-amber-400 text-sm"
@@ -3491,7 +3497,7 @@ export const Home: React.FC = () => {
                             >
                                 <Icons.Close size={18} />
                             </button>
-                            
+
                             <div className="flex flex-col items-center text-center">
                                 <div className="w-20 h-20 bg-gradient-to-br from-cyan-500/30 to-emerald-500/30 rounded-2xl flex items-center justify-center mb-4 border border-cyan-500/30 shadow-lg shadow-cyan-500/20">
                                     <Icons.League size={40} className="text-cyan-400" />
@@ -3508,7 +3514,7 @@ export const Home: React.FC = () => {
                             <p className="text-slate-300 text-center text-sm leading-relaxed mb-5">
                                 Create and join leagues, track standings, and compete with players across multiple rounds with automated payouts.
                             </p>
-                            
+
                             {/* Feature preview */}
                             <div className="space-y-2.5 mb-5">
                                 <div className="flex items-center space-x-3 p-2.5 bg-slate-800/50 rounded-xl border border-slate-700/50">
@@ -3534,7 +3540,7 @@ export const Home: React.FC = () => {
 
                         {/* Footer */}
                         <div className="px-6 pb-6">
-                            <button 
+                            <button
                                 onClick={() => setShowLeagueComingSoon(false)}
                                 className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-emerald-500 text-white font-bold rounded-xl hover:from-cyan-400 hover:to-emerald-400 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-cyan-500/25"
                             >
