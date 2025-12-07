@@ -153,6 +153,7 @@ export const Home: React.FC = () => {
     // Info Modal State
     const [showInfoModal, setShowInfoModal] = useState(false);
     const [expandedTopic, setExpandedTopic] = useState<string | null>(null);
+    const [showTeeOrderInfo, setShowTeeOrderInfo] = useState(false);
 
     // Guided Tour State
     const shouldShowTour = useTourStatus('play-tab');
@@ -1458,523 +1459,567 @@ export const Home: React.FC = () => {
         });
 
         return (
-            <div className="flex flex-col h-full p-6 pb-24">
-                {/* Header - Wallet style */}
-                <div className="flex justify-between items-center mb-4">
-                    <div className="flex items-center">
-                        <button
-                            onClick={() => setView('select_players')}
-                            className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors"
-                        >
-                            <Icons.Prev />
-                        </button>
-                        <h1 className="text-2xl font-bold flex items-center">
-                            <Icons.Zap className="mr-2 text-orange-400" /> Payment
-                        </h1>
-                    </div>
-                    <div className="flex space-x-2">
-                        <button
-                            onClick={() => setShowInfoModal(true)}
-                            className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                        >
-                            <Icons.Help size={20} />
-                        </button>
-                        <button
-                            onClick={goToSettings}
-                            className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                        >
-                            <Icons.Settings size={20} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Dynamic Pot Totals */}
-                {hasEntryFee && (entryFee > 0 || acePot > 0) && (
-                    <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-2xl p-5 border border-white/10 backdrop-blur-sm mb-3">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                                    <Icons.Zap size={16} className="text-orange-400" />
-                                </div>
-                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Pot</h3>
-                            </div>
-                            <div className="text-2xl font-bold text-white">
-                                {(totalEntryPot + totalAcePot).toLocaleString()} <span className="text-sm text-slate-400">sats</span>
-                            </div>
+            <>
+                <div className="flex flex-col h-full p-6 pb-24">
+                    {/* Header - Wallet style */}
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-center">
+                            <button
+                                onClick={() => setView('select_players')}
+                                className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors"
+                            >
+                                <Icons.Prev />
+                            </button>
+                            <h1 className="text-2xl font-bold flex items-center">
+                                <Icons.Zap className="mr-2 text-orange-400" /> Payment
+                            </h1>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            {entryFee > 0 && (
-                                <div className="bg-black/30 rounded-xl p-3 border border-white/10">
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Entry Fee</p>
-                                    <p className="text-lg font-bold text-orange-400">{totalEntryPot.toLocaleString()} <span className="text-xs text-slate-400">sats</span></p>
-                                </div>
-                            )}
-                            {acePot > 0 && (
-                                <div className="bg-black/30 rounded-xl p-3 border border-white/10">
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ace Pot</p>
-                                    <p className="text-lg font-bold text-emerald-400">{totalAcePot.toLocaleString()} <span className="text-xs text-slate-400">sats</span></p>
-                                </div>
-                            )}
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => setShowInfoModal(true)}
+                                className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                            >
+                                <Icons.Help size={20} />
+                            </button>
+                            <button
+                                onClick={goToSettings}
+                                className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                            >
+                                <Icons.Settings size={20} />
+                            </button>
                         </div>
                     </div>
-                )}
 
-                <div className="flex-1 overflow-y-auto space-y-3">
-                    {/* Customize your round - moved above player tiles */}
-                    <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-2xl overflow-hidden border border-white/10 backdrop-blur-sm">
-                        <button
-                            onClick={() => setIsCustomExpanded(!isCustomExpanded)}
-                            className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
-                        >
-                            <div className="flex items-center space-x-3">
-                                <div className="w-8 h-8 bg-blue-500/15 rounded-lg flex items-center justify-center">
-                                    <Icons.Settings size={16} className="text-blue-400/80" />
-                                </div>
-                                <h3 className="font-bold text-white">Customize Your Round</h3>
-                            </div>
-                            <Icons.Next size={20} className={`text-slate-400 transition-transform duration-300 ${isCustomExpanded ? '-rotate-90' : 'rotate-90'}`} />
-                        </button>
-
-                        {isCustomExpanded && (
-                            <div className="p-4 space-y-4 border-t border-white/5 bg-black/20">
-                                {/* Payout Distribution Mode */}
-                                {hasEntryFee && entryFee > 0 && (
-                                    <div className="space-y-3">
-                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Payout Distribution</h4>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <button
-                                                onClick={() => setPayoutMode('winner-take-all')}
-                                                className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${payoutMode === 'winner-take-all'
-                                                    ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
-                                                    : 'bg-black/30 text-slate-400 border-white/10 hover:bg-white/5'
-                                                    }`}
-                                            >
-                                                Winner Take All
-                                            </button>
-                                            <button
-                                                onClick={() => setPayoutMode('percentage-based')}
-                                                className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${payoutMode === 'percentage-based'
-                                                    ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
-                                                    : 'bg-black/30 text-slate-400 border-white/10 hover:bg-white/5'
-                                                    }`}
-                                            >
-                                                Top % of Players
-                                            </button>
+                    {/* Dynamic Pot Totals with integrated Customize Round */}
+                    {hasEntryFee && (entryFee > 0 || acePot > 0) && (
+                        <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-2xl border border-white/10 backdrop-blur-sm mb-3 overflow-hidden">
+                            {/* Total Pot Header - Always Visible */}
+                            <div className="p-5">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center space-x-2">
+                                        <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                                            <Icons.Zap size={16} className="text-orange-400" />
                                         </div>
+                                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Pot</h3>
+                                    </div>
+                                    <div className="text-2xl font-bold text-white">
+                                        {(totalEntryPot + totalAcePot).toLocaleString()} <span className="text-sm text-slate-400">sats</span>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {entryFee > 0 && (
+                                        <div className="bg-black/30 rounded-xl p-3 border border-white/10">
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Entry Fee</p>
+                                            <p className="text-lg font-bold text-orange-400">{totalEntryPot.toLocaleString()} <span className="text-xs text-slate-400">sats</span></p>
+                                        </div>
+                                    )}
+                                    {acePot > 0 && (
+                                        <div className="bg-black/30 rounded-xl p-3 border border-white/10">
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ace Pot</p>
+                                            <p className="text-lg font-bold text-emerald-400">{totalAcePot.toLocaleString()} <span className="text-xs text-slate-400">sats</span></p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
 
-                                        {/* Percentage Threshold Input */}
-                                        {payoutMode === 'percentage-based' && (
-                                            <div className="space-y-2">
-                                                <span className="text-sm font-bold text-slate-300">% of players paid</span>
-                                                <div className="flex space-x-2">
-                                                    {[20, 30, 40].map(pct => (
+                            {/* Customize Your Round - Collapsible section integrated into pot tile */}
+                            <button
+                                onClick={() => setIsCustomExpanded(!isCustomExpanded)}
+                                className="w-full flex items-center justify-between px-5 py-3 border-t border-white/5 hover:bg-white/5 transition-colors"
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <Icons.Settings size={14} className="text-blue-400/80" />
+                                    <span className="text-xs font-bold text-slate-400">Customize Round</span>
+                                </div>
+                                <Icons.Next size={16} className={`text-slate-400 transition-transform duration-300 ${isCustomExpanded ? '-rotate-90' : 'rotate-90'}`} />
+                            </button>
+
+                            {isCustomExpanded && (
+                                <div className="px-5 pb-5 space-y-4 border-t border-white/5 bg-black/20">
+                                    {/* Payout Distribution Mode */}
+                                    {hasEntryFee && entryFee > 0 && (
+                                        <div className="space-y-3 pt-4">
+                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Payout Distribution</h4>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button
+                                                    onClick={() => setPayoutMode('winner-take-all')}
+                                                    className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${payoutMode === 'winner-take-all'
+                                                        ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
+                                                        : 'bg-black/30 text-slate-400 border-white/10 hover:bg-white/5'
+                                                        }`}
+                                                >
+                                                    Winner Take All
+                                                </button>
+                                                <button
+                                                    onClick={() => setPayoutMode('percentage-based')}
+                                                    className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${payoutMode === 'percentage-based'
+                                                        ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
+                                                        : 'bg-black/30 text-slate-400 border-white/10 hover:bg-white/5'
+                                                        }`}
+                                                >
+                                                    Top % of Players
+                                                </button>
+                                            </div>
+
+                                            {/* Percentage Threshold Input */}
+                                            {payoutMode === 'percentage-based' && (
+                                                <div className="space-y-2">
+                                                    <span className="text-sm font-bold text-slate-300">% of players paid</span>
+                                                    <div className="flex space-x-2">
+                                                        {[20, 30, 40].map(pct => (
+                                                            <button
+                                                                key={pct}
+                                                                onClick={() => setPayoutPercentage(pct)}
+                                                                className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all ${payoutPercentage === pct
+                                                                    ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
+                                                                    : 'bg-black/30 text-slate-400 border-white/10 hover:bg-white/5'
+                                                                    }`}
+                                                            >
+                                                                {pct}%
+                                                            </button>
+                                                        ))}
                                                         <button
-                                                            key={pct}
-                                                            onClick={() => setPayoutPercentage(pct)}
-                                                            className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all ${payoutPercentage === pct
+                                                            onClick={() => setPayoutPercentage(customPayoutPercentage)}
+                                                            className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all ${![20, 30, 40].includes(payoutPercentage)
                                                                 ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
                                                                 : 'bg-black/30 text-slate-400 border-white/10 hover:bg-white/5'
                                                                 }`}
                                                         >
-                                                            {pct}%
+                                                            Custom
                                                         </button>
-                                                    ))}
-                                                    <button
-                                                        onClick={() => setPayoutPercentage(customPayoutPercentage)}
-                                                        className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all ${![20, 30, 40].includes(payoutPercentage)
-                                                            ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
-                                                            : 'bg-black/30 text-slate-400 border-white/10 hover:bg-white/5'
-                                                            }`}
-                                                    >
-                                                        Custom
-                                                    </button>
-                                                </div>
-                                                {![20, 30, 40].includes(payoutPercentage) && (
-                                                    <div className="flex items-center justify-between bg-black/30 rounded-xl p-3 border border-white/10 animate-in slide-in-from-top-2">
-                                                        <span className="text-sm text-slate-400">Custom Percentage</span>
-                                                        <div className="flex items-center space-x-2">
-                                                            <input
-                                                                type="number"
-                                                                min="1"
-                                                                max="100"
-                                                                value={customPayoutPercentage}
-                                                                onChange={(e) => {
-                                                                    const val = Math.min(100, Math.max(1, parseInt(e.target.value) || 0));
-                                                                    setCustomPayoutPercentage(val);
-                                                                    setPayoutPercentage(val);
-                                                                }}
-                                                                className="bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-sm text-white w-16 text-center outline-none focus:ring-2 focus:ring-orange-500"
-                                                            />
-                                                            <span className="text-sm text-slate-400">%</span>
-                                                        </div>
                                                     </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Payout Gradient */}
-                                        {payoutMode === 'percentage-based' && (
-                                            <>
-                                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Payout Gradient</h4>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <button
-                                                        onClick={() => setPayoutGradient('top-heavy')}
-                                                        className={`px-3 py-3 rounded-xl text-xs font-bold border transition-all ${payoutGradient === 'top-heavy'
-                                                            ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
-                                                            : 'bg-black/30 text-slate-400 border-white/10 hover:bg-white/5'
-                                                            }`}
-                                                    >
-                                                        <div>Top-Heavy</div>
-                                                        <div className="text-[9px] text-slate-500 mt-1">
-                                                            {(() => {
-                                                                const numPlayers = selectedCardmates.length + 1;
-                                                                const numWinners = Math.max(1, Math.ceil(numPlayers * (payoutPercentage / 100)));
-                                                                const dist = getTopHeavyDistribution(numWinners);
-                                                                return dist.map(p => `${Math.round(p * 100)}%`).join(' / ');
-                                                            })()}
-                                                        </div>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setPayoutGradient('linear')}
-                                                        className={`px-3 py-3 rounded-xl text-xs font-bold border transition-all ${payoutGradient === 'linear'
-                                                            ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
-                                                            : 'bg-black/30 text-slate-400 border-white/10 hover:bg-white/5'
-                                                            }`}
-                                                    >
-                                                        <div>Flat</div>
-                                                        <div className="text-[9px] text-slate-500 mt-1">
-                                                            {(() => {
-                                                                const numPlayers = selectedCardmates.length + 1;
-                                                                const numWinners = Math.max(1, Math.ceil(numPlayers * (payoutPercentage / 100)));
-                                                                const dist = getLinearDistribution(numWinners);
-                                                                return dist.map(p => `${Math.round(p * 100)}%`).join(' / ');
-                                                            })()}
-                                                        </div>
-                                                    </button>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Tee Order Toggle */}
-                                <div className="flex items-center justify-between py-2">
-                                    <div>
-                                        <h4 className="text-xs font-bold text-slate-300">Order by Tee Position</h4>
-                                        <p className="text-[10px] text-slate-500">Best previous hole goes first</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setUseHonorSystem(!useHonorSystem)}
-                                        className={`w-11 h-6 rounded-full p-0.5 transition-colors duration-300 ${useHonorSystem ? 'bg-emerald-500' : 'bg-slate-700'}`}
-                                    >
-                                        <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${useHonorSystem ? 'translate-x-5' : 'translate-x-0'}`} />
-                                    </button>
-                                </div>
-
-                                {/* Ace Pot Redistribution - Compact */}
-                                {hasEntryFee && acePot > 0 && (
-                                    <div className="space-y-2">
-                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">If No Ace</h4>
-                                        <div className="grid grid-cols-3 gap-1.5">
-                                            {[
-                                                { value: 'add-to-entry-pot' as const, label: '+ Entry', icon: '🏆' },
-                                                { value: 'redistribute-to-participants' as const, label: 'Split', icon: '↩️' },
-                                                { value: 'forfeit' as const, label: 'Forfeit', icon: '❌' },
-                                            ].map((option) => (
-                                                <button
-                                                    key={option.value}
-                                                    onClick={() => setAcePotRedistribution(option.value)}
-                                                    className={`px-2 py-2 rounded-lg text-[10px] font-bold border transition-all text-center ${acePotRedistribution === option.value
-                                                        ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                                                        : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
-                                                        }`}
-                                                >
-                                                    <div className="text-sm mb-0.5">{option.icon}</div>
-                                                    <div>{option.label}</div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Handicap Toggle */}
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Handicap</h4>
-                                        <button
-                                            onClick={() => setHandicapEnabled(!handicapEnabled)}
-                                            className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${handicapEnabled ? 'bg-brand-secondary' : 'bg-slate-700'}`}
-                                        >
-                                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${handicapEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
-                                        </button>
-                                    </div>
-                                    {handicapEnabled && (
-                                        <p className="text-[10px] text-slate-500">
-                                            Adjust starting scores for each player using the +/- buttons on their player tiles above.
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* Custom Starting Hole */}
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Custom Starting Hole</h4>
-                                        <button
-                                            onClick={() => {
-                                                setStartHoleEnabled(!startHoleEnabled);
-                                                if (startHoleEnabled) setStartHole(1); // Reset to hole 1 when disabled
-                                            }}
-                                            className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${startHoleEnabled ? 'bg-brand-secondary' : 'bg-slate-700'}`}
-                                        >
-                                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${startHoleEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
-                                        </button>
-                                    </div>
-
-                                    {startHoleEnabled && (
-                                        <div className="grid grid-cols-6 gap-2 animate-in slide-in-from-top-2 duration-300">
-                                            {Array.from({ length: layout === '9' ? 9 : layout === '18' ? 18 : customHoles }, (_, i) => i + 1).map((holeNum) => (
-                                                <button
-                                                    key={holeNum}
-                                                    onClick={() => setStartHole(holeNum)}
-                                                    className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all ${startHole === holeNum
-                                                        ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
-                                                        : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
-                                                        }`}
-                                                >
-                                                    {holeNum}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="space-y-3">
-                        {allPlayers.map((p, idx) => {
-                            const isPaid = paidStatus[p.pubkey] || false;
-                            const payment = paymentSelections[p.pubkey] || { entry: true, ace: true };
-                            const isHost = (p as any).isHost;
-                            const totalAmount = entryFee + acePot;
-
-                            // Determine what the player owes
-                            const owesEntry = hasEntryFee && entryFee > 0 && payment.entry;
-                            const owesAce = hasEntryFee && acePot > 0 && payment.ace;
-                            const owesAnything = owesEntry || owesAce;
-
-                            return (
-                                <div key={p.pubkey} className="bg-slate-800 rounded-xl p-3 border border-slate-700">
-                                    <div className="flex items-start justify-between gap-3">
-                                        {/* Player Info */}
-                                        <div className="flex items-center space-x-2 min-w-0 flex-1">
-                                            <span className="font-bold text-sm text-slate-500 w-5">{idx + 1}</span>
-                                            <div className="w-9 h-9 rounded-full bg-slate-700 overflow-hidden shrink-0">
-                                                {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <Icons.Users className="p-2 text-slate-500" />}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="font-bold text-sm truncate text-white leading-tight">{p.name} {isHost && '(You)'}</p>
-                                                <p className="text-[10px] text-slate-400 truncate leading-tight">
-                                                    {(() => {
-                                                        const nip05Value = p.nip05 ? String(p.nip05) : '';
-                                                        return nip05Value ? (nip05Value.length > 18 ? nip05Value.substring(0, 15) + '...' : nip05Value) : 'Nostr User';
-                                                    })()}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        {/* Handicap Controls - shown only when enabled */}
-                                        {handicapEnabled && (
-                                            <div className="flex items-center space-x-1 mr-1 shrink-0">
-                                                <button
-                                                    onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.max(-3, (prev[p.pubkey] || 0) - 1) }))}
-                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
-                                                >
-                                                    -
-                                                </button>
-                                                <div className="w-8 h-6 flex items-center justify-center bg-slate-900 border border-slate-600 rounded text-xs font-bold text-white">
-                                                    {playerHandicaps[p.pubkey] || 0}
-                                                </div>
-                                                <button
-                                                    onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.min(3, (prev[p.pubkey] || 0) + 1) }))}
-                                                    className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
-                                                >
-                                                    +
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* Payment Status */}
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            {/* Payment Status Icon */}
-                                            {hasEntryFee && owesAnything && (
-                                                <button
-                                                    onClick={() => openPaymentModal(p)}
-                                                    className="relative shrink-0"
-                                                >
-                                                    {isPaid ? (
-                                                        // Green checkmark - static
-                                                        <div className="w-8 h-8 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
-                                                            <Icons.CheckMark size={16} className="text-green-500" strokeWidth={3} />
-                                                        </div>
-                                                    ) : (
-                                                        // Red glowing dollar sign - payment due
-                                                        <div className="w-8 h-8 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center animate-pulse">
-                                                            <Icons.Dollar size={14} className="text-red-500" strokeWidth={3} />
+                                                    {![20, 30, 40].includes(payoutPercentage) && (
+                                                        <div className="flex items-center justify-between bg-black/30 rounded-xl p-3 border border-white/10 animate-in slide-in-from-top-2">
+                                                            <span className="text-sm text-slate-400">Custom Percentage</span>
+                                                            <div className="flex items-center space-x-2">
+                                                                <input
+                                                                    type="number"
+                                                                    min="1"
+                                                                    max="100"
+                                                                    value={customPayoutPercentage}
+                                                                    onChange={(e) => {
+                                                                        const val = Math.min(100, Math.max(1, parseInt(e.target.value) || 0));
+                                                                        setCustomPayoutPercentage(val);
+                                                                        setPayoutPercentage(val);
+                                                                    }}
+                                                                    className="bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-sm text-white w-16 text-center outline-none focus:ring-2 focus:ring-orange-500"
+                                                                />
+                                                                <span className="text-sm text-slate-400">%</span>
+                                                            </div>
                                                         </div>
                                                     )}
-                                                </button>
+                                                </div>
+                                            )}
+
+                                            {/* Payout Gradient */}
+                                            {payoutMode === 'percentage-based' && (
+                                                <>
+                                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Payout Gradient</h4>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <button
+                                                            onClick={() => setPayoutGradient('top-heavy')}
+                                                            className={`px-3 py-3 rounded-xl text-xs font-bold border transition-all ${payoutGradient === 'top-heavy'
+                                                                ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
+                                                                : 'bg-black/30 text-slate-400 border-white/10 hover:bg-white/5'
+                                                                }`}
+                                                        >
+                                                            <div>Top-Heavy</div>
+                                                            <div className="text-[9px] text-slate-500 mt-1">
+                                                                {(() => {
+                                                                    const numPlayers = selectedCardmates.length + 1;
+                                                                    const numWinners = Math.max(1, Math.ceil(numPlayers * (payoutPercentage / 100)));
+                                                                    const dist = getTopHeavyDistribution(numWinners);
+                                                                    return dist.map(p => `${Math.round(p * 100)}%`).join(' / ');
+                                                                })()}
+                                                            </div>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setPayoutGradient('linear')}
+                                                            className={`px-3 py-3 rounded-xl text-xs font-bold border transition-all ${payoutGradient === 'linear'
+                                                                ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
+                                                                : 'bg-black/30 text-slate-400 border-white/10 hover:bg-white/5'
+                                                                }`}
+                                                        >
+                                                            <div>Flat</div>
+                                                            <div className="text-[9px] text-slate-500 mt-1">
+                                                                {(() => {
+                                                                    const numPlayers = selectedCardmates.length + 1;
+                                                                    const numWinners = Math.max(1, Math.ceil(numPlayers * (payoutPercentage / 100)));
+                                                                    const dist = getLinearDistribution(numWinners);
+                                                                    return dist.map(p => `${Math.round(p * 100)}%`).join(' / ');
+                                                                })()}
+                                                            </div>
+                                                        </button>
+                                                    </div>
+                                                </>
                                             )}
                                         </div>
+                                    )}
+
+                                    {/* Ace Pot Redistribution - Compact */}
+                                    {hasEntryFee && acePot > 0 && (
+                                        <div className="space-y-2">
+                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">If No Ace</h4>
+                                            <div className="grid grid-cols-3 gap-1.5">
+                                                {[
+                                                    { value: 'add-to-entry-pot' as const, label: '+ Entry', icon: '🏆' },
+                                                    { value: 'redistribute-to-participants' as const, label: 'Split', icon: '↩️' },
+                                                    { value: 'forfeit' as const, label: 'Forfeit', icon: '❌' },
+                                                ].map((option) => (
+                                                    <button
+                                                        key={option.value}
+                                                        onClick={() => setAcePotRedistribution(option.value)}
+                                                        className={`px-2 py-2 rounded-lg text-[10px] font-bold border transition-all text-center ${acePotRedistribution === option.value
+                                                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                                                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                                                            }`}
+                                                    >
+                                                        <div className="text-sm mb-0.5">{option.icon}</div>
+                                                        <div>{option.label}</div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Tee Order Toggle - Moved under If No Ace */}
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-1.5">
+                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tee Order</h4>
+                                            <button
+                                                onClick={() => setShowTeeOrderInfo(true)}
+                                                className="text-slate-500 hover:text-slate-300 transition-colors"
+                                            >
+                                                <Icons.Help size={12} />
+                                            </button>
+                                        </div>
+                                        <button
+                                            onClick={() => setUseHonorSystem(!useHonorSystem)}
+                                            className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${useHonorSystem ? 'bg-brand-secondary' : 'bg-slate-700'}`}
+                                        >
+                                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${useHonorSystem ? 'translate-x-6' : 'translate-x-0'}`} />
+                                        </button>
+                                    </div>
+
+                                    {/* Handicap Toggle */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Handicap</h4>
+                                            <button
+                                                onClick={() => setHandicapEnabled(!handicapEnabled)}
+                                                className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${handicapEnabled ? 'bg-brand-secondary' : 'bg-slate-700'}`}
+                                            >
+                                                <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${handicapEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                                            </button>
+                                        </div>
+                                        {handicapEnabled && (
+                                            <p className="text-[10px] text-slate-500">
+                                                Adjust starting scores for each player using the +/- buttons on their player tiles above.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Custom Starting Hole */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Custom Starting Hole</h4>
+                                            <button
+                                                onClick={() => {
+                                                    setStartHoleEnabled(!startHoleEnabled);
+                                                    if (startHoleEnabled) setStartHole(1); // Reset to hole 1 when disabled
+                                                }}
+                                                className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${startHoleEnabled ? 'bg-brand-secondary' : 'bg-slate-700'}`}
+                                            >
+                                                <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${startHoleEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                                            </button>
+                                        </div>
+
+                                        {startHoleEnabled && (
+                                            <div className="grid grid-cols-6 gap-2 animate-in slide-in-from-top-2 duration-300">
+                                                {Array.from({ length: layout === '9' ? 9 : layout === '18' ? 18 : customHoles }, (_, i) => i + 1).map((holeNum) => (
+                                                    <button
+                                                        key={holeNum}
+                                                        onClick={() => setStartHole(holeNum)}
+                                                        className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all ${startHole === holeNum
+                                                            ? 'bg-brand-accent/20 text-brand-accent border-brand-accent/40'
+                                                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                                                            }`}
+                                                    >
+                                                        {holeNum}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                            );
-                        })}
+                            )}
+                        </div>
+                    )}
+
+                    <div className="flex-1 overflow-y-auto space-y-3">
+                        <div className="space-y-3">
+                            {allPlayers.map((p, idx) => {
+                                const isPaid = paidStatus[p.pubkey] || false;
+                                const payment = paymentSelections[p.pubkey] || { entry: true, ace: true };
+                                const isHost = (p as any).isHost;
+                                const totalAmount = entryFee + acePot;
+
+                                // Determine what the player owes
+                                const owesEntry = hasEntryFee && entryFee > 0 && payment.entry;
+                                const owesAce = hasEntryFee && acePot > 0 && payment.ace;
+                                const owesAnything = owesEntry || owesAce;
+
+                                return (
+                                    <div key={p.pubkey} className="bg-slate-800 rounded-xl p-3 border border-slate-700">
+                                        <div className="flex items-start justify-between gap-3">
+                                            {/* Player Info */}
+                                            <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                                <span className="font-bold text-sm text-slate-500 w-5">{idx + 1}</span>
+                                                <div className="w-9 h-9 rounded-full bg-slate-700 overflow-hidden shrink-0">
+                                                    {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <Icons.Users className="p-2 text-slate-500" />}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-bold text-sm truncate text-white leading-tight">{p.name} {isHost && '(You)'}</p>
+                                                    <p className="text-[10px] text-slate-400 truncate leading-tight">
+                                                        {(() => {
+                                                            const nip05Value = p.nip05 ? String(p.nip05) : '';
+                                                            return nip05Value ? (nip05Value.length > 18 ? nip05Value.substring(0, 15) + '...' : nip05Value) : 'Nostr User';
+                                                        })()}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Handicap Controls - shown only when enabled */}
+                                            {handicapEnabled && (
+                                                <div className="flex items-center space-x-1 mr-1 shrink-0">
+                                                    <button
+                                                        onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.max(-3, (prev[p.pubkey] || 0) - 1) }))}
+                                                        className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <div className="w-8 h-6 flex items-center justify-center bg-slate-900 border border-slate-600 rounded text-xs font-bold text-white">
+                                                        {playerHandicaps[p.pubkey] || 0}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.min(3, (prev[p.pubkey] || 0) + 1) }))}
+                                                        className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Payment Status */}
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                {/* Payment Status Icon */}
+                                                {hasEntryFee && owesAnything && (
+                                                    <button
+                                                        onClick={() => openPaymentModal(p)}
+                                                        className="relative shrink-0"
+                                                    >
+                                                        {isPaid ? (
+                                                            // Green checkmark - static
+                                                            <div className="w-8 h-8 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
+                                                                <Icons.CheckMark size={16} className="text-green-500" strokeWidth={3} />
+                                                            </div>
+                                                        ) : (
+                                                            // Red glowing dollar sign - payment due
+                                                            <div className="w-8 h-8 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center animate-pulse">
+                                                                <Icons.Dollar size={14} className="text-red-500" strokeWidth={3} />
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+
                     </div>
 
+                    <div className="fixed bottom-20 left-0 right-0 bg-brand-dark border-t border-slate-800 p-4 max-w-md mx-auto z-20">
+                        {(() => {
+                            // Calculate unpaid players count
+                            const playersNeedingPayment = allPlayers.filter(p => {
+                                const payment = paymentSelections[p.pubkey] || { entry: true, ace: true };
+                                const owesEntry = hasEntryFee && entryFee > 0 && payment.entry;
+                                const owesAce = hasEntryFee && acePot > 0 && payment.ace;
+                                const owesAnything = owesEntry || owesAce;
+                                const isPaid = paidStatus[p.pubkey] || false;
+                                return owesAnything && !isPaid;
+                            });
 
-                </div>
+                            const unpaidCount = playersNeedingPayment.length;
+                            const allPaid = unpaidCount === 0;
 
-                <div className="fixed bottom-20 left-0 right-0 bg-brand-dark border-t border-slate-800 p-4 max-w-md mx-auto z-20">
-                    {(() => {
-                        // Calculate unpaid players count
-                        const playersNeedingPayment = allPlayers.filter(p => {
-                            const payment = paymentSelections[p.pubkey] || { entry: true, ace: true };
-                            const owesEntry = hasEntryFee && entryFee > 0 && payment.entry;
-                            const owesAce = hasEntryFee && acePot > 0 && payment.ace;
-                            const owesAnything = owesEntry || owesAce;
-                            const isPaid = paidStatus[p.pubkey] || false;
-                            return owesAnything && !isPaid;
-                        });
-
-                        const unpaidCount = playersNeedingPayment.length;
-                        const allPaid = unpaidCount === 0;
-
-                        return (
-                            <Button
-                                fullWidth
-                                onClick={() => allPaid ? handleStartRound() : undefined}
-                                disabled={!allPaid}
-                                className={`font-bold py-4 rounded-full shadow-lg transition-all ${allPaid
-                                    ? 'bg-brand-accent text-black shadow-[0_0_30px_rgba(251,191,36,0.6)] animate-pulse'
-                                    : 'bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/40 cursor-not-allowed shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-pulse'
-                                    }`}
-                            >
-                                {allPaid ? 'Start Round' : `Waiting for Payments (${unpaidCount})`}
-                            </Button>
-                        );
-                    })()}
-                </div>
-
-                {/* PAYMENT MODAL */}
-                {
-                    showPaymentModal && paymentTarget && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm">
-                            <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-200 relative overflow-hidden">
-
-                                {paymentSuccess && (
-                                    <SuccessOverlay message="Paid!" onClose={() => {/* handled by timeout */ }} />
-                                )}
-
-                                <button
-                                    onClick={() => setShowPaymentModal(false)}
-                                    className="absolute top-4 right-4 text-slate-400 hover:text-white z-10"
+                            return (
+                                <Button
+                                    fullWidth
+                                    onClick={() => allPaid ? handleStartRound() : undefined}
+                                    disabled={!allPaid}
+                                    className={`font-bold py-4 rounded-full shadow-lg transition-all ${allPaid
+                                        ? 'bg-brand-accent text-black shadow-[0_0_30px_rgba(251,191,36,0.6)] animate-pulse'
+                                        : 'bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/40 cursor-not-allowed shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-pulse'
+                                        }`}
                                 >
-                                    <Icons.Close size={24} />
-                                </button>
+                                    {allPaid ? 'Start Round' : `Waiting for Payments (${unpaidCount})`}
+                                </Button>
+                            );
+                        })()}
+                    </div>
 
-                                <div className="text-center space-y-4 pt-2">
-                                    {/* Simplified header - host-centric perspective */}
-                                    <h3 className="text-xl font-bold text-white">Pay Your Entry Fee</h3>
-                                    <p className="text-slate-400 text-sm">
-                                        Complete the entry fee payment for <span className="text-white font-bold">{paymentTarget.name}</span>.
-                                    </p>
+                    {/* PAYMENT MODAL */}
+                    {
+                        showPaymentModal && paymentTarget && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm">
+                                <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-200 relative overflow-hidden">
 
-                                    {/* Error Banner */}
-                                    {paymentError && (
-                                        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 flex items-start space-x-2 text-left animate-in fade-in slide-in-from-top-2">
-                                            <Icons.Close className="text-red-500 shrink-0 mt-0.5" size={16} />
-                                            <p className="text-xs text-red-200 font-bold leading-tight">{paymentError}</p>
-                                        </div>
+                                    {paymentSuccess && (
+                                        <SuccessOverlay message="Paid!" onClose={() => {/* handled by timeout */ }} />
                                     )}
 
-                                    {/* Amount Display - Moved BEFORE QR Code */}
-                                    <div>
-                                        <p className="text-2xl font-bold text-brand-accent">{entryFee + acePot} SATS</p>
-                                        <p className="text-xs text-slate-500">Entry: {entryFee} | Ace Pot: {acePot}</p>
-                                    </div>
+                                    <button
+                                        onClick={() => setShowPaymentModal(false)}
+                                        className="absolute top-4 right-4 text-slate-400 hover:text-white z-10"
+                                    >
+                                        <Icons.Close size={24} />
+                                    </button>
 
-                                    {/* Inline Copy Invoice */}
-                                    {!isGeneratingInvoice && (
-                                        <div
-                                            onClick={handleCopyInvoice}
-                                            className="flex items-center justify-center space-x-2 mb-2 cursor-pointer text-brand-primary hover:text-brand-accent transition-colors"
-                                        >
-                                            <span className="text-xs font-mono opacity-80">
-                                                {paymentInvoice.slice(0, 8)}...{paymentInvoice.slice(-8)}
-                                            </span>
-                                            <Icons.Copy size={12} />
-                                        </div>
-                                    )}
+                                    <div className="text-center space-y-4 pt-2">
+                                        {/* Simplified header - host-centric perspective */}
+                                        <h3 className="text-xl font-bold text-white">Pay Your Entry Fee</h3>
+                                        <p className="text-slate-400 text-sm">
+                                            Complete the entry fee payment for <span className="text-white font-bold">{paymentTarget.name}</span>.
+                                        </p>
 
-                                    {/* QR Code Block with Pulse and Colorful Border */}
-                                    <div className={`bg-gradient-to-br from-emerald-400 via-cyan-500 to-teal-600 p-1 rounded-2xl shadow-2xl shadow-cyan-500/30 inline-block mx-auto ${!isGeneratingInvoice && !paymentSuccess ? 'qr-pulse' : ''}`}>
-                                        <div className="bg-white p-3 rounded-xl relative min-h-[200px] min-w-[200px] flex items-center justify-center">
-                                            {isGeneratingInvoice ? (
-                                                <div className="flex flex-col items-center">
-                                                    <Icons.Zap className="text-brand-accent animate-bounce mb-2" size={32} />
-                                                    <span className="text-slate-900 text-xs font-bold">Generating Invoice...</span>
-                                                </div>
-                                            ) : (
-                                                <img
-                                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentInvoice)}`}
-                                                    className="w-48 h-48"
-                                                    alt="Payment QR"
-                                                />
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Listening Indicator - Moved Closer */}
-                                    {!isGeneratingInvoice && !paymentSuccess && (
-                                        <div className="pt-2 flex items-center justify-center space-x-2 text-brand-primary animate-pulse">
-                                            <Icons.Zap size={14} />
-                                            <span className="text-[10px] font-bold uppercase tracking-wider">Listening for payment...</span>
-                                        </div>
-                                    )}
-
-                                    {/* Payment Actions */}
-                                    <div className="pt-4 space-y-3">
-                                        {/* Primary Pay with App Wallet */}
-                                        <Button
-                                            fullWidth
-                                            onClick={handlePayWithWallet}
-                                            className="text-sm py-3 button-gleam"
-                                            disabled={isPayingWallet}
-                                        >
-                                            <div className="flex items-center justify-center space-x-2">
-                                                <span>{isPayingWallet ? 'Processing...' : `Pay ${(entryFee + acePot).toLocaleString()} SATS with App Wallet`}</span>
-                                                <Icons.Wallet size={18} />
+                                        {/* Error Banner */}
+                                        {paymentError && (
+                                            <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 flex items-start space-x-2 text-left animate-in fade-in slide-in-from-top-2">
+                                                <Icons.Close className="text-red-500 shrink-0 mt-0.5" size={16} />
+                                                <p className="text-xs text-red-200 font-bold leading-tight">{paymentError}</p>
                                             </div>
-                                        </Button>
+                                        )}
 
-                                        {/* External Wallet */}
-                                        <Button
-                                            fullWidth
-                                            onClick={handleOpenLightningWallet}
-                                            variant="secondary"
-                                            className="text-xs py-2"
-                                        >
-                                            Open Lightning Wallet
-                                        </Button>
+                                        {/* Amount Display - Moved BEFORE QR Code */}
+                                        <div>
+                                            <p className="text-2xl font-bold text-brand-accent">{entryFee + acePot} SATS</p>
+                                            <p className="text-xs text-slate-500">Entry: {entryFee} | Ace Pot: {acePot}</p>
+                                        </div>
+
+                                        {/* Inline Copy Invoice */}
+                                        {!isGeneratingInvoice && (
+                                            <div
+                                                onClick={handleCopyInvoice}
+                                                className="flex items-center justify-center space-x-2 mb-2 cursor-pointer text-brand-primary hover:text-brand-accent transition-colors"
+                                            >
+                                                <span className="text-xs font-mono opacity-80">
+                                                    {paymentInvoice.slice(0, 8)}...{paymentInvoice.slice(-8)}
+                                                </span>
+                                                <Icons.Copy size={12} />
+                                            </div>
+                                        )}
+
+                                        {/* QR Code Block with Pulse and Colorful Border */}
+                                        <div className={`bg-gradient-to-br from-emerald-400 via-cyan-500 to-teal-600 p-1 rounded-2xl shadow-2xl shadow-cyan-500/30 inline-block mx-auto ${!isGeneratingInvoice && !paymentSuccess ? 'qr-pulse' : ''}`}>
+                                            <div className="bg-white p-3 rounded-xl relative min-h-[200px] min-w-[200px] flex items-center justify-center">
+                                                {isGeneratingInvoice ? (
+                                                    <div className="flex flex-col items-center">
+                                                        <Icons.Zap className="text-brand-accent animate-bounce mb-2" size={32} />
+                                                        <span className="text-slate-900 text-xs font-bold">Generating Invoice...</span>
+                                                    </div>
+                                                ) : (
+                                                    <img
+                                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(paymentInvoice)}`}
+                                                        className="w-48 h-48"
+                                                        alt="Payment QR"
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Listening Indicator - Moved Closer */}
+                                        {!isGeneratingInvoice && !paymentSuccess && (
+                                            <div className="pt-2 flex items-center justify-center space-x-2 text-brand-primary animate-pulse">
+                                                <Icons.Zap size={14} />
+                                                <span className="text-[10px] font-bold uppercase tracking-wider">Listening for payment...</span>
+                                            </div>
+                                        )}
+
+                                        {/* Payment Actions */}
+                                        <div className="pt-4 space-y-3">
+                                            {/* Primary Pay with App Wallet */}
+                                            <Button
+                                                fullWidth
+                                                onClick={handlePayWithWallet}
+                                                className="text-sm py-3 button-gleam"
+                                                disabled={isPayingWallet}
+                                            >
+                                                <div className="flex items-center justify-center space-x-2">
+                                                    <span>{isPayingWallet ? 'Processing...' : `Pay ${(entryFee + acePot).toLocaleString()} SATS with App Wallet`}</span>
+                                                    <Icons.Wallet size={18} />
+                                                </div>
+                                            </Button>
+
+                                            {/* External Wallet */}
+                                            <Button
+                                                fullWidth
+                                                onClick={handleOpenLightningWallet}
+                                                variant="secondary"
+                                                className="text-xs py-2"
+                                            >
+                                                Open Lightning Wallet
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
+                            </div>
+                        )
+                    }
+
+                </div>
+
+                {/* TEE ORDER INFO MODAL */}
+                {
+                    showTeeOrderInfo && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                            <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-200">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-10 h-10 bg-brand-secondary/20 rounded-xl flex items-center justify-center">
+                                            <Icons.Users size={20} className="text-brand-secondary" />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-white">Tee Order</h3>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowTeeOrderInfo(false)}
+                                        className="text-slate-400 hover:text-white transition-colors"
+                                    >
+                                        <Icons.Close size={20} />
+                                    </button>
+                                </div>
+                                <div className="space-y-3 text-sm text-slate-300">
+                                    <p>
+                                        When enabled, the player who scored best on the previous hole will tee off first on the next hole.
+                                    </p>
+                                    <p className="text-slate-400 text-xs">
+                                        This follows the traditional "honor system" in disc golf where the best performer earns the honor of throwing first.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setShowTeeOrderInfo(false)}
+                                    className="w-full mt-5 bg-brand-secondary text-black font-bold py-3 rounded-xl hover:bg-brand-secondary/90 transition-colors"
+                                >
+                                    Got it
+                                </button>
                             </div>
                         </div>
                     )
                 }
-
-            </div >
+            </>
         );
     }
 
