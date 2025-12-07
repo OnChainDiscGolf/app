@@ -5,14 +5,14 @@ import { AppState, Player, RoundSettings, WalletTransaction, UserProfile, UserSt
 import { DEFAULT_HOLE_COUNT, BREEZ_API_KEY } from '../constants';
 import { publishProfile, publishRound, publishScore, subscribeToRound, subscribeToPlayerRounds, fetchProfile, fetchUserHistory, getSession, loginWithNsec, loginWithNip46, loginWithAmber, generateNewProfile, generateNewProfileFromMnemonic, loginWithMnemonic as nostrLoginWithMnemonic, logout as nostrLogout, publishWalletBackup, fetchWalletBackup, publishRecentPlayers, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, sendDirectMessage, subscribeToDirectMessages, subscribeToGiftWraps, subscribeToNutzaps, subscribeToLightningGiftWraps, fetchHistoricalGiftWraps, getMagicLightningAddress } from '../services/nostrService';
 import { getAuthSource, hasStoredMnemonic, hasUnifiedSeed, AuthSource, retrieveMnemonicEncrypted, clearMnemonicStorage } from '../services/mnemonicService';
-import { 
-    initializeBreez, 
-    isBreezInitialized, 
-    getBreezBalance, 
-    subscribeToPayments as subscribeToBreezEvents,
-    disconnectBreez,
-    getPaymentHistory,
-    syncBreez
+import {
+  initializeBreez,
+  isBreezInitialized,
+  getBreezBalance,
+  subscribeToPayments as subscribeToBreezEvents,
+  disconnectBreez,
+  getPaymentHistory,
+  syncBreez
 } from '../services/breezService';
 import { checkPendingPayments, NpubCashQuote, subscribeToQuoteUpdates, unsubscribeFromQuoteUpdates, getQuoteById, registerWithAllGateways, checkGatewayRegistration, subscribeToAllGatewayUpdates } from '../services/npubCashService';
 import { checkGatewayRegistration as getGatewayRegistrations } from '../services/npubCashService';
@@ -65,7 +65,7 @@ interface AppContextType extends AppState {
   performLogout: () => void;
   isProfileLoading: boolean;
   createToken: (amount: number) => Promise<string>;
-  
+
   // Auth Info
   authSource: AuthSource | null;
   hasUnifiedBackup: boolean;
@@ -74,7 +74,7 @@ interface AppContextType extends AppState {
   setWalletMode: (mode: 'cashu' | 'nwc' | 'breez') => void;
   setNwcConnection: (uri: string) => void;
   checkForPayments: () => Promise<number>;
-  
+
   // Individual Wallet Balances (for cumulative view)
   walletBalances: {
     cashu: number;
@@ -122,7 +122,7 @@ interface AppContextType extends AppState {
   setRecentPlayersState: (players: DisplayProfile[]) => void;
   restoreWalletFromBackup: (backup: { proofs: Proof[]; mints: Mint[]; transactions: WalletTransaction[] }) => void;
   initializeSubscriptions: (pubkey: string) => void;
-  
+
   // Resume/foreground reconciliation
   reconcileOnResume: () => Promise<void>;
 }
@@ -137,7 +137,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authMethod, setAuthMethod] = useState<'local' | 'nip46' | 'amber' | null>(null);
   const [currentUserPubkey, setCurrentUserPubkey] = useState('');
   const [isProfileLoading, setIsProfileLoading] = useState(false);
-  
+
   // Mnemonic/Auth Source State
   const [authSource, setAuthSourceState] = useState<AuthSource | null>(() => getAuthSource());
   const [hasUnifiedBackup, setHasUnifiedBackup] = useState<boolean>(() => hasUnifiedSeed());
@@ -162,7 +162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return 0;
   });
-  
+
   // Individual wallet balances for cumulative view
   const [walletBalances, setWalletBalances] = useState<{
     cashu: number;
@@ -276,6 +276,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const subRef = useRef<any>(null);
   const walletServiceRef = useRef<WalletService | null>(null);
   const nwcServiceRef = useRef<NWCService | null>(null);
+
+  // Track recently animated payment IDs to prevent duplicate animations
+  // This handles race conditions between event subscriptions and reconciliation
+  const animatedPaymentIdsRef = useRef<Set<string>>(new Set());
 
   // Payment Notification State
   const [paymentNotification, setPaymentNotification] = useState<{
@@ -656,27 +660,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const initBreezWallet = async () => {
         // Check if user has a mnemonic (unified or Breez-specific)
         const hasMnemonic = hasStoredMnemonic(false) || hasStoredMnemonic(true);
-        
+
         if (hasMnemonic && !isBreezInitialized()) {
           console.log('⚡ [AppContext] Starting Breez SDK initialization...');
-          
+
           // Try unified mnemonic first, then Breez-specific
           let mnemonic = retrieveMnemonicEncrypted(currentUserPubkey, false);
           if (!mnemonic) {
             mnemonic = retrieveMnemonicEncrypted(currentUserPubkey, true);
           }
-          
+
           if (mnemonic) {
             // Initialize Breez with API key config
             const breezConfig = {
               apiKey: BREEZ_API_KEY,
               environment: 'production' as const
             };
-            
+
             initializeBreez(mnemonic, breezConfig).then((success) => {
               if (success) {
                 console.log('✅ [AppContext] Breez SDK initialized successfully');
-                
+
                 // Subscribe to Breez events for payment notifications
                 subscribeToBreezEvents(
                   // On payment received
@@ -690,18 +694,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   (payment) => {
                     const amountSats = payment.amountSats;
                     console.log(`⚡ Sent ${amountSats} sats via Breez (id: ${payment.id})`);
-                    
+
                     if (amountSats && amountSats > 0) {
                       // Record transaction in history with payment ID for deduplication
                       const txId = payment.id ? `breez-${payment.id}` : undefined;
                       addTransaction('send', amountSats, 'Sent via Breez Lightning', 'breez', { id: txId });
-                      
+
                       // Refresh balances after sending
                       refreshAllBalances();
                     }
                   }
                 );
-                
+
                 // Refresh balances now that Breez is ready
                 refreshAllBalances();
               }
@@ -711,7 +715,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
       };
-      
+
       // Start Breez initialization in background (don't await)
       initBreezWallet();
     }
@@ -864,9 +868,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               console.log(`⚡ Lightning nutzap received: ${amount} sats (event: ${event.id})`);
 
               // Add transaction and show notification (use event.id for deduplication)
+              // handleIncomingPayment already calls setLightningStrike, setPaymentNotification, and refreshAllBalances
               handleIncomingPayment('cashu', amount, 'Received via Lightning Zap', event.id);
-              setPaymentNotification({ amount, context: 'wallet_receive' });
-              setLightningStrike({ amount, show: true });
 
               // Play lightning strike sound
               try {
@@ -876,9 +879,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               } catch (e) {
                 console.warn('Audio not supported:', e);
               }
-
-              // Trigger balance refresh to ensure UI updates
-              refreshWalletBalance();
             }
           }
         } catch (e) {
@@ -1036,10 +1036,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.setItem(processedKey, Date.now().toString());
 
             // Add transaction record (use quoteId for deduplication)
+            // handleIncomingPayment already calls setLightningStrike, setPaymentNotification, and refreshAllBalances
             handleIncomingPayment('cashu', quote.amount, `Received via ${gateway}`, quoteId);
-
-            // Trigger lightning strike notification
-            setLightningStrike({ amount: quote.amount, show: true });
 
             console.log(`✅ [${gateway}] Successfully received ${quote.amount} sats!`);
 
@@ -1138,7 +1136,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Generate new identity from mnemonic (NIP-06 / BIP-89)
     // This creates both Nostr keys AND Breez wallet seed from the same 12 words
     const { mnemonic, pk } = generateNewProfileFromMnemonic();
-    
+
     setCurrentUserPubkey(pk);
     setAuthMethod('local');
     setAuthSourceState('mnemonic');
@@ -1187,7 +1185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.error("⚠️ Failed to create initial wallet backup:", e);
     }
-    
+
     return { mnemonic };
   };
 
@@ -1286,7 +1284,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('gateway_registrations');
 
     // Clear processed payment tracking keys
-    Object.keys(localStorage).filter(k => 
+    Object.keys(localStorage).filter(k =>
       k.startsWith('processed_token_') || k.startsWith('processed_quote_')
     ).forEach(k => localStorage.removeItem(k));
 
@@ -1732,7 +1730,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // I won, I keep the pot (which I already hold as host)
         addTransaction('payout', prize, `Won Round: ${activeRound.name}`);
         payoutsMade.push({ playerName: winner.name, amount: prize, isCurrentUser: true });
-        
+
         // Update modal with payout info
         setRoundSummary(prev => prev ? {
           ...prev,
@@ -1743,21 +1741,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Someone else won, pay them via their Lightning Address
         try {
           const winnerLightningAddress = winner.lightningAddress || getMagicLightningAddress(winner.id);
-          
+
           if (!winnerLightningAddress) {
             throw new Error("Winner has no Lightning Address configured");
           }
-          
+
           console.log(`💸 Paying ${prize} sats to winner ${winner.name} at ${winnerLightningAddress}`);
-          
+
           const invoice = await resolveLightningAddress(winnerLightningAddress, prize);
-          
+
           if (!invoice) {
             throw new Error(`Could not get invoice from ${winnerLightningAddress}`);
           }
-          
+
           const success = await sendFunds(prize, invoice);
-          
+
           if (success) {
             console.log(`✅ Successfully paid ${prize} sats to ${winner.name}`);
             addTransaction('payout', prize, `Payout to ${winner.name}`);
@@ -1771,7 +1769,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           // Show error in modal or alert
           alert(`Failed to pay winner: ${errorMessage}. Please pay manually.`);
         }
-        
+
         // Update modal with payout info (whether success or fail)
         setRoundSummary(prev => prev ? {
           ...prev,
@@ -1783,7 +1781,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Pay ace pot if someone got an ace
     if (aceWinners.length > 0 && acePotAmount > 0) {
-      const aceWinner = players.find(p => 
+      const aceWinner = players.find(p =>
         p.scores && Object.values(p.scores).includes(1)
       );
       if (aceWinner) {
@@ -1821,7 +1819,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         acePotFeeSats: activeRound.acePotFeeSats,
         finalizedAt: Date.now()
       };
-      
+
       const existingHistory = localStorage.getItem('cdg_round_history');
       const history = existingHistory ? JSON.parse(existingHistory) : [];
       // Add new round at the beginning, limit to 50 rounds
@@ -1925,7 +1923,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const refreshWalletBalance = async () => {
     setIsBalanceLoading(true);
-    
+
     // Breez Logic
     if (walletMode === 'breez') {
       if (isBreezInitialized()) {
@@ -1943,7 +1941,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsBalanceLoading(false);
       return;
     }
-    
+
     // NWC Logic
     if (walletMode === 'nwc') {
       if (nwcServiceRef.current) {
@@ -1991,7 +1989,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           }
         }).catch(e => console.warn("Refresh Gift Wrap check failed:", e))
-        .finally(() => setIsBalanceLoading(false));
+          .finally(() => setIsBalanceLoading(false));
 
         // NOTE: npub.cash payments now handled by WebSocket subscription
       } else {
@@ -2042,7 +2040,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch (e) {
           const errorMsg = e instanceof Error ? e.message : String(e);
           console.warn(`Failed to verify proofs for ${mintUrl}:`, errorMsg);
-          
+
           // Check for keyset mismatch - clear those proofs
           if (errorMsg.includes('different units') || errorMsg.includes('keyset') || errorMsg.includes('unknown keyset')) {
             console.warn(`⚠️ Keyset mismatch for ${mintUrl}. Clearing invalid proofs.`);
@@ -2050,7 +2048,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // Don't add these proofs to allValidProofs - they're invalid
             continue;
           }
-          
+
           // If verification fails for other reasons (network), keep original proofs to be safe
           allValidProofs = [...allValidProofs, ...mintProofs];
         }
@@ -2105,9 +2103,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshAllBalances = useCallback(async () => {
     setIsBalanceLoading(true);
     console.log("🔄 Refreshing all wallet balances...");
-    
+
     const newBalances = { cashu: 0, nwc: 0, breez: 0 };
-    
+
     // 1. Get Cashu balance from proofs
     try {
       if (proofs.length > 0) {
@@ -2117,7 +2115,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn("Failed to get Cashu balance:", e);
     }
-    
+
     // 2. Get NWC balance (if connected)
     if (nwcServiceRef.current && nwcString) {
       try {
@@ -2128,7 +2126,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn("Failed to get NWC balance:", e);
       }
     }
-    
+
     // 3. Get Breez balance (if initialized)
     try {
       if (isBreezInitialized()) {
@@ -2139,9 +2137,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn("Failed to get Breez balance:", e);
     }
-    
+
     setWalletBalances(newBalances);
-    
+
     // Also update the main walletBalance based on current mode
     if (walletMode === 'cashu') {
       setWalletBalance(newBalances.cashu);
@@ -2150,10 +2148,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else if (walletMode === 'breez') {
       setWalletBalance(newBalances.breez);
     }
-    
+
     const total = newBalances.cashu + newBalances.nwc + newBalances.breez;
     console.log(`📊 Total balance across all wallets: ${total} sats`);
-    
+
     setIsBalanceLoading(false);
   }, [walletMode, nwcString, proofs]);
 
@@ -2169,11 +2167,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     paymentId?: string
   ) => {
     if (!amount || amount <= 0) return;
+
     // Use payment ID for deduplication if provided
     const txId = paymentId ? `${walletType}-${paymentId}` : undefined;
+
+    // Check if we've already animated this payment (prevents race condition duplicates)
+    if (txId && animatedPaymentIdsRef.current.has(txId)) {
+      console.log(`⚡ [handleIncomingPayment] Already animated payment ${txId}, skipping animation`);
+      addTransaction('receive', amount, description, walletType, { id: txId });
+      refreshAllBalances();
+      return;
+    }
+
+    // Mark as animated
+    if (txId) {
+      animatedPaymentIdsRef.current.add(txId);
+      // Clean up after 30 seconds to prevent memory leak
+      setTimeout(() => animatedPaymentIdsRef.current.delete(txId), 30000);
+    }
+
     addTransaction('receive', amount, description, walletType, { id: txId });
     setLightningStrike({ amount, show: true });
-    setPaymentNotification({ amount, context: 'wallet_receive' });
+    // Note: We only set lightningStrike, NOT paymentNotification
+    // Setting both would cause double animation (paymentNotification plays after lightningStrike resets)
     refreshAllBalances();
   }, [refreshAllBalances]);
 
@@ -2190,7 +2206,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const history = await getPaymentHistory();
       if (!history || history.length === 0) return;
 
-      let latestReceive: { amount: number; timestamp: number } | null = null;
+      // Track new receives found during reconciliation (only for transactions NOT already processed)
+      let latestNewReceive: { amount: number; timestamp: number } | null = null;
 
       setTransactions(prev => {
         const existingIds = new Set(prev.map(t => t.id));
@@ -2202,7 +2219,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (!p.amountSats || p.amountSats <= 0) continue;
 
           const txId = `breez-${p.id}`;
+          // Skip if already processed (by event subscription or previous reconciliation)
           if (existingIds.has(txId)) continue;
+
+          // Also skip if this payment was already animated by the event subscription
+          // (handles race condition where animation fired but setTransactions hasn't completed)
+          if (animatedPaymentIdsRef.current.has(txId)) {
+            console.log(`🔄 [Breez Reconciliation] Payment ${txId} already animated, skipping animation`);
+            continue;
+          }
 
           // Breez timestamps are in seconds, convert to milliseconds for JS Date
           const tsSeconds = Math.floor(p.timestamp || Date.now() / 1000);
@@ -2218,9 +2243,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           toAdd.push(tx);
 
+          // Only track as "new" receive if it's being added for the first time AND wasn't animated already
+          // This prevents double-animation when event subscription already handled it
           if (tx.type === 'receive') {
-            if (!latestReceive || tsMillis > latestReceive.timestamp) {
-              latestReceive = { amount: tx.amountSats, timestamp: tsMillis };
+            if (!latestNewReceive || tsMillis > latestNewReceive.timestamp) {
+              latestNewReceive = { amount: tx.amountSats, timestamp: tsMillis };
             }
           }
         }
@@ -2232,9 +2259,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return next;
       });
 
-      if (latestReceive) {
-        setLightningStrike({ amount: latestReceive.amount, show: true });
-        setPaymentNotification({ amount: latestReceive.amount, context: 'wallet_receive' });
+      // Only trigger animation for truly NEW receives (not already processed by event subscription)
+      // The event subscription adds transactions with `breez-{id}` format, so if we get here
+      // with a new receive, it means it wasn't caught by the realtime subscription
+      if (latestNewReceive) {
+        console.log(`🔄 [Breez Reconciliation] Found missed payment, showing animation for ${latestNewReceive.amount} sats`);
+        setLightningStrike({ amount: latestNewReceive.amount, show: true });
+        // Note: We only set lightningStrike, NOT paymentNotification
+        // Setting both would cause double animation
         await refreshAllBalances();
       }
     } catch (e) {
@@ -2442,11 +2474,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Validate proofs before using them
     const validProofs = proofs.filter(proof => {
       return proof &&
-             typeof proof === 'object' &&
-             proof.id &&
-             proof.amount &&
-             proof.secret &&
-             proof.C;
+        typeof proof === 'object' &&
+        proof.id &&
+        proof.amount &&
+        proof.secret &&
+        proof.C;
     });
 
     if (validProofs.length === 0) {
@@ -2520,8 +2552,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return updatedTxs;
       });
 
-      // Trigger payment notification and lightning strike for auto-received payments
-      setPaymentNotification({ amount, context: 'wallet_receive' });
+      // Trigger lightning strike for auto-received payments
+      // Note: We only set lightningStrike, NOT paymentNotification
+      // Setting both would cause double animation
       setLightningStrike({ amount, show: true });
 
       // Play lightning strike sound

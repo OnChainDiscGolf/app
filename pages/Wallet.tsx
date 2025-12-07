@@ -10,9 +10,9 @@ import { useNavigate } from 'react-router-dom';
 import { getBtcPrice, satsToUsd } from '../services/priceService';
 import { generateMnemonic, storeMnemonicEncrypted, retrieveMnemonicEncrypted, hasStoredMnemonic, hasUnifiedSeed } from '../services/mnemonicService';
 import { downloadWalletCardPDF } from '../services/backupService';
-import { 
-    isBreezInitialized, 
-    getSparkAddress, 
+import {
+    isBreezInitialized,
+    getSparkAddress,
     createInvoice as createBreezInvoice,
     prepareSendPayment,
     sendPayment as sendBreezPayment,
@@ -33,11 +33,11 @@ const SuccessOverlay: React.FC<{
     type?: 'sent' | 'received' | 'deposit'
 }> = ({ message, subMessage, onClose, type }) => {
     const [showContent, setShowContent] = useState(false);
-    
+
     useEffect(() => {
         // Stagger content appearance
         const showTimer = setTimeout(() => setShowContent(true), 100);
-        
+
         // Auto-close timing
         const duration = type === 'received' ? 4000 : 2500;
         const closeTimer = setTimeout(() => {
@@ -45,7 +45,7 @@ const SuccessOverlay: React.FC<{
                 onClose();
             }
         }, duration);
-        
+
         return () => {
             clearTimeout(showTimer);
             clearTimeout(closeTimer);
@@ -62,46 +62,46 @@ const SuccessOverlay: React.FC<{
     return (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center animate-in fade-in duration-200">
             {/* Gradient background */}
-            <div 
+            <div
                 className={`absolute inset-0 bg-gradient-to-br ${theme.bg} via-slate-900/95 to-black/98 backdrop-blur-md`}
             />
-            
+
             {/* Radial glow behind icon */}
-            <div 
+            <div
                 className="absolute w-64 h-64 rounded-full opacity-30 blur-3xl animate-pulse"
                 style={{ background: `radial-gradient(circle, ${theme.color} 0%, transparent 70%)` }}
             />
-            
+
             {/* Content */}
             <div className={`relative z-10 flex flex-col items-center transition-all duration-500 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                 {/* Success icon with ring animation */}
                 <div className="relative mb-6">
                     {/* Outer ring pulse */}
-                    <div 
+                    <div
                         className="absolute inset-0 rounded-full animate-ping opacity-20"
-                        style={{ 
+                        style={{
                             background: theme.color,
                             animationDuration: '1.5s',
                             animationIterationCount: '2'
                         }}
                     />
                     {/* Icon container */}
-                    <div 
+                    <div
                         className={`relative w-20 h-20 rounded-full flex items-center justify-center shadow-2xl ${theme.glow}`}
                         style={{ background: `linear-gradient(135deg, ${theme.color}, ${theme.color}dd)` }}
                     >
                         <Icons.CheckMark size={40} className="text-white" strokeWidth={3} />
-            </div>
+                    </div>
                 </div>
-                
+
                 {/* Message */}
-                <h3 
+                <h3
                     className="text-2xl font-bold text-white mb-2 text-center"
                     style={{ textShadow: `0 0 30px ${theme.color}60` }}
                 >
                     {message}
                 </h3>
-                
+
                 {/* Sub message */}
                 {subMessage && (
                     <p className="text-slate-400 text-base text-center max-w-xs">
@@ -110,18 +110,18 @@ const SuccessOverlay: React.FC<{
                 )}
 
                 {/* Continue button for received */}
-            {type === 'received' && (
-                <button
-                    onClick={onClose}
+                {type === 'received' && (
+                    <button
+                        onClick={onClose}
                         className="mt-8 px-8 py-3 rounded-xl font-bold text-white transition-all hover:scale-105 active:scale-95"
-                        style={{ 
+                        style={{
                             background: `linear-gradient(135deg, ${theme.color}, ${theme.color}cc)`,
                             boxShadow: `0 4px 20px ${theme.color}40`
                         }}
-                >
-                    Continue
-                </button>
-            )}
+                    >
+                        Continue
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -133,19 +133,19 @@ const ProcessingOverlay: React.FC<{ message: string }> = ({ message }) => {
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center animate-in fade-in duration-200">
             {/* Dark gradient backdrop */}
             <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-black/95 to-slate-900/95 backdrop-blur-md" />
-            
+
             {/* Pulsing glow */}
-            <div 
+            <div
                 className="absolute w-48 h-48 rounded-full opacity-20 blur-3xl animate-pulse"
                 style={{ background: 'radial-gradient(circle, #f97316 0%, transparent 70%)' }}
             />
-            
+
             {/* Content */}
             <div className="relative z-10 flex flex-col items-center">
                 {/* Animated lightning bolt loader */}
                 <div className="relative w-16 h-16 mb-6">
                     {/* Rotating ring */}
-                    <div 
+                    <div
                         className="absolute inset-0 rounded-full border-2 border-orange-500/30"
                         style={{
                             borderTopColor: '#f97316',
@@ -153,7 +153,7 @@ const ProcessingOverlay: React.FC<{ message: string }> = ({ message }) => {
                         }}
                     />
                     {/* Inner glow ring */}
-                    <div 
+                    <div
                         className="absolute inset-2 rounded-full border border-orange-500/20"
                         style={{
                             borderTopColor: '#fb923c',
@@ -162,30 +162,30 @@ const ProcessingOverlay: React.FC<{ message: string }> = ({ message }) => {
                     />
                     {/* Center lightning icon */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <svg 
-                            width="24" 
-                            height="24" 
-                            viewBox="0 0 24 24" 
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
                             fill="none"
                             className="text-orange-400 animate-pulse"
                             style={{ filter: 'drop-shadow(0 0 8px #f97316)' }}
                         >
-                            <path 
-                                d="M13 2L4.09344 12.6879C3.74463 13.1064 3.57023 13.3157 3.56756 13.4925C3.56524 13.6461 3.63372 13.7923 3.75324 13.8889C3.89073 14 4.16316 14 4.70802 14H12L11 22L19.9065 11.3121C20.2553 10.8936 20.4297 10.6843 20.4324 10.5075C20.4347 10.3539 20.3663 10.2077 20.2467 10.1111C20.1092 10 19.8368 10 19.292 10H12L13 2Z" 
+                            <path
+                                d="M13 2L4.09344 12.6879C3.74463 13.1064 3.57023 13.3157 3.56756 13.4925C3.56524 13.6461 3.63372 13.7923 3.75324 13.8889C3.89073 14 4.16316 14 4.70802 14H12L11 22L19.9065 11.3121C20.2553 10.8936 20.4297 10.6843 20.4324 10.5075C20.4347 10.3539 20.3663 10.2077 20.2467 10.1111C20.1092 10 19.8368 10 19.292 10H12L13 2Z"
                                 fill="currentColor"
                             />
                         </svg>
                     </div>
                 </div>
-                
+
                 {/* Message with subtle animation */}
-                <h3 
+                <h3
                     className="text-lg font-bold text-white"
                     style={{ textShadow: '0 0 20px rgba(249,115,22,0.4)' }}
                 >
                     {message}
                 </h3>
-                
+
                 {/* Animated dots */}
                 <div className="flex space-x-1 mt-3">
                     <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -205,7 +205,7 @@ const HelpModal: React.FC<{
     onAction?: (action: string) => void;
 }> = ({ isOpen, title, text, onClose, onAction }) => {
     if (!isOpen) return null;
-    
+
     const handleContentClick = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
         const action = target.getAttribute('data-action');
@@ -213,7 +213,7 @@ const HelpModal: React.FC<{
             onAction(action);
         }
     };
-    
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
             <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -228,19 +228,19 @@ const HelpModal: React.FC<{
                         </div>
                         <button onClick={onClose} className="text-slate-400 hover:text-white p-1">
                             <Icons.Close size={20} />
-                    </button>
+                        </button>
+                    </div>
                 </div>
-                </div>
-                
+
                 {/* Content */}
                 <div className="p-5 max-h-[60vh] overflow-y-auto">
-                    <div 
+                    <div
                         className="text-slate-300 text-sm leading-relaxed"
                         dangerouslySetInnerHTML={{ __html: text }}
                         onClick={handleContentClick}
                     />
                 </div>
-                
+
                 {/* Footer */}
                 <div className="p-4 border-t border-slate-800">
                     <Button fullWidth onClick={onClose}>Got it</Button>
@@ -282,17 +282,17 @@ const ExpandableWalletTile: React.FC<{
             details: `Already using Alby, Zeus, or another Lightning wallet? Plug it right in! NWC (Nostr Wallet Connect) lets apps talk to your wallet securely. You keep full control — this app just sends payment requests.`
         }
     };
-    
+
     const c = config[type];
     const colorClasses = {
         blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', hover: 'hover:bg-blue-500/20', text: 'text-blue-400' },
         emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', hover: 'hover:bg-emerald-500/20', text: 'text-emerald-400' },
         purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', hover: 'hover:bg-purple-500/20', text: 'text-purple-400' }
     }[c.color];
-    
+
     return (
         <div className={`${colorClasses.bg} border ${colorClasses.border} rounded-lg overflow-hidden transition-all duration-300`}>
-            <button 
+            <button
                 onClick={onToggle}
                 className={`w-full p-3 ${colorClasses.hover} transition-colors text-left`}
             >
@@ -302,19 +302,18 @@ const ExpandableWalletTile: React.FC<{
                         <span className={`font-bold ${colorClasses.text}`}>{c.title}</span>
                         {c.badge && <span className="text-slate-500 text-xs italic">{c.badge}</span>}
                     </div>
-                    <Icons.ChevronDown 
-                        size={16} 
-                        className={`${colorClasses.text} transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} 
+                    <Icons.ChevronDown
+                        size={16}
+                        className={`${colorClasses.text} transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
                     />
                 </div>
                 <p className="text-xs text-slate-400 mt-1">{c.subtitle}</p>
             </button>
-            
+
             {/* Expandable Content */}
-            <div 
-                className={`overflow-hidden transition-all duration-300 ease-out ${
-                    isExpanded ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
-                }`}
+            <div
+                className={`overflow-hidden transition-all duration-300 ease-out ${isExpanded ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
+                    }`}
             >
                 <div className="px-3 pb-3 pt-1 border-t border-slate-700/50">
                     <p className="text-xs text-slate-400 leading-relaxed">{c.details}</p>
@@ -335,13 +334,13 @@ const WalletHelpModal: React.FC<{
     showNewToBitcoin?: boolean;
 }> = ({ isOpen, onClose, onLightningClick, onWhyThreeClick, onNewToBitcoinClick, onSatoshiClick, showNewToBitcoin = false }) => {
     const [expandedWallet, setExpandedWallet] = useState<string | null>(null);
-    
+
     if (!isOpen) return null;
-    
+
     const toggleWallet = (type: string) => {
         setExpandedWallet(expandedWallet === type ? null : type);
     };
-    
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
             <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -359,7 +358,7 @@ const WalletHelpModal: React.FC<{
                         </button>
                     </div>
                 </div>
-                
+
                 {/* Content */}
                 <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                     <p className="text-slate-300 text-sm">
@@ -373,7 +372,7 @@ const WalletHelpModal: React.FC<{
                         </button>
                         {' '}(or sats).
                     </p>
-                    
+
                     <div>
                         <p className="font-bold text-white mb-2">💡 Quick Tips:</p>
                         <ul className="list-disc ml-5 space-y-1 text-sm text-slate-300">
@@ -381,7 +380,7 @@ const WalletHelpModal: React.FC<{
                             <li><strong>Pull down</strong> to refresh your balance</li>
                         </ul>
                     </div>
-                    
+
                     <div>
                         <div className="flex items-center space-x-2 mb-2">
                             <p className="font-bold text-white">🔄 Three Wallet Options</p>
@@ -389,30 +388,30 @@ const WalletHelpModal: React.FC<{
                                 (Why three?)
                             </button>
                         </div>
-                        
+
                         <div className="space-y-2">
-                            <ExpandableWalletTile 
-                                type="breez" 
-                                isExpanded={expandedWallet === 'breez'} 
-                                onToggle={() => toggleWallet('breez')} 
+                            <ExpandableWalletTile
+                                type="breez"
+                                isExpanded={expandedWallet === 'breez'}
+                                onToggle={() => toggleWallet('breez')}
                             />
-                            <ExpandableWalletTile 
-                                type="cashu" 
-                                isExpanded={expandedWallet === 'cashu'} 
-                                onToggle={() => toggleWallet('cashu')} 
+                            <ExpandableWalletTile
+                                type="cashu"
+                                isExpanded={expandedWallet === 'cashu'}
+                                onToggle={() => toggleWallet('cashu')}
                             />
-                            <ExpandableWalletTile 
-                                type="nwc" 
-                                isExpanded={expandedWallet === 'nwc'} 
-                                onToggle={() => toggleWallet('nwc')} 
+                            <ExpandableWalletTile
+                                type="nwc"
+                                isExpanded={expandedWallet === 'nwc'}
+                                onToggle={() => toggleWallet('nwc')}
                             />
                         </div>
                     </div>
-                    
+
                     <p className="text-xs text-slate-500">
                         Tap a wallet above for more details. Switch anytime using the selector at the top.
                     </p>
-                    
+
                     {/* New to Bitcoin - shows when user has balance */}
                     {showNewToBitcoin && (
                         <button
@@ -432,7 +431,7 @@ const WalletHelpModal: React.FC<{
                         </button>
                     )}
                 </div>
-                
+
                 {/* Footer */}
                 <div className="p-4 border-t border-slate-800">
                     <Button fullWidth onClick={onClose}>Got it</Button>
@@ -529,23 +528,23 @@ const WalletModeSwitcher: React.FC<{
                     relative flex items-center justify-center rounded-lg transition-all duration-300 ease-out
                     px-2.5 py-1.5 min-h-[36px]
                     ${isAllActive && !isExpanded
-                        ? `${allColors.active} ${allColors.border} border` 
+                        ? `${allColors.active} ${allColors.border} border`
                         : `${allColors.inactive} border border-transparent`
                     }
                 `}
             >
-                <Icons.Bitcoin 
-                    size={24} 
-                    className={`${allColors.text} transition-all duration-300`} 
+                <Icons.Bitcoin
+                    size={24}
+                    className={`${allColors.text} transition-all duration-300`}
                 />
             </button>
-            
+
             {/* Individual wallet buttons - shown when expanded or animating */}
             {shouldRender && (
-                <div 
+                <div
                     className="flex items-center justify-center origin-center overflow-hidden"
                     style={{
-                        animation: isClosing 
+                        animation: isClosing
                             ? 'wallet-collapse 350ms ease-in forwards'
                             : 'wallet-expand 300ms ease-out forwards',
                         // Fixed width: big enough to fit 3 icons + 1 label ("Lightning" is longest)
@@ -560,14 +559,14 @@ const WalletModeSwitcher: React.FC<{
                         const colors = getColorClasses(mode.color);
                         const IconComponent = mode.icon;
                         // Reverse the index for closing animation
-                        const animationDelay = isClosing 
-                            ? (modes.length - 1 - index) * 50 
+                        const animationDelay = isClosing
+                            ? (modes.length - 1 - index) * 50
                             : index * 50;
 
                         // When no wallet is selected (viewMode === 'all'), all buttons share space equally
                         // When a wallet IS selected, selected one expands for label, others stay compact
                         const hasSelection = viewMode !== 'all';
-                        
+
                         return (
                             <button
                                 key={mode.id}
@@ -575,8 +574,8 @@ const WalletModeSwitcher: React.FC<{
                                 className={`
                                     relative flex items-center justify-center rounded-lg transition-colors duration-200
                                     min-h-[36px] py-1.5 px-2
-                                    ${isActive 
-                                        ? `${colors.active} ${colors.border} border` 
+                                    ${isActive
+                                        ? `${colors.active} ${colors.border} border`
                                         : `${colors.inactive} border border-transparent`
                                     }
                                 `}
@@ -591,13 +590,13 @@ const WalletModeSwitcher: React.FC<{
                                     transform: 'scale(0.8) translateY(-8px)'
                                 }}
                             >
-                                <IconComponent 
-                                    size={ICON_SIZE} 
-                                    className={`${colors.text} flex-shrink-0 ${isActive ? 'mr-1' : ''}`} 
+                                <IconComponent
+                                    size={ICON_SIZE}
+                                    className={`${colors.text} flex-shrink-0 ${isActive ? 'mr-1' : ''}`}
                                 />
                                 {/* Only show label when this wallet is selected */}
                                 {isActive && (
-                                    <span 
+                                    <span
                                         className={`
                                             text-xs font-bold uppercase tracking-wide whitespace-nowrap
                                             ${colors.text}
@@ -611,7 +610,7 @@ const WalletModeSwitcher: React.FC<{
                     })}
                 </div>
             )}
-            
+
             {/* CSS Keyframes for smooth animations */}
             <style>{`
                 @keyframes wallet-expand {
@@ -665,25 +664,25 @@ const WalletModeSwitcher: React.FC<{
 
 // Color mapping for wallet modes
 const WALLET_COLORS = {
-    breez: { 
+    breez: {
         primary: 'rgb(59, 130, 246)',    // blue-500
         glow: 'rgba(59, 130, 246, 0.2)',
         glowStrong: 'rgba(59, 130, 246, 0.25)',
         border: 'rgba(59, 130, 246, 0.3)'
     },
-    cashu: { 
+    cashu: {
         primary: 'rgb(16, 185, 129)',    // emerald-500
         glow: 'rgba(16, 185, 129, 0.2)',
         glowStrong: 'rgba(16, 185, 129, 0.25)',
         border: 'rgba(16, 185, 129, 0.3)'
     },
-    nwc: { 
+    nwc: {
         primary: 'rgb(168, 85, 247)',    // purple-500
         glow: 'rgba(168, 85, 247, 0.2)',
         glowStrong: 'rgba(168, 85, 247, 0.25)',
         border: 'rgba(168, 85, 247, 0.3)'
     },
-    all: { 
+    all: {
         primary: 'rgb(249, 115, 22)',    // orange-500
         glow: 'rgba(249, 115, 22, 0.2)',
         glowStrong: 'rgba(249, 115, 22, 0.25)',
@@ -711,7 +710,7 @@ const getLeftGlowColor = (currentMode: 'breez' | 'cashu' | 'nwc'): 'breez' | 'ca
 export const Wallet: React.FC = () => {
     const { walletBalance, isBalanceLoading, transactions, userProfile, currentUserPubkey, mints, setActiveMint, addMint, removeMint, sendFunds, receiveEcash, depositFunds, checkDepositStatus, confirmDeposit, getLightningQuote, isAuthenticated, refreshWalletBalance, walletMode, nwcString, setWalletMode, setNwcConnection, checkForPayments, walletBalances, refreshAllBalances, authSource } = useApp();
     const navigate = useNavigate();
-    
+
     // Breez Wallet Creation State (for non-mnemonic users)
     const [hasBreezWallet, setHasBreezWallet] = useState<boolean>(() => {
         // Check if user has unified seed OR separate Breez mnemonic
@@ -721,7 +720,7 @@ export const Wallet: React.FC = () => {
     const [breezMnemonic, setBreezMnemonic] = useState<string | null>(null);
     const [showBreezMnemonic, setShowBreezMnemonic] = useState(false);
     const [isCreatingBreezWallet, setIsCreatingBreezWallet] = useState(false);
-    
+
     // Breez Receive State (must be at top level to satisfy React hooks rules)
     const [breezReceiveMode, setBreezReceiveMode] = useState<'address' | 'invoice'>('address');
     const [breezInvoiceAmount, setBreezInvoiceAmount] = useState('');
@@ -729,7 +728,7 @@ export const Wallet: React.FC = () => {
     const [breezSparkAddress, setBreezSparkAddress] = useState<string | null>(null);
     const [breezLnAddress, setBreezLnAddress] = useState<string | null>(null);
     const [isGeneratingBreezInvoice, setIsGeneratingBreezInvoice] = useState(false);
-    
+
     // Breez Send State (must be at top level to satisfy React hooks rules)
     const [breezSendInput, setBreezSendInput] = useState('');
     const [breezSendAmount, setBreezSendAmount] = useState('');
@@ -739,17 +738,20 @@ export const Wallet: React.FC = () => {
     const [isBreezParsing, setIsBreezParsing] = useState(false);
     const [isBreezSending, setIsBreezSending] = useState(false);
     const [breezSendError, setBreezSendError] = useState<string | null>(null);
-    
+
     // View mode for cumulative balance display ('all' shows total of all wallets)
     // Start in 'all' mode (collapsed) by default for cleaner UI
     const [viewMode, setViewMode] = useState<'all' | 'breez' | 'cashu' | 'nwc'>('all');
     const [isWalletSelectorExpanded, setIsWalletSelectorExpanded] = useState(false);
     const autoCollapseTimerRef = useRef<NodeJS.Timeout | null>(null);
-    
+
     // Track wallet mode for gradient transitions
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [transitionDirection, setTransitionDirection] = useState<'left' | 'right'>('left');
-    
+
+    // Track wallet switching for loading state
+    const [isWalletTransitioning, setIsWalletTransitioning] = useState(false);
+
     // Wallet selector expand/collapse handlers
     const clearAutoCollapseTimer = () => {
         if (autoCollapseTimerRef.current) {
@@ -757,7 +759,7 @@ export const Wallet: React.FC = () => {
             autoCollapseTimerRef.current = null;
         }
     };
-    
+
     const startAutoCollapseTimer = () => {
         clearAutoCollapseTimer();
         autoCollapseTimerRef.current = setTimeout(() => {
@@ -766,7 +768,7 @@ export const Wallet: React.FC = () => {
             }
         }, 3000);
     };
-    
+
     const handleExpandToggle = () => {
         if (isWalletSelectorExpanded) {
             setIsWalletSelectorExpanded(false);
@@ -779,33 +781,65 @@ export const Wallet: React.FC = () => {
             }
         }
     };
-    
+
     const handleWalletSelect = (mode: 'breez' | 'cashu' | 'nwc') => {
         clearAutoCollapseTimer();
         setViewMode(mode);
         if (walletMode !== mode) {
+            // Set transitioning state to show shimmer during balance load
+            setIsWalletTransitioning(true);
             handleWalletModeChange(mode);
         }
     };
-    
+
     // Cleanup timer on unmount
     useEffect(() => {
         return () => clearAutoCollapseTimer();
     }, []);
-    
+
     // Calculate cumulative balance for "All Wallets" view
     const cumulativeBalance = walletBalances.cashu + walletBalances.nwc + walletBalances.breez;
-    
+
     // Get the display balance based on view mode
-    const displayBalance = viewMode === 'all' ? cumulativeBalance : walletBalance;
-    
+    // Show 0 during wallet transition to enable shimmer effect
+    const displayBalance = isWalletTransitioning ? 0 : (viewMode === 'all' ? cumulativeBalance : walletBalance);
+
+    // Clear wallet transitioning state when balance loading completes
+    // Use a minimum shimmer duration of 300ms for visual feedback
+    const transitionMinTimeRef = useRef<number>(0);
+
+    useEffect(() => {
+        if (isWalletTransitioning) {
+            // Record when transition started
+            transitionMinTimeRef.current = Date.now();
+        }
+    }, [isWalletTransitioning]);
+
+    useEffect(() => {
+        if (!isBalanceLoading && isWalletTransitioning) {
+            const elapsed = Date.now() - transitionMinTimeRef.current;
+            const remaining = Math.max(0, 300 - elapsed);
+
+            if (remaining > 0) {
+                // Wait for minimum shimmer time
+                const timer = setTimeout(() => {
+                    setIsWalletTransitioning(false);
+                }, remaining);
+                return () => clearTimeout(timer);
+            } else {
+                // Minimum time already elapsed
+                setIsWalletTransitioning(false);
+            }
+        }
+    }, [isBalanceLoading, isWalletTransitioning]);
+
     // Refresh all balances when entering "all" view mode
     useEffect(() => {
         if (viewMode === 'all') {
             refreshAllBalances();
         }
     }, [viewMode]);
-    
+
     // Fetch Breez addresses when SDK initializes or wallet mode changes
     useEffect(() => {
         if (walletMode === 'breez' && isBreezInitialized()) {
@@ -815,12 +849,12 @@ export const Wallet: React.FC = () => {
             });
         }
     }, [walletMode]);
-    
+
     // Breez invoice generation helper
     const generateBreezInvoice = async () => {
         const amount = parseInt(breezInvoiceAmount);
         if (isNaN(amount) || amount <= 0) return;
-        
+
         setIsGeneratingBreezInvoice(true);
         try {
             const invoice = await createBreezInvoice(amount, 'On-Chain Disc Golf Payment');
@@ -832,21 +866,21 @@ export const Wallet: React.FC = () => {
         }
         setIsGeneratingBreezInvoice(false);
     };
-    
+
     // Breez send helpers
     const parseBreezSendInput = async () => {
         if (!breezSendInput.trim()) return;
-        
+
         setIsBreezParsing(true);
         setBreezSendError(null);
         setBreezSendParsed(null);
         setBreezSendFee(null);
-        
+
         try {
             const parsed = await parseBreezInput(breezSendInput.trim());
             if (parsed) {
                 setBreezSendParsed(parsed);
-                
+
                 // If it's a bolt11 invoice, prepare the payment to get fee
                 if (parsed.type === 'bolt11Invoice') {
                     const prepared = await prepareSendPayment(breezSendInput.trim());
@@ -864,17 +898,17 @@ export const Wallet: React.FC = () => {
         } catch (e) {
             setBreezSendError('Invalid invoice or address');
         }
-        
+
         setIsBreezParsing(false);
     };
-    
+
     const executeBreezSend = async () => {
         setIsBreezSending(true);
         setBreezSendError(null);
-        
+
         try {
             let result;
-            
+
             if (breezSendPrepared) {
                 // Use prepared payment
                 result = await sendBreezPayment(breezSendPrepared);
@@ -882,7 +916,7 @@ export const Wallet: React.FC = () => {
                 // Direct invoice payment
                 result = await payBreezInvoice(breezSendInput.trim());
             }
-            
+
             if (result.success) {
                 setBreezSendInput('');
                 setBreezSendParsed(null);
@@ -896,16 +930,16 @@ export const Wallet: React.FC = () => {
         } catch (e) {
             setBreezSendError(e instanceof Error ? e.message : 'Payment failed');
         }
-        
+
         setIsBreezSending(false);
     };
-    
+
     // Balance display toggle (SATS ↔ USD)
     const [showUsd, setShowUsd] = useState(false);
     const [usdValue, setUsdValue] = useState<string | null>(null);
     const [isFetchingPrice, setIsFetchingPrice] = useState(false);
     const usdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    
+
     // Fund wallet modal
     const [showFundModal, setShowFundModal] = useState(false);
     const [rabbitHoleLevel, setRabbitHoleLevel] = useState(0); // 0 = main, 1 = deeper, 2 = deepest, 3 = matrix
@@ -923,10 +957,10 @@ export const Wallet: React.FC = () => {
     const [showLifeboat, setShowLifeboat] = useState(false); // Easter egg: Level 4 - Hope and Bitcoin
     const [showRedPill, setShowRedPill] = useState(false); // Easter egg: Level 5 - The final reveal
     const [redPillPhase, setRedPillPhase] = useState(0); // 0 = glitch, 1 = screen tear, 2 = message
-    
+
     // Wallet selection modal for "All" mode
     const [showWalletSelectionModal, setShowWalletSelectionModal] = useState<'send' | 'receive' | null>(null);
-    
+
     // Default wallet preferences (persisted to localStorage)
     const [defaultSendWallet, setDefaultSendWallet] = useState<'cashu' | 'nwc' | 'breez' | null>(() => {
         const saved = localStorage.getItem('cdg_default_send_wallet');
@@ -941,7 +975,7 @@ export const Wallet: React.FC = () => {
         const saved = localStorage.getItem('cdg_default_quick_send_wallet');
         return (saved as 'auto' | 'cashu' | 'nwc' | 'breez') || 'auto';
     });
-    
+
     // Persist default wallet preferences
     useEffect(() => {
         if (defaultSendWallet) {
@@ -950,7 +984,7 @@ export const Wallet: React.FC = () => {
             localStorage.removeItem('cdg_default_send_wallet');
         }
     }, [defaultSendWallet]);
-    
+
     useEffect(() => {
         if (defaultReceiveWallet) {
             localStorage.setItem('cdg_default_receive_wallet', defaultReceiveWallet);
@@ -958,12 +992,12 @@ export const Wallet: React.FC = () => {
             localStorage.removeItem('cdg_default_receive_wallet');
         }
     }, [defaultReceiveWallet]);
-    
+
     // Persist quick-send wallet preference
     useEffect(() => {
         localStorage.setItem('cdg_default_quick_send_wallet', defaultQuickSendWallet);
     }, [defaultQuickSendWallet]);
-    
+
     // Smart wallet selection - picks the best wallet to send from based on balance
     // Priority: NWC (if connected & funded) > Breez (if available & funded) > Cashu (default)
     const getPreferredSendWallet = (): 'breez' | 'nwc' | 'cashu' => {
@@ -976,30 +1010,30 @@ export const Wallet: React.FC = () => {
             if (defaultQuickSendWallet === 'cashu' && preferredBalance > 0) return 'cashu';
             // If preferred wallet has no balance, fall through to auto-selection
         }
-        
+
         // Auto-selection: Priority 1 - NWC (if connected and has balance)
         if (nwcString && walletBalances.nwc > 0) {
             return 'nwc';
         }
-        
+
         // Priority 2: Breez - if wallet exists and has balance
         if (hasBreezWallet && walletBalances.breez > 0) {
             return 'breez';
         }
-        
+
         // Priority 3: Cashu - if has balance
         if (walletBalances.cashu > 0) {
             return 'cashu';
         }
-        
+
         // Fallback: Check for any wallet with balance (handles edge cases)
         if (walletBalances.nwc > 0 && nwcString) return 'nwc';
         if (walletBalances.breez > 0 && hasBreezWallet) return 'breez';
-        
+
         // Default to Cashu (built-in wallet, always available)
         return 'cashu';
     };
-    
+
     // Helper to use default wallet or show selection modal
     const handleAllWalletsSend = () => {
         if (defaultSendWallet) {
@@ -1013,7 +1047,7 @@ export const Wallet: React.FC = () => {
             setShowWalletSelectionModal('send');
         }
     };
-    
+
     const handleAllWalletsReceive = () => {
         if (defaultReceiveWallet) {
             // Use the default wallet directly
@@ -1030,7 +1064,7 @@ export const Wallet: React.FC = () => {
             setShowWalletSelectionModal('receive');
         }
     };
-    
+
     // Satoshi Rabbit Hole states
     const [showWhatIsSatoshi, setShowWhatIsSatoshi] = useState(false); // Level 1: What is a Satoshi
     const [showSatoshiPricing, setShowSatoshiPricing] = useState(false); // Level 2: Historical pricing
@@ -1038,18 +1072,18 @@ export const Wallet: React.FC = () => {
     const [showEmpiresFall, setShowEmpiresFall] = useState(false); // Level 4: Empires and currency
     const [showBitcoinForever, setShowBitcoinForever] = useState(false); // Level 5: Bitcoin cannot be debased
     const [transmissionPhase, setTransmissionPhase] = useState(0); // For the final fourth-wall break
-    
+
     // Matrix typewriter effect
     useEffect(() => {
         if (rabbitHoleLevel === 3) {
             const userName = userProfile?.name || 'friend';
             const fullText = `Hello, ${userName}.\n\nYou've reached the bottom.\n\nCongratulations?\n\nBut here's the thing — the real revolution isn't on a screen. It's out there. On the course. With friends. Throwing plastic at chains.\n\nThe empire will crumble whether you're doom-scrolling or not.\n\nNow put your phone down and get to throwing. <3`;
-            
+
             let currentIndex = 0;
             setMatrixText('');
             setMatrixComplete(false);
             setMatrixClickable(false);
-            
+
             // Initial blink delay
             const blinkDelay = setTimeout(() => {
                 const typeInterval = setInterval(() => {
@@ -1065,14 +1099,14 @@ export const Wallet: React.FC = () => {
                         }, 3000);
                     }
                 }, 35); // Typewriter speed
-                
+
                 return () => clearInterval(typeInterval);
             }, 1500); // Initial blink time
-            
+
             return () => clearTimeout(blinkDelay);
         }
     }, [rabbitHoleLevel, userProfile?.name]);
-    
+
     // Handle Matrix exit
     const handleMatrixExit = () => {
         if (matrixClickable) {
@@ -1083,35 +1117,36 @@ export const Wallet: React.FC = () => {
             setMatrixClickable(false);
         }
     };
-    
+
     // Calculate gradient colors based on current view selection
     // When viewing 'all', use orange. Otherwise use the viewMode's color
     const effectiveMode = viewMode === 'all' ? 'all' : viewMode;
     const leftGlowType = viewMode === 'all' ? 'none' : getLeftGlowColor(viewMode as 'breez' | 'cashu' | 'nwc');
     const rightGlowColor = WALLET_COLORS[effectiveMode];
     const leftGlowColor = WALLET_COLORS[leftGlowType];
-    
+
     // Handle wallet mode change with directional transition
     const handleWalletModeChange = (newMode: 'breez' | 'cashu' | 'nwc') => {
         if (newMode === walletMode) return;
-        
+
         // Determine transition direction based on wallet order
         const currentIndex = WALLET_ORDER.indexOf(walletMode);
         const newIndex = WALLET_ORDER.indexOf(newMode);
         setTransitionDirection(newIndex > currentIndex ? 'left' : 'right');
-        
+
         setIsTransitioning(true);
         setWalletMode(newMode);
-        
-        // Refresh balance for the new wallet
-        refreshWalletBalance();
-        
+
+        // NOTE: Do NOT call refreshWalletBalance() here!
+        // The AppContext has a useEffect that handles balance refresh when walletMode changes.
+        // Calling it here would use the OLD walletMode value (stale closure) and fetch the wrong balance.
+
         // End transition after animation completes
         setTimeout(() => {
             setIsTransitioning(false);
         }, 500);
     };
-    
+
     // Handle balance tap to show USD for 3 seconds
     const handleBalanceTap = async () => {
         // If already showing USD, clear and return to sats immediately
@@ -1123,20 +1158,20 @@ export const Wallet: React.FC = () => {
             setShowUsd(false);
             return;
         }
-        
+
         // Don't fetch if already fetching
         if (isFetchingPrice) return;
-        
+
         setIsFetchingPrice(true);
-        
+
         try {
             const btcPrice = await getBtcPrice();
-            
+
             if (btcPrice) {
                 const usd = satsToUsd(displayBalance, btcPrice);
                 setUsdValue(usd);
                 setShowUsd(true);
-                
+
                 // Auto-switch back to sats after 3 seconds
                 usdTimeoutRef.current = setTimeout(() => {
                     setShowUsd(false);
@@ -1149,7 +1184,7 @@ export const Wallet: React.FC = () => {
             setIsFetchingPrice(false);
         }
     };
-    
+
     // Cleanup timeout on unmount
     useEffect(() => {
         return () => {
@@ -1689,11 +1724,10 @@ export const Wallet: React.FC = () => {
                         {/* Auto (Smart Selection) */}
                         <button
                             onClick={() => setDefaultQuickSendWallet('auto')}
-                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${
-                                defaultQuickSendWallet === 'auto' 
-                                    ? 'bg-orange-500/20 border-orange-500' 
-                                    : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
-                            }`}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${defaultQuickSendWallet === 'auto'
+                                ? 'bg-orange-500/20 border-orange-500'
+                                : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
+                                }`}
                         >
                             <Icons.Zap size={18} className={`mb-1 ${defaultQuickSendWallet === 'auto' ? 'text-orange-400' : 'text-slate-400'}`} />
                             <span className="font-bold text-[10px]">Auto</span>
@@ -1702,13 +1736,12 @@ export const Wallet: React.FC = () => {
                         <button
                             onClick={() => setDefaultQuickSendWallet('nwc')}
                             disabled={!nwcString}
-                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${
-                                defaultQuickSendWallet === 'nwc' 
-                                    ? 'bg-purple-500/20 border-purple-500' 
-                                    : !nwcString 
-                                        ? 'bg-slate-800/50 border-slate-700/50 opacity-30 cursor-not-allowed'
-                                        : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
-                            }`}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${defaultQuickSendWallet === 'nwc'
+                                ? 'bg-purple-500/20 border-purple-500'
+                                : !nwcString
+                                    ? 'bg-slate-800/50 border-slate-700/50 opacity-30 cursor-not-allowed'
+                                    : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
+                                }`}
                         >
                             <Icons.Link size={18} className={`mb-1 ${defaultQuickSendWallet === 'nwc' ? 'text-purple-400' : 'text-slate-400'}`} />
                             <span className="font-bold text-[10px]">NWC</span>
@@ -1717,13 +1750,12 @@ export const Wallet: React.FC = () => {
                         <button
                             onClick={() => setDefaultQuickSendWallet('breez')}
                             disabled={!hasBreezWallet}
-                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${
-                                defaultQuickSendWallet === 'breez' 
-                                    ? 'bg-blue-500/20 border-blue-500' 
-                                    : !hasBreezWallet 
-                                        ? 'bg-slate-800/50 border-slate-700/50 opacity-30 cursor-not-allowed'
-                                        : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
-                            }`}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${defaultQuickSendWallet === 'breez'
+                                ? 'bg-blue-500/20 border-blue-500'
+                                : !hasBreezWallet
+                                    ? 'bg-slate-800/50 border-slate-700/50 opacity-30 cursor-not-allowed'
+                                    : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
+                                }`}
                         >
                             <Icons.Zap size={18} className={`mb-1 ${defaultQuickSendWallet === 'breez' ? 'text-blue-400' : 'text-slate-400'}`} />
                             <span className="font-bold text-[10px]">Breez</span>
@@ -1731,11 +1763,10 @@ export const Wallet: React.FC = () => {
                         {/* Cashu */}
                         <button
                             onClick={() => setDefaultQuickSendWallet('cashu')}
-                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${
-                                defaultQuickSendWallet === 'cashu' 
-                                    ? 'bg-emerald-500/20 border-emerald-500' 
-                                    : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
-                            }`}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${defaultQuickSendWallet === 'cashu'
+                                ? 'bg-emerald-500/20 border-emerald-500'
+                                : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
+                                }`}
                         >
                             <Icons.Cashew size={18} className={`mb-1 ${defaultQuickSendWallet === 'cashu' ? 'text-emerald-400' : 'text-slate-400'}`} />
                             <span className="font-bold text-[10px]">Cashu</span>
@@ -1752,7 +1783,7 @@ export const Wallet: React.FC = () => {
                 {walletMode === 'breez' && (
                     <div className="mb-8 animate-in fade-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Lightning Wallet</h3>
-                        
+
                         {/* Create Wallet Prompt (for non-mnemonic users without Breez wallet) */}
                         {!hasBreezWallet ? (
                             <div className="bg-gradient-to-br from-blue-500/10 via-slate-900 to-blue-500/5 border border-blue-500/30 p-6 rounded-xl">
@@ -1763,12 +1794,12 @@ export const Wallet: React.FC = () => {
                                             <Icons.Plus size={16} className="text-blue-400" />
                                         </div>
                                     </div>
-                                    
+
                                     <h4 className="text-xl font-bold text-white mb-2">Create Lightning Wallet</h4>
                                     <p className="text-slate-400 text-sm mb-4 max-w-xs">
                                         Set up your self-custodial Lightning wallet powered by Breez SDK.
                                     </p>
-                                    
+
                                     {/* Warning for non-mnemonic users */}
                                     {authSource !== 'mnemonic' && (
                                         <div className="w-full bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4">
@@ -1777,7 +1808,7 @@ export const Wallet: React.FC = () => {
                                             </p>
                                         </div>
                                     )}
-                                    
+
                                     <button
                                         onClick={async () => {
                                             setIsCreatingBreezWallet(true);
@@ -1799,7 +1830,7 @@ export const Wallet: React.FC = () => {
                                     >
                                         {isCreatingBreezWallet ? 'Creating...' : 'Create Wallet'}
                                     </button>
-                                    
+
                                     {/* Alternative: Unified backup suggestion */}
                                     {authSource !== 'mnemonic' && (
                                         <div className="mt-4 pt-4 border-t border-white/10 w-full">
@@ -1823,7 +1854,7 @@ export const Wallet: React.FC = () => {
                                             <p className="text-slate-400 text-xs">Self-custodial wallet</p>
                                         </div>
                                     </div>
-                                    
+
                                     <div className="space-y-3">
                                         <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700">
                                             <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Lightning Address</label>
@@ -1835,7 +1866,7 @@ export const Wallet: React.FC = () => {
                                                 <p className="text-sm text-slate-400 italic">Loading...</p>
                                             )}
                                         </div>
-                                        
+
                                         <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700">
                                             <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Wallet Status</label>
                                             {isBreezInitialized() ? (
@@ -1850,14 +1881,14 @@ export const Wallet: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        
+
                                         <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700">
                                             <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Balance</label>
                                             <p className="text-sm text-white font-bold">{walletBalances.breez.toLocaleString()} sats</p>
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 {/* Breez Wallet Backup Section - Only for separate Breez mnemonic (non-unified users) */}
                                 {!hasUnifiedSeed() && hasStoredMnemonic(true) && (
                                     <div className="mt-4 bg-gradient-to-br from-blue-500/10 via-slate-900 to-orange-500/5 border border-blue-500/30 rounded-xl p-4">
@@ -1884,7 +1915,7 @@ export const Wallet: React.FC = () => {
                                                 {showBreezMnemonic ? 'Hide' : 'Show'}
                                             </button>
                                         </div>
-                                        
+
                                         {showBreezMnemonic && breezMnemonic ? (
                                             <>
                                                 <div className="grid grid-cols-3 gap-2 mb-3">
@@ -1895,7 +1926,7 @@ export const Wallet: React.FC = () => {
                                                         </div>
                                                     ))}
                                                 </div>
-                                                
+
                                                 <div className="flex space-x-2">
                                                     <button
                                                         onClick={() => {
@@ -1920,7 +1951,7 @@ export const Wallet: React.FC = () => {
                                                 This is a separate backup from your Nostr identity. Keep both backups safe!
                                             </p>
                                         )}
-                                        
+
                                         {/* Warning that this is separate from Nostr */}
                                         <div className="mt-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                                             <p className="text-[10px] text-amber-400">
@@ -1979,32 +2010,32 @@ export const Wallet: React.FC = () => {
                                     value={localNwcString}
                                     onChange={e => setLocalNwcString(e.target.value)}
                                 />
-                                    <Button
+                                <Button
                                     fullWidth
-                                        onClick={async () => {
-                                            if (!localNwcString) return;
-                                            setIsProcessing(true);
-                                            try {
-                                                // Dynamic import to avoid circular deps or large bundles if not needed elsewhere
-                                                const { NWCService } = await import('../services/nwcService');
-                                                const tempService = new NWCService(localNwcString);
+                                    onClick={async () => {
+                                        if (!localNwcString) return;
+                                        setIsProcessing(true);
+                                        try {
+                                            // Dynamic import to avoid circular deps or large bundles if not needed elsewhere
+                                            const { NWCService } = await import('../services/nwcService');
+                                            const tempService = new NWCService(localNwcString);
 
-                                                // Test connection by fetching balance
-                                                await tempService.getBalance();
+                                            // Test connection by fetching balance
+                                            await tempService.getBalance();
 
-                                                // If successful, save to context
-                                                setNwcConnection(localNwcString);
-                                                // Success UI is handled by re-render with nwcString present
-                                            } catch (e) {
-                                                alert("Connection Failed: " + (e instanceof Error ? e.message : "Unknown error"));
-                                            } finally {
-                                                setIsProcessing(false);
-                                            }
-                                        }}
-                                        disabled={!localNwcString || isProcessing}
-                                    >
-                                        {isProcessing ? 'Verifying...' : 'Save Connection'}
-                                    </Button>
+                                            // If successful, save to context
+                                            setNwcConnection(localNwcString);
+                                            // Success UI is handled by re-render with nwcString present
+                                        } catch (e) {
+                                            alert("Connection Failed: " + (e instanceof Error ? e.message : "Unknown error"));
+                                        } finally {
+                                            setIsProcessing(false);
+                                        }
+                                    }}
+                                    disabled={!localNwcString || isProcessing}
+                                >
+                                    {isProcessing ? 'Verifying...' : 'Save Connection'}
+                                </Button>
                                 <p className="text-xs text-slate-400 mt-3">
                                     Get your NWC connection string from{' '}
                                     <a href="https://getalby.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 underline">Alby</a>,{' '}
@@ -2014,14 +2045,14 @@ export const Wallet: React.FC = () => {
                                 </p>
                             </div>
                         )}
-                        
+
                         {/* NWC Explanation */}
                         <div className="mt-6 bg-purple-500/5 border border-purple-500/20 rounded-xl p-4">
                             <h4 className="text-sm font-bold text-purple-400 mb-2">What is NWC?</h4>
                             <p className="text-xs text-slate-400 leading-relaxed mb-3">
                                 <strong className="text-slate-300">Nostr Wallet Connect</strong> is a protocol that lets this app communicate securely with your existing <strong className="text-slate-300">external</strong> Lightning wallet. Think of it like connecting your bank account to Venmo — your funds stay in your wallet, and this app just sends payment requests.
                             </p>
-                            
+
                             <h4 className="text-sm font-bold text-purple-400 mb-2">Why use NWC?</h4>
                             <ul className="text-xs text-slate-400 space-y-1.5 mb-3">
                                 <li className="flex items-start space-x-2">
@@ -2037,7 +2068,7 @@ export const Wallet: React.FC = () => {
                                     <span><strong className="text-slate-300">One balance</strong> — See your disc golf funds in your main wallet</span>
                                 </li>
                             </ul>
-                            
+
                             <div className="bg-slate-800/50 rounded-lg p-3">
                                 <p className="text-xs text-slate-500">
                                     <strong className="text-slate-400">Best for:</strong> Experienced Lightning users who already have Alby, Zeus, Phoenix, or another NWC-compatible wallet set up.
@@ -2099,16 +2130,16 @@ export const Wallet: React.FC = () => {
             <div className="p-6 h-full flex flex-col">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center">
-                    <button onClick={() => setView('main')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700">
-                        <Icons.Prev />
-                    </button>
-                    <div className="flex items-center justify-center space-x-2">
-                        <h2 className="text-xl font-bold">Create Invoice</h2>
-                        <button
-                            onClick={() => setHelpModal({
-                                isOpen: true,
-                                title: "Lightning Invoice",
-                                text: `
+                        <button onClick={() => setView('main')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700">
+                            <Icons.Prev />
+                        </button>
+                        <div className="flex items-center justify-center space-x-2">
+                            <h2 className="text-xl font-bold">Create Invoice</h2>
+                            <button
+                                onClick={() => setHelpModal({
+                                    isOpen: true,
+                                    title: "Lightning Invoice",
+                                    text: `
                                     <p class="mb-3">An invoice is a <strong>one-time payment request</strong> for a specific amount.</p>
                                     
                                     <p class="font-bold text-white mb-2">📋 When to use:</p>
@@ -2129,16 +2160,16 @@ export const Wallet: React.FC = () => {
                                         <p class="text-xs text-slate-300">💡 <strong>Tip:</strong> For general receiving, use your Lightning Address instead—it never expires!</p>
                                     </div>
                                 `
-                            })}
-                            className="text-slate-500 hover:text-brand-primary transition-colors"
-                        >
-                            <Icons.Help size={18} />
-                        </button>
-                    </div>
+                                })}
+                                className="text-slate-500 hover:text-brand-primary transition-colors"
+                            >
+                                <Icons.Help size={18} />
+                            </button>
+                        </div>
                     </div>
                     {/* Gear icon to change default receive wallet */}
                     {defaultReceiveWallet && (
-                        <button 
+                        <button
                             onClick={() => setShowWalletSelectionModal('receive')}
                             className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors"
                             title="Change default receive wallet"
@@ -2185,9 +2216,9 @@ export const Wallet: React.FC = () => {
                     </div>
                 )}
 
-                {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => { 
-                if (action === 'lightning-explainer') { setHelpModal(null); setReturnToWalletHelp(false); setShowLightningExplainer(true); }
-            }} />}
+                {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => {
+                    if (action === 'lightning-explainer') { setHelpModal(null); setReturnToWalletHelp(false); setShowLightningExplainer(true); }
+                }} />}
             </div>
         );
     }
@@ -2207,7 +2238,7 @@ export const Wallet: React.FC = () => {
                                 <Icons.Prev />
                             </button>
                         </div>
-                        
+
                         <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto text-center">
                             <div className="w-24 h-24 bg-blue-500/20 rounded-full flex items-center justify-center mb-6 relative">
                                 <Icons.Zap size={48} className="text-blue-400" />
@@ -2215,12 +2246,12 @@ export const Wallet: React.FC = () => {
                                     <Icons.Plus size={20} className="text-blue-400" />
                                 </div>
                             </div>
-                            
+
                             <h2 className="text-2xl font-bold text-white mb-3">Create Lightning Wallet</h2>
                             <p className="text-slate-400 text-sm mb-6">
                                 Set up your self-custodial Lightning wallet to receive payments.
                             </p>
-                            
+
                             {authSource !== 'mnemonic' && (
                                 <div className="w-full bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-6">
                                     <p className="text-xs text-amber-400">
@@ -2228,7 +2259,7 @@ export const Wallet: React.FC = () => {
                                     </p>
                                 </div>
                             )}
-                            
+
                             <button
                                 onClick={async () => {
                                     setIsCreatingBreezWallet(true);
@@ -2249,23 +2280,23 @@ export const Wallet: React.FC = () => {
                             >
                                 {isCreatingBreezWallet ? 'Creating...' : 'Create Wallet'}
                             </button>
-                            
-                            <Button 
-                                fullWidth 
+
+                            <Button
+                                fullWidth
                                 variant="secondary"
                                 onClick={() => { setWalletMode('cashu'); }}
                             >
-                                <Icons.Cashew size={18} className="mr-2 text-emerald-400" /> 
+                                <Icons.Cashew size={18} className="mr-2 text-emerald-400" />
                                 Use Cashu Instead
                             </Button>
                         </div>
                     </div>
                 );
             }
-            
+
             // Breez wallet receive - show Spark address or invoice generation
             // Note: State hooks are declared at component top level to satisfy React rules
-            
+
             if (!isBreezInitialized()) {
                 return (
                     <div className="p-6 h-full flex flex-col items-center text-center">
@@ -2274,17 +2305,17 @@ export const Wallet: React.FC = () => {
                                 <Icons.Prev />
                             </button>
                         </div>
-                        
+
                         <div className="flex-1 flex flex-col items-center justify-center max-w-xs">
                             <div className="w-24 h-24 rounded-full bg-blue-500/20 flex items-center justify-center mb-6 animate-pulse">
                                 <Icons.Zap size={48} className="text-blue-400" />
                             </div>
-                            
+
                             <h2 className="text-2xl font-bold text-white mb-3">Initializing...</h2>
                             <p className="text-slate-400 text-sm mb-6">
                                 Your Lightning wallet is starting up. This may take a moment.
                             </p>
-                            
+
                             <div className="w-full bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
                                 <div className="flex items-center justify-center space-x-2">
                                     <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
@@ -2296,13 +2327,13 @@ export const Wallet: React.FC = () => {
                     </div>
                 );
             }
-            
+
             // Determine the address to show (prefer Lightning Address, fall back to Spark Address)
             const breezDisplayAddress = breezLnAddress || breezSparkAddress || '';
-            const breezQrUrl = breezDisplayAddress 
+            const breezQrUrl = breezDisplayAddress
                 ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(breezDisplayAddress)}&bgcolor=ffffff&color=000000&margin=2`
                 : '';
-            
+
             return (
                 <div className="p-6 h-full flex flex-col items-center text-center">
                     <div className="w-full flex justify-between mb-6">
@@ -2311,7 +2342,7 @@ export const Wallet: React.FC = () => {
                         </button>
                         {/* Gear icon to change default receive wallet */}
                         {defaultReceiveWallet && (
-                            <button 
+                            <button
                                 onClick={() => setShowWalletSelectionModal('receive')}
                                 className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors"
                                 title="Change default receive wallet"
@@ -2406,8 +2437,8 @@ export const Wallet: React.FC = () => {
                                 >
                                     <Icons.Share size={18} className="mr-2" /> Share
                                 </Button>
-                                <Button 
-                                    variant="secondary" 
+                                <Button
+                                    variant="secondary"
                                     onClick={() => setBreezReceiveMode('invoice')}
                                 >
                                     <Icons.Plus size={18} className="mr-2" /> Invoice
@@ -2419,9 +2450,9 @@ export const Wallet: React.FC = () => {
                                     <Icons.Zap size={18} />
                                     <span className="text-sm font-bold">Waiting for payment...</span>
                                 </div>
-                                
+
                                 {/* Don't have Bitcoin link */}
-                                <button 
+                                <button
                                     onClick={() => setShowFundModal(true)}
                                     className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
                                 >
@@ -2437,7 +2468,7 @@ export const Wallet: React.FC = () => {
                             <p className="text-slate-400 text-sm">Loading your Lightning Address...</p>
                         </div>
                     )}
-                    
+
                     {/* Invoice Generation Modal */}
                     {breezReceiveMode === 'invoice' && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => { setBreezReceiveMode('address'); setBreezInvoice(null); setBreezInvoiceAmount(''); }}>
@@ -2450,7 +2481,7 @@ export const Wallet: React.FC = () => {
                                         </button>
                                     </div>
                                 </div>
-                                
+
                                 <div className="p-5">
                                     {!breezInvoice ? (
                                         <>
@@ -2477,7 +2508,7 @@ export const Wallet: React.FC = () => {
                                         <div className="text-center">
                                             <div className="p-1 rounded-2xl shadow-2xl mb-4 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-blue-500/20 inline-block">
                                                 <div className="bg-white p-3 rounded-xl">
-                                                    <img 
+                                                    <img
                                                         src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(breezInvoice)}&bgcolor=ffffff&color=000000&margin=2`}
                                                         alt="Invoice QR"
                                                         className="w-48 h-48"
@@ -2507,14 +2538,14 @@ export const Wallet: React.FC = () => {
                             </div>
                         </div>
                     )}
-                    
-                    {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => { 
+
+                    {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => {
                         if (action === 'lightning-explainer') { setHelpModal(null); setReturnToWalletHelp(false); setShowLightningExplainer(true); }
                     }} />}
                 </div>
             );
         }
-        
+
         // NWC wallet receive view - if not connected, go directly to settings
         if (walletMode === 'nwc' && !nwcString) {
             // Redirect to settings immediately
@@ -2531,7 +2562,7 @@ export const Wallet: React.FC = () => {
                     </button>
                     {/* Gear icon to change default receive wallet */}
                     {defaultReceiveWallet && (
-                        <button 
+                        <button
                             onClick={() => setShowWalletSelectionModal('receive')}
                             className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors"
                             title="Change default receive wallet"
@@ -2548,7 +2579,7 @@ export const Wallet: React.FC = () => {
                         onClick={() => setHelpModal({
                             isOpen: true,
                             title: walletMode === 'nwc' ? "NWC Receiving" : "Lightning Address",
-                            text: walletMode === 'nwc' 
+                            text: walletMode === 'nwc'
                                 ? `
                                     <p class="mb-3">Funds sent to this address will be routed to your <strong>connected NWC wallet</strong>.</p>
                                     
@@ -2587,16 +2618,15 @@ export const Wallet: React.FC = () => {
                     </button>
                 </div>
                 <p className="text-slate-400 text-sm mb-6 max-w-xs mx-auto">
-                    {walletMode === 'nwc' 
+                    {walletMode === 'nwc'
                         ? 'Payments will be routed to your connected wallet.'
                         : 'Your permanent address for receiving payments. Share it like a username.'}
                 </p>
 
-                <div className={`p-1 rounded-2xl shadow-2xl mb-6 ${
-                    walletMode === 'nwc' 
-                        ? 'bg-gradient-to-br from-purple-400 via-purple-500 to-purple-600 shadow-purple-500/20'
-                        : 'bg-gradient-to-br from-cyan-400 via-emerald-500 to-teal-600 shadow-emerald-500/20'
-                }`}>
+                <div className={`p-1 rounded-2xl shadow-2xl mb-6 ${walletMode === 'nwc'
+                    ? 'bg-gradient-to-br from-purple-400 via-purple-500 to-purple-600 shadow-purple-500/20'
+                    : 'bg-gradient-to-br from-cyan-400 via-emerald-500 to-teal-600 shadow-emerald-500/20'
+                    }`}>
                     <div className="bg-white p-3 rounded-xl">
                         <img src={qrUrl} alt="Wallet QR Code" className="w-48 h-48" loading="eager" />
                     </div>
@@ -2608,10 +2638,9 @@ export const Wallet: React.FC = () => {
                         className="w-full flex items-center justify-between bg-slate-800 p-4 rounded-xl border border-slate-700 hover:border-brand-primary transition-all group"
                     >
                         <div className="flex items-center space-x-3 overflow-hidden">
-                            <div className={`p-2 rounded-lg ${
-                                walletMode === 'nwc' ? 'bg-purple-500/10' : 'bg-emerald-500/10'
-                            }`}>
-                                {walletMode === 'nwc' 
+                            <div className={`p-2 rounded-lg ${walletMode === 'nwc' ? 'bg-purple-500/10' : 'bg-emerald-500/10'
+                                }`}>
+                                {walletMode === 'nwc'
                                     ? <Icons.Link size={18} className="text-purple-400" />
                                     : <Icons.Cashew size={18} className="text-emerald-400" />}
                             </div>
@@ -2651,25 +2680,24 @@ export const Wallet: React.FC = () => {
                 </div>
 
                 <div className="mt-6 w-full flex flex-col items-center space-y-4">
-                    <div className={`flex items-center space-x-2 animate-pulse ${
-                        walletMode === 'nwc' ? 'text-purple-400' : 'text-emerald-400'
-                    }`}>
+                    <div className={`flex items-center space-x-2 animate-pulse ${walletMode === 'nwc' ? 'text-purple-400' : 'text-emerald-400'
+                        }`}>
                         {walletMode === 'nwc' ? <Icons.Link size={18} /> : <Icons.Cashew size={18} />}
                         <span className="text-sm font-bold">Waiting for payment...</span>
                     </div>
-                    
+
                     {/* Don't have Bitcoin link */}
-                    <button 
+                    <button
                         onClick={() => setShowFundModal(true)}
                         className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
                     >
                         Don't have Bitcoin yet? Learn how to buy
                     </button>
                 </div>
-                {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => { 
-                if (action === 'lightning-explainer') { setHelpModal(null); setReturnToWalletHelp(false); setShowLightningExplainer(true); }
-            }} />}
-                
+                {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => {
+                    if (action === 'lightning-explainer') { setHelpModal(null); setReturnToWalletHelp(false); setShowLightningExplainer(true); }
+                }} />}
+
                 {/* Fund Modal also available from receive view */}
                 {showFundModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowFundModal(false)}>
@@ -2688,23 +2716,23 @@ export const Wallet: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
-                            
+
                             {/* Content */}
                             <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                                 <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
                                     <p className="text-slate-300 text-sm leading-relaxed mb-3">
-                                        <span className="text-white font-bold">Here's the deal:</span> The government has made it unnecessarily complicated to buy Bitcoin. 
+                                        <span className="text-white font-bold">Here's the deal:</span> The government has made it unnecessarily complicated to buy Bitcoin.
                                         They'd prefer you keep your savings in dollars that lose value every year while they print trillions more.
                                     </p>
                                     <p className="text-slate-400 text-xs italic">
-                                        Meanwhile, Bitcoin's supply is fixed forever. No one can print more. Ever. 
+                                        Meanwhile, Bitcoin's supply is fixed forever. No one can print more. Ever.
                                     </p>
                                 </div>
-                                
+
                                 <p className="text-slate-300 text-sm">
                                     <span className="text-brand-primary font-bold">The good news?</span> These apps make it easy:
                                 </p>
-                                
+
                                 <div className="space-y-2">
                                     <a href="https://cash.app" target="_blank" rel="noopener noreferrer" className="block p-3 bg-[#00D64F]/10 border border-[#00D64F]/30 rounded-lg hover:bg-[#00D64F]/20 transition-colors">
                                         <p className="font-bold text-[#00D64F] text-sm">Cash App <span className="text-xs text-slate-400 font-normal">• US & UK</span></p>
@@ -2719,7 +2747,7 @@ export const Wallet: React.FC = () => {
                                         <p className="font-bold text-purple-400 text-sm">Blink <span className="text-xs text-slate-400 font-normal">• Global</span></p>
                                     </a>
                                 </div>
-                                
+
                                 <button
                                     onClick={() => {
                                         navigator.clipboard.writeText(receiveAddress);
@@ -2731,7 +2759,7 @@ export const Wallet: React.FC = () => {
                                     <span className="text-sm text-slate-300">Copy Your Address</span>
                                 </button>
                             </div>
-                            
+
                             <div className="p-4 border-t border-slate-800">
                                 <Button fullWidth onClick={() => setShowFundModal(false)}>Got it</Button>
                             </div>
@@ -2758,7 +2786,7 @@ export const Wallet: React.FC = () => {
                                 <Icons.Prev />
                             </button>
                         </div>
-                        
+
                         <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto text-center">
                             <div className="w-24 h-24 bg-blue-500/20 rounded-full flex items-center justify-center mb-6 relative">
                                 <Icons.Send size={48} className="text-blue-400" />
@@ -2766,12 +2794,12 @@ export const Wallet: React.FC = () => {
                                     <Icons.Plus size={20} className="text-blue-400" />
                                 </div>
                             </div>
-                            
+
                             <h2 className="text-2xl font-bold text-white mb-3">Create Lightning Wallet</h2>
                             <p className="text-slate-400 text-sm mb-6">
                                 Set up your self-custodial Lightning wallet to send payments.
                             </p>
-                            
+
                             {authSource !== 'mnemonic' && (
                                 <div className="w-full bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-6">
                                     <p className="text-xs text-amber-400">
@@ -2779,7 +2807,7 @@ export const Wallet: React.FC = () => {
                                     </p>
                                 </div>
                             )}
-                            
+
                             <button
                                 onClick={async () => {
                                     setIsCreatingBreezWallet(true);
@@ -2800,23 +2828,23 @@ export const Wallet: React.FC = () => {
                             >
                                 {isCreatingBreezWallet ? 'Creating...' : 'Create Wallet'}
                             </button>
-                            
-                            <Button 
-                                fullWidth 
+
+                            <Button
+                                fullWidth
                                 variant="secondary"
                                 onClick={() => { setWalletMode('cashu'); }}
                             >
-                                <Icons.Cashew size={18} className="mr-2 text-emerald-400" /> 
+                                <Icons.Cashew size={18} className="mr-2 text-emerald-400" />
                                 Use Cashu Instead
                             </Button>
                         </div>
                     </div>
                 );
             }
-            
+
             // Breez send view - parse and pay invoices/addresses
             // Note: State hooks are declared at component top level to satisfy React rules
-            
+
             if (!isBreezInitialized()) {
                 return (
                     <div className="p-6 h-full flex flex-col items-center text-center">
@@ -2825,12 +2853,12 @@ export const Wallet: React.FC = () => {
                                 <Icons.Prev />
                             </button>
                         </div>
-                        
+
                         <div className="flex-1 flex flex-col items-center justify-center max-w-xs">
                             <div className="w-24 h-24 rounded-full bg-blue-500/20 flex items-center justify-center mb-6 animate-pulse">
                                 <Icons.Zap size={48} className="text-blue-400" />
                             </div>
-                            
+
                             <h2 className="text-2xl font-bold text-white mb-3">Initializing...</h2>
                             <p className="text-slate-400 text-sm mb-6">
                                 Your Lightning wallet is starting up. This may take a moment.
@@ -2841,7 +2869,7 @@ export const Wallet: React.FC = () => {
             }
             // Breez is initialized - fall through to shared grid layout
         }
-        
+
         // NWC wallet send view - if not connected, go directly to settings
         if (walletMode === 'nwc' && !nwcString) {
             // Redirect to settings immediately
@@ -2853,14 +2881,14 @@ export const Wallet: React.FC = () => {
             <div className="p-6 h-full flex flex-col">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center">
-                    <button onClick={() => setView('main')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors">
-                        <Icons.Prev />
-                    </button>
-                    <h2 className="text-xl font-bold">Choose Payment Method</h2>
+                        <button onClick={() => setView('main')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors">
+                            <Icons.Prev />
+                        </button>
+                        <h2 className="text-xl font-bold">Choose Payment Method</h2>
                     </div>
                     {/* Gear icon to change default send wallet */}
                     {defaultSendWallet && (
-                        <button 
+                        <button
                             onClick={() => setShowWalletSelectionModal('send')}
                             className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors"
                             title="Change default send wallet"
@@ -3083,7 +3111,7 @@ export const Wallet: React.FC = () => {
                                 <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-cyan-400 rounded-tr-xl"></div>
                                 <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-cyan-400 rounded-bl-xl"></div>
                                 <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-cyan-400 rounded-br-xl"></div>
-                                
+
                                 {/* Scanning line animation */}
                                 <div className="absolute left-2 right-2 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse top-1/2"></div>
                             </div>
@@ -3253,18 +3281,18 @@ export const Wallet: React.FC = () => {
                                     // Route to Breez-specific send logic
                                     const amount = parseInt(sendAmount);
                                     const input = sendInput.trim();
-                                    
+
                                     if (!input) {
                                         setTransactionError("Missing invoice or address");
                                         return;
                                     }
-                                    
+
                                     setIsProcessing(true);
                                     setTransactionError(null);
-                                    
+
                                     try {
                                         let result;
-                                        
+
                                         // Check if it's a lightning address (contains @)
                                         if (input.includes('@') && !input.toLowerCase().startsWith('lnurl')) {
                                             if (isNaN(amount) || amount <= 0) {
@@ -3277,7 +3305,7 @@ export const Wallet: React.FC = () => {
                                             // Assume it's a bolt11 invoice
                                             result = await payBreezInvoice(input);
                                         }
-                                        
+
                                         if (result.success) {
                                             setSuccessMode('sent');
                                         } else {
@@ -3362,7 +3390,7 @@ export const Wallet: React.FC = () => {
             </div>
 
             {/* Wallet Balance Tile - Dual gradient system with shimmer transitions */}
-            <div 
+            <div
                 className="rounded-3xl p-6 shadow-xl relative overflow-hidden mb-8 bg-slate-900"
                 style={{
                     borderWidth: '1px',
@@ -3373,9 +3401,9 @@ export const Wallet: React.FC = () => {
             >
                 {/* Base dark gradient */}
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 pointer-events-none" />
-                
+
                 {/* LEFT GLOW - Shows the wallet to the LEFT of current selection */}
-                <div 
+                <div
                     className="absolute w-44 h-44 rounded-full blur-3xl pointer-events-none"
                     style={{
                         background: leftGlowColor.glowStrong,
@@ -3383,16 +3411,16 @@ export const Wallet: React.FC = () => {
                         left: '-30px',
                         opacity: leftGlowType === 'none' ? 0 : 1,
                         transition: 'all 0.5s ease-out',
-                        transform: isTransitioning && transitionDirection === 'left' 
-                            ? 'translateX(-20px) scale(1.1)' 
+                        transform: isTransitioning && transitionDirection === 'left'
+                            ? 'translateX(-20px) scale(1.1)'
                             : isTransitioning && transitionDirection === 'right'
                                 ? 'translateX(20px) scale(0.9)'
                                 : 'translateX(0) scale(1)',
                     }}
                 />
-                
+
                 {/* RIGHT GLOW - Shows the CURRENT wallet's color */}
-                <div 
+                <div
                     className="absolute w-48 h-48 rounded-full blur-3xl pointer-events-none"
                     style={{
                         background: rightGlowColor.glowStrong,
@@ -3400,16 +3428,16 @@ export const Wallet: React.FC = () => {
                         right: '-30px',
                         opacity: 1,
                         transition: 'all 0.5s ease-out',
-                        transform: isTransitioning 
-                            ? transitionDirection === 'left' 
-                                ? 'translateX(20px) scale(0.8)' 
+                        transform: isTransitioning
+                            ? transitionDirection === 'left'
+                                ? 'translateX(20px) scale(0.8)'
                                 : 'translateX(-20px) scale(0.8)'
                             : 'translateX(0) scale(1)',
                     }}
                 />
-                
+
                 {/* Subtle bottom accent glow */}
-                <div 
+                <div
                     className="absolute w-32 h-32 rounded-full blur-2xl pointer-events-none"
                     style={{
                         background: rightGlowColor.glow,
@@ -3419,16 +3447,16 @@ export const Wallet: React.FC = () => {
                         transition: 'background 0.5s ease-out',
                     }}
                 />
-                
+
                 {/* Shimmer sweep effect during transition */}
                 {isTransitioning && (
-                    <div 
+                    <div
                         className="absolute inset-0 pointer-events-none z-5"
                         style={{
                             background: transitionDirection === 'left'
                                 ? `linear-gradient(90deg, transparent 0%, ${rightGlowColor.glow} 50%, transparent 100%)`
                                 : `linear-gradient(-90deg, transparent 0%, ${leftGlowColor.glow} 50%, transparent 100%)`,
-                            animation: transitionDirection === 'left' 
+                            animation: transitionDirection === 'left'
                                 ? 'shimmerSweepLeft 0.5s ease-out forwards'
                                 : 'shimmerSweepRight 0.5s ease-out forwards',
                         }}
@@ -3437,7 +3465,7 @@ export const Wallet: React.FC = () => {
 
                 {/* Wallet Mode Switcher */}
                 <div className="relative z-10 flex items-center justify-between mb-4">
-                    <WalletModeSwitcher 
+                    <WalletModeSwitcher
                         activeMode={walletMode}
                         viewMode={viewMode}
                         isExpanded={isWalletSelectorExpanded}
@@ -3449,7 +3477,7 @@ export const Wallet: React.FC = () => {
 
                     {/* Status Indicator - Tappable, goes to settings (hidden when viewing "all") */}
                     {viewMode !== 'all' && (
-                        <button 
+                        <button
                             onClick={() => setView('settings')}
                             className="flex items-center space-x-1.5 bg-black/30 hover:bg-black/50 px-2 py-1 rounded-md border border-white/5 hover:border-white/10 transition-all active:scale-95"
                         >
@@ -3467,7 +3495,7 @@ export const Wallet: React.FC = () => {
                                     <>
                                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]"></div>
                                         <span className="text-[10px] text-slate-400 font-mono truncate max-w-[80px]">
-                                {activeMint.nickname}
+                                            {activeMint.nickname}
                                         </span>
                                     </>
                                 ) : (
@@ -3498,7 +3526,7 @@ export const Wallet: React.FC = () => {
                             )}
                         </button>
                     )}
-                    
+
                     {/* "All Wallets" indicator when viewing cumulative balance */}
                     {viewMode === 'all' && (
                         <div className="flex items-center space-x-1.5 bg-orange-500/10 px-2 py-1 rounded-md border border-orange-500/20">
@@ -3512,48 +3540,45 @@ export const Wallet: React.FC = () => {
 
                 <div className="relative z-10">
                     {/* Tappable Balance - toggles between SATS and USD */}
-                    <button 
+                    <button
                         onClick={handleBalanceTap}
                         disabled={isBalanceLoading}
                         className="flex items-baseline space-x-1 mb-3 cursor-pointer active:scale-95 transition-transform select-none"
                     >
                         <div className="relative overflow-hidden">
                             {/* SATS display */}
-                            <span 
-                                className={`text-5xl font-extrabold tracking-tight drop-shadow-sm transition-all duration-300 ${
-                                    isBalanceLoading || isFetchingPrice
-                                        ? 'balance-shimmer' 
-                                        : 'text-white'
-                                } ${showUsd ? 'opacity-0 absolute' : 'opacity-100'}`}
+                            <span
+                                className={`text-5xl font-extrabold tracking-tight drop-shadow-sm transition-all duration-300 ${isBalanceLoading || isFetchingPrice || isWalletTransitioning
+                                    ? 'balance-shimmer'
+                                    : 'text-white'
+                                    } ${showUsd ? 'opacity-0 absolute' : 'opacity-100'}`}
                             >
                                 {displayBalance.toLocaleString()}
                             </span>
-                            
+
                             {/* USD display */}
-                            <span 
-                                className={`text-5xl font-extrabold tracking-tight drop-shadow-sm transition-all duration-300 text-green-400 ${
-                                    showUsd ? 'opacity-100' : 'opacity-0 absolute'
-                                }`}
+                            <span
+                                className={`text-5xl font-extrabold tracking-tight drop-shadow-sm transition-all duration-300 text-green-400 ${showUsd ? 'opacity-100' : 'opacity-0 absolute'
+                                    }`}
                             >
                                 {usdValue || '$0.00'}
                             </span>
-                    </div>
-                        
-                        <span className={`text-xl font-bold transition-all duration-300 ${
-                            showUsd 
-                                ? 'text-green-400'
-                                : viewMode === 'all'
-                                    ? 'text-orange-400'
-                                    : viewMode === 'breez' 
-                                        ? 'text-blue-400' 
-                                        : viewMode === 'nwc' 
-                                            ? 'text-purple-400' 
-                                            : 'text-emerald-400'
-                        }`}>
+                        </div>
+
+                        <span className={`text-xl font-bold transition-all duration-300 ${showUsd
+                            ? 'text-green-400'
+                            : viewMode === 'all'
+                                ? 'text-orange-400'
+                                : viewMode === 'breez'
+                                    ? 'text-blue-400'
+                                    : viewMode === 'nwc'
+                                        ? 'text-purple-400'
+                                        : 'text-emerald-400'
+                            }`}>
                             {showUsd ? 'USD' : 'SATS'}
                         </span>
                     </button>
-                    
+
                     {/* Zero Balance Prompt - Shows immediately if balance is 0 (don't wait for loading) */}
                     {displayBalance === 0 && (
                         <button
@@ -3577,79 +3602,76 @@ export const Wallet: React.FC = () => {
 
                     <div className="relative">
                         <div className="grid grid-cols-2 gap-3">
-                            <button 
+                            <button
                                 onClick={() => {
                                     if (viewMode === 'all') {
                                         handleAllWalletsSend();
                                     } else {
                                         setView('send-input');
                                     }
-                                }} 
+                                }}
                                 className={`flex flex-col items-center justify-center bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl py-2.5 transition-all active:scale-95`}
                             >
-                                <div className={`p-2 rounded-full mb-1 ${
-                                    viewMode === 'all'
-                                        ? 'bg-orange-500/20'
-                                        : viewMode === 'breez' 
-                                            ? 'bg-blue-500/20' 
-                                            : viewMode === 'nwc' 
-                                                ? 'bg-purple-500/20' 
-                                                : 'bg-emerald-500/20'
-                                }`}>
+                                <div className={`p-2 rounded-full mb-1 ${viewMode === 'all'
+                                    ? 'bg-orange-500/20'
+                                    : viewMode === 'breez'
+                                        ? 'bg-blue-500/20'
+                                        : viewMode === 'nwc'
+                                            ? 'bg-purple-500/20'
+                                            : 'bg-emerald-500/20'
+                                    }`}>
                                     <Icons.Send size={20} className={
                                         viewMode === 'all'
                                             ? 'text-orange-400'
-                                            : viewMode === 'breez' 
-                                                ? 'text-blue-400' 
-                                                : viewMode === 'nwc' 
-                                                    ? 'text-purple-400' 
+                                            : viewMode === 'breez'
+                                                ? 'text-blue-400'
+                                                : viewMode === 'nwc'
+                                                    ? 'text-purple-400'
                                                     : 'text-emerald-400'
                                     } />
                                 </div>
                                 <span className="text-sm font-bold text-white">Send</span>
                             </button>
 
-                            <button 
+                            <button
                                 onClick={() => {
                                     if (viewMode === 'all') {
                                         handleAllWalletsReceive();
                                     } else {
                                         walletMode === 'nwc' ? setView('deposit') : setView('receive');
                                     }
-                                }} 
-                                className={`flex flex-col items-center justify-center rounded-xl py-2.5 transition-all active:scale-95 ${
-                                    viewMode === 'all'
-                                        ? 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 hover:border-orange-500'
-                                        : viewMode === 'breez' 
-                                            ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 hover:border-blue-500' 
-                                            : viewMode === 'nwc' 
-                                                ? 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 hover:border-purple-500' 
-                                                : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 hover:border-emerald-500'
-                                }`}
+                                }}
+                                className={`flex flex-col items-center justify-center rounded-xl py-2.5 transition-all active:scale-95 ${viewMode === 'all'
+                                    ? 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 hover:border-orange-500'
+                                    : viewMode === 'breez'
+                                        ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 hover:border-blue-500'
+                                        : viewMode === 'nwc'
+                                            ? 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 hover:border-purple-500'
+                                            : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 hover:border-emerald-500'
+                                    }`}
                             >
-                                <div className={`p-2 rounded-full mb-1 ${
-                                    viewMode === 'all'
-                                        ? 'bg-orange-500/20'
-                                        : viewMode === 'breez' 
-                                            ? 'bg-blue-500/20' 
-                                            : viewMode === 'nwc' 
-                                                ? 'bg-purple-500/20' 
-                                                : 'bg-emerald-500/20'
-                                }`}>
+                                <div className={`p-2 rounded-full mb-1 ${viewMode === 'all'
+                                    ? 'bg-orange-500/20'
+                                    : viewMode === 'breez'
+                                        ? 'bg-blue-500/20'
+                                        : viewMode === 'nwc'
+                                            ? 'bg-purple-500/20'
+                                            : 'bg-emerald-500/20'
+                                    }`}>
                                     <Icons.Receive size={20} className={
                                         viewMode === 'all'
                                             ? 'text-orange-400'
-                                            : viewMode === 'breez' 
-                                                ? 'text-blue-400' 
-                                                : viewMode === 'nwc' 
-                                                    ? 'text-purple-400' 
+                                            : viewMode === 'breez'
+                                                ? 'text-blue-400'
+                                                : viewMode === 'nwc'
+                                                    ? 'text-purple-400'
                                                     : 'text-emerald-400'
                                     } />
                                 </div>
                                 <span className="text-sm font-bold text-white">Receive</span>
                             </button>
                         </div>
-                        
+
                         {/* Quick QR Scan Button - Centered overlay (Frosted Glass) */}
                         <button
                             onClick={() => {
@@ -3665,23 +3687,22 @@ export const Wallet: React.FC = () => {
                                     setView('send-scan');
                                 }
                             }}
-                            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-95 backdrop-blur-sm border hover:brightness-110 ${
-                                viewMode === 'all'
-                                    ? 'bg-slate-800/70 border-orange-500/30 hover:border-orange-500/50'
-                                    : viewMode === 'breez' 
-                                        ? 'bg-blue-900/40 border-blue-500/30 hover:border-blue-500/50' 
-                                        : viewMode === 'nwc' 
-                                            ? 'bg-purple-900/40 border-purple-500/30 hover:border-purple-500/50' 
-                                            : 'bg-emerald-900/40 border-emerald-500/30 hover:border-emerald-500/50'
-                            }`}
+                            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-95 backdrop-blur-sm border hover:brightness-110 ${viewMode === 'all'
+                                ? 'bg-slate-800/70 border-orange-500/30 hover:border-orange-500/50'
+                                : viewMode === 'breez'
+                                    ? 'bg-blue-900/40 border-blue-500/30 hover:border-blue-500/50'
+                                    : viewMode === 'nwc'
+                                        ? 'bg-purple-900/40 border-purple-500/30 hover:border-purple-500/50'
+                                        : 'bg-emerald-900/40 border-emerald-500/30 hover:border-emerald-500/50'
+                                }`}
                         >
                             <Icons.QrCode size={20} className={
                                 viewMode === 'all'
                                     ? 'text-orange-400'
-                                    : viewMode === 'breez' 
-                                        ? 'text-blue-400' 
-                                        : viewMode === 'nwc' 
-                                            ? 'text-purple-400' 
+                                    : viewMode === 'breez'
+                                        ? 'text-blue-400'
+                                        : viewMode === 'nwc'
+                                            ? 'text-purple-400'
                                             : 'text-emerald-400'
                             } />
                         </button>
@@ -3709,22 +3730,45 @@ export const Wallet: React.FC = () => {
                             };
                             const txWallet = (tx.walletType || 'cashu') as 'breez' | 'cashu' | 'nwc';
                             const walletStyle = walletColors[txWallet] || walletColors.cashu;
-                            
+
                             return (
-                                <div 
-                                    key={tx.id} 
+                                <div
+                                    key={tx.id}
                                     className={`flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 ${viewMode === 'all' ? `border-l-4 ${walletStyle.border}` : ''}`}
                                 >
                                     <div className="flex items-center space-x-3">
-                                        <div className={`p-2 rounded-full ${['deposit', 'receive'].includes(tx.type) ? 'bg-green-500/20 text-green-400' :
-                                            ['payout', 'ace_pot'].includes(tx.type) ? 'bg-brand-primary/20 text-brand-primary' :
-                                                ['send', 'payment'].includes(tx.type) ? 'bg-brand-accent/20 text-brand-accent' :
-                                                    'bg-slate-600/30 text-slate-300'
-                                            }`}>
-                                            {['deposit', 'receive'].includes(tx.type) && <Icons.Zap size={16} />}
-                                            {(tx.type === 'payout' || tx.type === 'ace_pot') && <Icons.Trophy size={16} />}
-                                            {(tx.type === 'payment' || tx.type === 'send') && <Icons.Send size={16} />}
-                                        </div>
+                                        {/* Transaction icon with wallet-specific colors */}
+                                        {(() => {
+                                            // Determine if this is a send or receive transaction
+                                            const isReceive = ['deposit', 'receive'].includes(tx.type);
+                                            const isSend = ['send', 'payment'].includes(tx.type);
+                                            const isPayout = tx.type === 'payout' || tx.type === 'ace_pot';
+
+                                            // Get wallet-specific colors for the icon
+                                            const iconColors = {
+                                                breez: { bg: 'bg-blue-500/20', text: 'text-blue-400' },
+                                                cashu: { bg: 'bg-emerald-500/20', text: 'text-emerald-400' },
+                                                nwc: { bg: 'bg-purple-500/20', text: 'text-purple-400' },
+                                            };
+                                            const colors = iconColors[txWallet] || iconColors.cashu;
+
+                                            // Payouts use gold/brand color regardless of wallet
+                                            if (isPayout) {
+                                                return (
+                                                    <div className="p-2 rounded-full bg-brand-primary/20 text-brand-primary">
+                                                        <Icons.Trophy size={16} />
+                                                    </div>
+                                                );
+                                            }
+
+                                            // Send/Receive use wallet colors with arrow icons
+                                            return (
+                                                <div className={`p-2 rounded-full ${colors.bg} ${colors.text}`}>
+                                                    {isReceive && <Icons.Receive size={16} />}
+                                                    {isSend && <Icons.Send size={16} />}
+                                                </div>
+                                            );
+                                        })()}
                                         <div>
                                             <div className="flex items-center space-x-2">
                                                 <p className="font-medium text-sm text-white">{tx.description}</p>
@@ -3746,18 +3790,18 @@ export const Wallet: React.FC = () => {
                         })
                 )}
             </div>
-            {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => { 
+            {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => {
                 if (action === 'lightning-explainer') { setHelpModal(null); setReturnToWalletHelp(false); setShowLightningExplainer(true); }
             }} />}
-            
+
             {/* Wallet Selection Modal (for "All Wallets" mode) */}
             {showWalletSelectionModal && (
-                <div 
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" 
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
                     onClick={() => setShowWalletSelectionModal(null)}
                 >
-                    <div 
-                        className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" 
+                    <div
+                        className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden"
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -3765,7 +3809,7 @@ export const Wallet: React.FC = () => {
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center space-x-3">
                                     <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
-                                        {showWalletSelectionModal === 'send' 
+                                        {showWalletSelectionModal === 'send'
                                             ? <Icons.Send size={20} className="text-orange-500" />
                                             : <Icons.Receive size={20} className="text-orange-500" />
                                         }
@@ -3782,7 +3826,7 @@ export const Wallet: React.FC = () => {
                                 Select which wallet to use
                             </p>
                         </div>
-                        
+
                         {/* Wallet Options */}
                         <div className="p-4 space-y-3">
                             {/* Cashu Option - Always available */}
@@ -3826,11 +3870,10 @@ export const Wallet: React.FC = () => {
                                     className="flex flex-col items-center justify-center p-2"
                                     title="Set as default"
                                 >
-                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                        (showWalletSelectionModal === 'send' ? defaultSendWallet : defaultReceiveWallet) === 'cashu'
-                                            ? 'bg-emerald-500 border-emerald-500'
-                                            : 'border-slate-500 hover:border-emerald-400'
-                                    }`}>
+                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${(showWalletSelectionModal === 'send' ? defaultSendWallet : defaultReceiveWallet) === 'cashu'
+                                        ? 'bg-emerald-500 border-emerald-500'
+                                        : 'border-slate-500 hover:border-emerald-400'
+                                        }`}>
                                         {(showWalletSelectionModal === 'send' ? defaultSendWallet : defaultReceiveWallet) === 'cashu' && (
                                             <Icons.Check size={12} className="text-white" />
                                         )}
@@ -3838,7 +3881,7 @@ export const Wallet: React.FC = () => {
                                     <span className="text-[9px] text-slate-500 mt-0.5">Default</span>
                                 </button>
                             </div>
-                            
+
                             {/* NWC Option - Only if connected */}
                             <div className="flex items-center gap-2">
                                 <button
@@ -3864,16 +3907,14 @@ export const Wallet: React.FC = () => {
                                             }, 100);
                                         }
                                     }}
-                                    className={`flex-1 flex items-center justify-between p-4 rounded-xl transition-all ${
-                                        nwcString 
-                                            ? 'bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/50'
-                                            : 'bg-slate-800/50 border border-slate-700 opacity-60'
-                                    }`}
+                                    className={`flex-1 flex items-center justify-between p-4 rounded-xl transition-all ${nwcString
+                                        ? 'bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/50'
+                                        : 'bg-slate-800/50 border border-slate-700 opacity-60'
+                                        }`}
                                 >
                                     <div className="flex items-center space-x-3">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                            nwcString ? 'bg-purple-500/20' : 'bg-slate-700'
-                                        }`}>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${nwcString ? 'bg-purple-500/20' : 'bg-slate-700'
+                                            }`}>
                                             <Icons.Link size={20} className={nwcString ? 'text-purple-400' : 'text-slate-500'} />
                                         </div>
                                         <div className="text-left">
@@ -3904,11 +3945,10 @@ export const Wallet: React.FC = () => {
                                         className="flex flex-col items-center justify-center p-2"
                                         title="Set as default"
                                     >
-                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                            (showWalletSelectionModal === 'send' ? defaultSendWallet : defaultReceiveWallet) === 'nwc'
-                                                ? 'bg-purple-500 border-purple-500'
-                                                : 'border-slate-500 hover:border-purple-400'
-                                        }`}>
+                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${(showWalletSelectionModal === 'send' ? defaultSendWallet : defaultReceiveWallet) === 'nwc'
+                                            ? 'bg-purple-500 border-purple-500'
+                                            : 'border-slate-500 hover:border-purple-400'
+                                            }`}>
                                             {(showWalletSelectionModal === 'send' ? defaultSendWallet : defaultReceiveWallet) === 'nwc' && (
                                                 <Icons.Check size={12} className="text-white" />
                                             )}
@@ -3919,7 +3959,7 @@ export const Wallet: React.FC = () => {
                                     <div className="w-[52px]" /> // Spacer to align with Cashu
                                 )}
                             </div>
-                            
+
                             {/* Breez Lightning Option */}
                             <div className="flex items-center gap-2">
                                 <button
@@ -3961,11 +4001,10 @@ export const Wallet: React.FC = () => {
                                     className="flex flex-col items-center justify-center p-2"
                                     title="Set as default"
                                 >
-                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                        (showWalletSelectionModal === 'send' ? defaultSendWallet : defaultReceiveWallet) === 'breez'
-                                            ? 'bg-blue-500 border-blue-500'
-                                            : 'border-slate-500 hover:border-blue-400'
-                                    }`}>
+                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${(showWalletSelectionModal === 'send' ? defaultSendWallet : defaultReceiveWallet) === 'breez'
+                                        ? 'bg-blue-500 border-blue-500'
+                                        : 'border-slate-500 hover:border-blue-400'
+                                        }`}>
                                         {(showWalletSelectionModal === 'send' ? defaultSendWallet : defaultReceiveWallet) === 'breez' && (
                                             <Icons.Check size={12} className="text-white" />
                                         )}
@@ -3974,7 +4013,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Footer hint */}
                         <div className="px-4 pb-4">
                             <p className="text-slate-500 text-xs text-center">
@@ -3984,7 +4023,7 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Fund Wallet Modal */}
             {showFundModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowFundModal(false)}>
@@ -4003,19 +4042,19 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content - Level 0: Getting Started */}
                         {rabbitHoleLevel === 0 && (
                             <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                                 {/* The Rant */}
                                 <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
                                     <p className="text-slate-300 text-sm leading-relaxed mb-3">
-                                        <span className="text-white font-bold">Here's the deal:</span> The government has made it unnecessarily complicated to buy Bitcoin. 
+                                        <span className="text-white font-bold">Here's the deal:</span> The government has made it unnecessarily complicated to buy Bitcoin.
                                         They'd prefer you keep your savings in dollars that lose value every year while they print trillions more.
                                     </p>
                                     <p className="text-slate-400 text-xs italic">
                                         Meanwhile, Bitcoin's supply is fixed forever. No one can print more. Ever. That's kind of the point.{' '}
-                                        <button 
+                                        <button
                                             onClick={() => setRabbitHoleLevel(1)}
                                             className="text-orange-400 hover:text-orange-300 underline transition-colors not-italic"
                                         >
@@ -4023,12 +4062,12 @@ export const Wallet: React.FC = () => {
                                         </button>
                                     </p>
                                 </div>
-                                
+
                                 {/* The Good News */}
                                 <p className="text-slate-300 text-sm">
                                     <span className="text-brand-primary font-bold">The good news?</span> A few apps make it easy to buy Bitcoin and send it directly to your wallet via Lightning:
                                 </p>
-                                
+
                                 {/* App Recommendations */}
                                 <div className="space-y-3">
                                     <a href="https://cash.app" target="_blank" rel="noopener noreferrer" className="block p-4 bg-[#00D64F]/10 border border-[#00D64F]/30 rounded-xl hover:bg-[#00D64F]/20 transition-colors group">
@@ -4068,7 +4107,7 @@ export const Wallet: React.FC = () => {
                                         </div>
                                     </a>
                                 </div>
-                                
+
                                 {/* Instructions */}
                                 <div className="bg-brand-primary/10 border border-brand-primary/30 rounded-xl p-4">
                                     <p className="text-sm text-slate-300 mb-2">
@@ -4081,7 +4120,7 @@ export const Wallet: React.FC = () => {
                                         <li>Paste your address: <span className="text-brand-primary font-mono">{receiveAddress.length > 20 ? receiveAddress.substring(0, 20) + '...' : receiveAddress}</span></li>
                                     </ol>
                                 </div>
-                                
+
                                 {/* Copy Address Button */}
                                 <button
                                     onClick={() => {
@@ -4095,33 +4134,33 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         )}
-                        
+
                         {/* Content - Level 1: Deeper */}
                         {rabbitHoleLevel === 1 && (
                             <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                                 <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
                                     <p className="text-slate-300 text-sm leading-relaxed mb-3">
-                                        Governments are, at their core, <span className="text-red-400 font-bold">institutions of coercion</span>. 
-                                        They fund themselves not through voluntary exchange, but through taxation backed by force — 
+                                        Governments are, at their core, <span className="text-red-400 font-bold">institutions of coercion</span>.
+                                        They fund themselves not through voluntary exchange, but through taxation backed by force —
                                         and increasingly, by simply <span className="text-red-400 font-bold">printing money out of thin air</span>.
                                     </p>
                                     <p className="text-slate-300 text-sm leading-relaxed mb-3">
-                                        Every dollar printed dilutes your savings. Your purchasing power erodes while you sleep. 
+                                        Every dollar printed dilutes your savings. Your purchasing power erodes while you sleep.
                                         This isn't a bug — <span className="text-white font-bold">it's how the system is designed</span>.
                                     </p>
                                 </div>
-                                
+
                                 <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
                                     <p className="text-orange-400 text-sm italic leading-relaxed">
                                         "No man should work for what another man prints."
                                     </p>
                                     <p className="text-slate-500 text-xs mt-2 text-right">— Jack Mallers, CEO of Strike</p>
                                 </div>
-                                
+
                                 <p className="text-slate-400 text-sm leading-relaxed">
-                                    Bitcoin is the first technology that allows you to <span className="text-white font-bold">opt out</span> of this system. 
+                                    Bitcoin is the first technology that allows you to <span className="text-white font-bold">opt out</span> of this system.
                                     Not through violence. Not through politics. Through mathematics. Through code that no government can change.{' '}
-                                    <button 
+                                    <button
                                         onClick={() => setRabbitHoleLevel(2)}
                                         className="text-orange-400 hover:text-orange-300 underline transition-colors"
                                     >
@@ -4130,46 +4169,46 @@ export const Wallet: React.FC = () => {
                                 </p>
                             </div>
                         )}
-                        
+
                         {/* Content - Level 2: The Signal */}
                         {rabbitHoleLevel === 2 && (
                             <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                                 <div className="bg-gradient-to-br from-purple-500/10 to-orange-500/10 border border-purple-500/30 rounded-xl p-4">
                                     <p className="text-slate-300 text-sm leading-relaxed mb-3">
-                                        Bitcoin isn't just a currency. It's an <span className="text-purple-400 font-bold">intergalactic protocol</span> — 
-                                        a discovery of absolute digital scarcity that will outlast not just our generation, 
+                                        Bitcoin isn't just a currency. It's an <span className="text-purple-400 font-bold">intergalactic protocol</span> —
+                                        a discovery of absolute digital scarcity that will outlast not just our generation,
                                         but our <span className="text-orange-400 font-bold">civilizations</span>.
                                     </p>
                                     <p className="text-slate-300 text-sm leading-relaxed">
-                                        This technology will be here for <span className="text-white font-bold">millennia</span>. 
-                                        Long after every fiat currency has hyperinflated into oblivion, 
+                                        This technology will be here for <span className="text-white font-bold">millennia</span>.
+                                        Long after every fiat currency has hyperinflated into oblivion,
                                         Bitcoin will still be running — block after block, forever.
                                     </p>
                                 </div>
-                                
+
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                     <p className="text-slate-300 text-sm leading-relaxed mb-3">
-                                        Throughout history, every coercive institution has eventually fallen. 
+                                        Throughout history, every coercive institution has eventually fallen.
                                         Empires. Monarchies. Dictatorships. They all crumble.
                                     </p>
                                     <p className="text-slate-300 text-sm leading-relaxed">
-                                        Bitcoin is the <span className="text-brand-primary font-bold">peaceful revolution</span>. 
-                                        It doesn't fight governments — it simply makes them irrelevant. 
-                                        When you can store and transfer value without permission, 
+                                        Bitcoin is the <span className="text-brand-primary font-bold">peaceful revolution</span>.
+                                        It doesn't fight governments — it simply makes them irrelevant.
+                                        When you can store and transfer value without permission,
                                         the power to inflate, confiscate, and control <span className="text-white font-bold">evaporates</span>.
                                     </p>
                                 </div>
-                                
+
                                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
                                     <p className="text-amber-400 text-sm leading-relaxed mb-2">
                                         <span className="font-bold">This is why there's so much misinformation.</span>
                                     </p>
                                     <p className="text-slate-400 text-xs leading-relaxed">
-                                        Those in power understand the threat. They'll call it a scam, a bubble, a tool for criminals — 
+                                        Those in power understand the threat. They'll call it a scam, a bubble, a tool for criminals —
                                         anything to delay the inevitable. But the signal cannot be stopped.
                                     </p>
                                 </div>
-                                
+
                                 <div className="bg-gradient-to-r from-orange-500/20 to-purple-500/20 border border-orange-500/30 rounded-xl p-4 text-center">
                                     <p className="text-white font-bold text-sm mb-1">
                                         A golden age for humanity awaits.
@@ -4178,9 +4217,9 @@ export const Wallet: React.FC = () => {
                                         You're early. You're here. Welcome to the revolution.
                                     </p>
                                 </div>
-                                
+
                                 <p className="text-center">
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             setShowGlitch(true);
                                             setTimeout(() => {
@@ -4197,14 +4236,14 @@ export const Wallet: React.FC = () => {
                                 </p>
                             </div>
                         )}
-                        
+
                         {/* Glitch Overlay */}
                         {showGlitch && (
                             <div className="fixed inset-0 z-[9999] bg-black pointer-events-none overflow-hidden">
                                 {/* Glitch scanlines */}
                                 <div className="absolute inset-0 animate-glitch-1">
-                                    <div className="h-full w-full bg-gradient-to-b from-transparent via-green-500/20 to-transparent" 
-                                         style={{ backgroundSize: '100% 4px' }} />
+                                    <div className="h-full w-full bg-gradient-to-b from-transparent via-green-500/20 to-transparent"
+                                        style={{ backgroundSize: '100% 4px' }} />
                                 </div>
                                 {/* RGB shift layers */}
                                 <div className="absolute inset-0 animate-glitch-2 mix-blend-screen">
@@ -4216,7 +4255,7 @@ export const Wallet: React.FC = () => {
                                 {/* Random noise blocks */}
                                 <div className="absolute inset-0 animate-glitch-noise opacity-50">
                                     {[...Array(20)].map((_, i) => (
-                                        <div 
+                                        <div
                                             key={i}
                                             className="absolute bg-white/80"
                                             style={{
@@ -4230,15 +4269,15 @@ export const Wallet: React.FC = () => {
                                     ))}
                                 </div>
                                 {/* Static noise overlay */}
-                                <div className="absolute inset-0 opacity-30" 
-                                     style={{ 
-                                         backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")',
-                                         animation: 'glitch-static 0.1s infinite'
-                                     }} 
+                                <div className="absolute inset-0 opacity-30"
+                                    style={{
+                                        backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")',
+                                        animation: 'glitch-static 0.1s infinite'
+                                    }}
                                 />
                             </div>
                         )}
-                        
+
                         {/* Footer - Hidden during Matrix (Level 3) */}
                         {rabbitHoleLevel < 3 && (
                             <div className="p-4 border-t border-slate-800">
@@ -4257,7 +4296,7 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Lightning Network Explainer Modal */}
             {showLightningExplainer && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => { setShowLightningExplainer(false); if (returnToWalletHelp) { setShowWalletHelp(true); setReturnToWalletHelp(false); } }}>
@@ -4267,7 +4306,7 @@ export const Wallet: React.FC = () => {
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center space-x-3">
                                     {returnToWalletHelp && (
-                                        <button 
+                                        <button
                                             onClick={() => { setShowLightningExplainer(false); setShowWalletHelp(true); setReturnToWalletHelp(false); }}
                                             className="p-1 -ml-1 text-slate-400 hover:text-white"
                                         >
@@ -4284,7 +4323,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content */}
                         <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                             <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
@@ -4292,7 +4331,7 @@ export const Wallet: React.FC = () => {
                                     <span className="text-white font-bold">The Lightning Network</span> is a payment layer built on top of Bitcoin that enables instant, nearly-free transactions.
                                 </p>
                             </div>
-                            
+
                             <div className="space-y-3">
                                 <p className="text-slate-300 text-sm">
                                     <span className="text-blue-400 font-bold">Think of it like this:</span>
@@ -4301,7 +4340,7 @@ export const Wallet: React.FC = () => {
                                     Bitcoin is like a bank vault — super secure but slow and expensive to move money in and out. Lightning is like your everyday wallet — fast, cheap, and perfect for daily spending.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-2">
                                 <p className="text-white font-bold text-sm">Why it matters for disc golf:</p>
                                 <ul className="text-slate-400 text-xs space-y-1.5 ml-3">
@@ -4319,10 +4358,10 @@ export const Wallet: React.FC = () => {
                                     </li>
                                 </ul>
                             </div>
-                            
+
                             <p className="text-slate-500 text-xs italic text-center">
                                 Lightning makes Bitcoin practical for everyday use — why didn't you use it to pay for your{' '}
-                                <button 
+                                <button
                                     onClick={() => { setShowLightningExplainer(false); setShowVisaConspiracy(true); }}
                                     className="text-blue-400 hover:text-blue-300 underline not-italic transition-colors"
                                 >
@@ -4330,7 +4369,7 @@ export const Wallet: React.FC = () => {
                                 </button>?
                             </p>
                         </div>
-                        
+
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-800">
                             <Button fullWidth onClick={() => { setShowLightningExplainer(false); if (returnToWalletHelp) { setShowWalletHelp(true); setReturnToWalletHelp(false); } }}>Got it</Button>
@@ -4338,7 +4377,7 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Visa/Apple Conspiracy Easter Egg Modal */}
             {showVisaConspiracy && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowVisaConspiracy(false)}>
@@ -4360,7 +4399,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content */}
                         <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                             <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
@@ -4368,7 +4407,7 @@ export const Wallet: React.FC = () => {
                                     <span className="text-red-400 font-bold">The short answer?</span> The entire legacy financial system is paying billions to make sure you can't.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">The Visa-Apple Deal</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -4378,14 +4417,14 @@ export const Wallet: React.FC = () => {
                                     This was revealed in 2024 DOJ antitrust documents against Visa, which framed Apple Pay as an "existential threat" to Visa's swipe-fee empire.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">It's Not Just Visa</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
                                     <span className="text-blue-400 font-bold">Mastercard</span> pays Apple too. <span className="text-green-400 font-bold">Google</span> pays Apple <span className="text-white">$20 billion per year</span> (229,016 BTC) just to be the default search engine on Safari.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/30 rounded-xl p-4">
                                 <p className="text-white font-bold text-sm mb-2">Why Bitcoin Threatens All of This</p>
                                 <p className="text-slate-300 text-xs leading-relaxed">
@@ -4395,7 +4434,7 @@ export const Wallet: React.FC = () => {
                                     Apple blocking early crypto apps in the App Store wasn't about "protecting users" — it was about <span className="text-red-400 font-bold">protecting its Visa/Mastercard partnerships</span>.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">
                                 <p className="text-amber-400 font-bold text-sm mb-1">
                                     The system that makes you poorer every day?
@@ -4404,9 +4443,9 @@ export const Wallet: React.FC = () => {
                                     It does <span className="text-white">not</span> want Bitcoin to succeed. Because it will destroy their monopoly and their empire.
                                 </p>
                             </div>
-                            
+
                             <p className="text-center pt-2">
-                                <button 
+                                <button
                                     onClick={() => { setShowVisaConspiracy(false); setShowMoneyPrinters(true); }}
                                     className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
                                 >
@@ -4414,7 +4453,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </p>
                         </div>
-                        
+
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-800">
                             <Button fullWidth onClick={() => setShowVisaConspiracy(false)}>Got it</Button>
@@ -4422,7 +4461,7 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Level 2: The Money Printers */}
             {showMoneyPrinters && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowMoneyPrinters(false)}>
@@ -4444,7 +4483,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content */}
                         <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                             <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4">
@@ -4452,7 +4491,7 @@ export const Wallet: React.FC = () => {
                                     Visa and Apple are just the <span className="text-purple-400 font-bold">distribution layer</span>. The real power lies with those who create the money itself.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">The Federal Reserve</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -4462,7 +4501,7 @@ export const Wallet: React.FC = () => {
                                     Every dollar in existence was created as debt — with interest owed to the banking system.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">The Hidden Tax</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -4472,7 +4511,7 @@ export const Wallet: React.FC = () => {
                                     Why do you think a disc now costs $25? Soon it'll be $30. In satoshis, it's 25k now. But in a year? It'll be 15k. <span className="text-orange-400">Price your life in Bitcoin and everything gets cheaper over time.</span> Price your life in dollars, everything gets more expensive.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-gradient-to-br from-purple-500/10 to-red-500/10 border border-purple-500/30 rounded-xl p-4">
                                 <p className="text-white font-bold text-sm mb-2">The Cantillon Effect</p>
                                 <p className="text-slate-300 text-xs leading-relaxed">
@@ -4482,9 +4521,9 @@ export const Wallet: React.FC = () => {
                                     By the time wages rise for ordinary people, prices have already increased. You're always one step behind.
                                 </p>
                             </div>
-                            
+
                             <p className="text-center pt-2">
-                                <button 
+                                <button
                                     onClick={() => { setShowMoneyPrinters(false); setShowCantillonClass(true); }}
                                     className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
                                 >
@@ -4492,7 +4531,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </p>
                         </div>
-                        
+
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-800">
                             <Button fullWidth onClick={() => setShowMoneyPrinters(false)}>Got it</Button>
@@ -4500,7 +4539,7 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Level 3: The Cantillon Class */}
             {showCantillonClass && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowCantillonClass(false)}>
@@ -4522,7 +4561,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content */}
                         <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                             <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
@@ -4530,7 +4569,7 @@ export const Wallet: React.FC = () => {
                                     There is an <span className="text-amber-400 font-bold">invisible class</span> of people who benefit from your losses. They don't work harder than you. They're just closer to the money printer.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">The First Recipients</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -4546,7 +4585,7 @@ export const Wallet: React.FC = () => {
                                     (Sound familiar? The PDGA collected membership fees for decades and still couldn't launch a cohesive pro tour. A private company had to step in and actually make things work...)
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">The Wealth Transfer</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -4556,7 +4595,7 @@ export const Wallet: React.FC = () => {
                                     This is why housing, healthcare, and education costs have skyrocketed while wages stagnated. Also why that two line Innova Destroyer you bought in 2013 is somehow worth $200 now.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">The Numbers</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -4573,7 +4612,7 @@ export const Wallet: React.FC = () => {
                                     The gap between these numbers is what was stolen from you.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-gradient-to-br from-red-500/10 to-amber-500/10 border border-red-500/30 rounded-xl p-4">
                                 <p className="text-slate-300 text-xs leading-relaxed italic">
                                     "Inflation is taxation without legislation."
@@ -4585,15 +4624,15 @@ export const Wallet: React.FC = () => {
                                     (probably threw Discraft)
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4">
                                 <p className="text-slate-400 text-xs leading-relaxed">
                                     Every dollar printed is a hidden tax on your savings. Every bailout transfers wealth from those who saved to those who speculated. The entire system is designed to move wealth <span className="text-red-400 font-bold">upward</span> — just like how the easiest way to get a high PDGA rating is to play a tournament where everyone else is already rated high.
                                 </p>
                             </div>
-                            
+
                             <p className="text-center pt-2">
-                                <button 
+                                <button
                                     onClick={() => { setShowCantillonClass(false); setShowLifeboat(true); }}
                                     className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
                                 >
@@ -4601,7 +4640,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </p>
                         </div>
-                        
+
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-800">
                             <Button fullWidth onClick={() => setShowCantillonClass(false)}>Got it</Button>
@@ -4609,7 +4648,7 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Level 4: The Lifeboat - Hope */}
             {showLifeboat && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowLifeboat(false)}>
@@ -4631,7 +4670,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content */}
                         <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                             {/* Big Answer */}
@@ -4640,7 +4679,7 @@ export const Wallet: React.FC = () => {
                                     Bitcoin.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border border-orange-500/30 rounded-xl p-4">
                                 <p className="text-slate-300 text-sm leading-relaxed">
                                     You don't have to fight them. You don't have to ask permission. You don't have to wait for politicians to save you.
@@ -4649,7 +4688,7 @@ export const Wallet: React.FC = () => {
                                     You just have to leave.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">Bitcoin Is the Exit</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -4659,7 +4698,7 @@ export const Wallet: React.FC = () => {
                                     21 million. Forever. Written in code that no one can change.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">The Peaceful Revolution</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -4669,7 +4708,7 @@ export const Wallet: React.FC = () => {
                                     You simply <span className="text-white">opt out</span>. You move your savings into a system they cannot inflate, cannot confiscate, and cannot stop.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">Your Sovereignty</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -4679,7 +4718,7 @@ export const Wallet: React.FC = () => {
                                     The state has always been controlled by those who control the money. Bitcoin separates money from state.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-xl p-4">
                                 <p className="text-white font-bold text-sm mb-2">This Is Hope</p>
                                 <p className="text-slate-300 text-xs leading-relaxed">
@@ -4692,7 +4731,7 @@ export const Wallet: React.FC = () => {
                                     Every day, more people walk through the door. And every day, the old system loses a little more power.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 text-center">
                                 <p className="text-slate-300 text-xs leading-relaxed italic">
                                     You are not powerless. You are not alone. And you are earlier than you think.
@@ -4700,9 +4739,9 @@ export const Wallet: React.FC = () => {
                                 <p className="text-orange-400 text-sm font-bold mt-3">
                                     Welcome to the revolution.
                                 </p>
-                                <button 
-                                    onClick={() => { 
-                                        setShowLifeboat(false); 
+                                <button
+                                    onClick={() => {
+                                        setShowLifeboat(false);
                                         setRedPillPhase(0);
                                         setShowRedPill(true);
                                     }}
@@ -4712,7 +4751,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-800">
                             <Button fullWidth onClick={() => setShowLifeboat(false)}>
@@ -4722,10 +4761,10 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Level 5: The Red Pill - Final Radical Easter Egg */}
             {showRedPill && (
-                <div 
+                <div
                     className="fixed inset-0 z-[99999] bg-black cursor-pointer select-none overflow-hidden"
                     onClick={() => {
                         if (redPillPhase >= 2) {
@@ -4751,12 +4790,12 @@ export const Wallet: React.FC = () => {
                                 backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,0,0,0.03) 2px, rgba(255,0,0,0.03) 4px)',
                                 animation: 'scanlines 0.1s linear infinite'
                             }} />
-                            
+
                             {/* Screen tear effect */}
                             {redPillPhase === 1 && (
                                 <div className="absolute inset-0 flex flex-col">
                                     {[...Array(20)].map((_, i) => (
-                                        <div 
+                                        <div
                                             key={i}
                                             className="flex-1 bg-black"
                                             style={{
@@ -4768,16 +4807,16 @@ export const Wallet: React.FC = () => {
                                     ))}
                                 </div>
                             )}
-                            
+
                             {/* Red flash */}
-                            <div 
+                            <div
                                 className="absolute inset-0 bg-red-600 pointer-events-none"
                                 style={{
                                     animation: 'red-flash 0.3s ease-out forwards',
                                     opacity: redPillPhase === 0 ? 1 : 0
                                 }}
                             />
-                            
+
                             {/* Loading text */}
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <p className="text-red-500 font-mono text-sm animate-pulse">
@@ -4786,18 +4825,18 @@ export const Wallet: React.FC = () => {
                             </div>
                         </>
                     )}
-                    
+
                     {/* Phase 2: The Message */}
                     {redPillPhase === 2 && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 animate-in fade-in duration-1000">
                             {/* Red glow effect */}
                             <div className="absolute inset-0 bg-gradient-radial from-red-900/20 via-transparent to-transparent pointer-events-none" />
-                            
+
                             <div className="relative z-10 max-w-md text-center space-y-6">
                                 <p className="text-red-500 font-mono text-2xl font-bold tracking-wider animate-in slide-in-from-bottom-4 duration-500">
                                     YOU SEE IT NOW.
                                 </p>
-                                
+
                                 <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500 delay-300">
                                     <p className="text-slate-400 text-sm leading-relaxed">
                                         The taxes. The inflation. The fees. The rules. The licenses. The permits. The regulations. The wars.
@@ -4806,18 +4845,18 @@ export const Wallet: React.FC = () => {
                                         All designed to keep you running on a hamster wheel while they print money and hand it to their friends.
                                     </p>
                                 </div>
-                                
+
                                 <div className="pt-4 animate-in slide-in-from-bottom-4 duration-500 delay-500">
                                     <p className="text-white text-lg font-bold">
                                         But you found the exit.
                                     </p>
                                 </div>
-                                
+
                                 {/* Large Bitcoin Logo */}
                                 <div className="pt-6 pb-2 animate-in zoom-in-50 duration-700 delay-600">
                                     <Icons.Bitcoin size={80} className="text-orange-500 mx-auto drop-shadow-[0_0_40px_rgba(249,115,22,0.6)]" />
                                 </div>
-                                
+
                                 <div className="pt-2 animate-in slide-in-from-bottom-4 duration-500 delay-700">
                                     <p className="text-slate-500 text-xs">
                                         Every sat you stack is a brick in the wall of your freedom.
@@ -4826,7 +4865,7 @@ export const Wallet: React.FC = () => {
                                         Every transaction is a vote against the machine.
                                     </p>
                                 </div>
-                                
+
                                 <div className="pt-8 animate-in slide-in-from-bottom-4 duration-500 delay-1000">
                                     <p className="text-red-400 font-mono text-xs">
                                         There is no going back.
@@ -4835,12 +4874,12 @@ export const Wallet: React.FC = () => {
                                         Welcome to the new world.
                                     </p>
                                 </div>
-                                
+
                                 <p className="text-slate-700 text-xs pt-8 animate-in fade-in duration-500 delay-1500">
                                     [ tap anywhere to return ]
                                 </p>
                             </div>
-                            
+
                             {/* Floating particles */}
                             <div className="absolute inset-0 pointer-events-none overflow-hidden">
                                 {[...Array(15)].map((_, i) => (
@@ -4860,7 +4899,7 @@ export const Wallet: React.FC = () => {
                     )}
                 </div>
             )}
-            
+
             {/* Why Three Wallets Modal */}
             {showWhyThreeWallets && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => { setShowWhyThreeWallets(false); setShowWalletHelp(true); }}>
@@ -4869,7 +4908,7 @@ export const Wallet: React.FC = () => {
                         <div className="p-5 border-b border-slate-800">
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center space-x-3">
-                                    <button 
+                                    <button
                                         onClick={() => { setShowWhyThreeWallets(false); setShowWalletHelp(true); }}
                                         className="p-1 -ml-1 text-slate-400 hover:text-white"
                                     >
@@ -4885,7 +4924,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content */}
                         <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                             <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
@@ -4893,11 +4932,11 @@ export const Wallet: React.FC = () => {
                                     <span className="text-amber-400 font-bold">We get it — this might seem confusing.</span> Why can't there just be one wallet?
                                 </p>
                             </div>
-                            
+
                             <p className="text-slate-300 text-sm leading-relaxed">
                                 Bitcoin is still young, and different wallet types have different trade-offs. We give you <strong className="text-white">three options</strong> so you can pick what works best for you:
                             </p>
-                            
+
                             <div className="space-y-3">
                                 <div className="flex items-start space-x-3">
                                     <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
@@ -4908,7 +4947,7 @@ export const Wallet: React.FC = () => {
                                         <p className="text-slate-400 text-xs">Self-custodial. Your keys, your coins.</p>
                                     </div>
                                 </div>
-                                
+
                                 <div className="flex items-start space-x-3">
                                     <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5">
                                         <Icons.Cashew size={16} className="text-emerald-400" />
@@ -4918,7 +4957,7 @@ export const Wallet: React.FC = () => {
                                         <p className="text-slate-400 text-xs">Super simple & private. Great for everyday use.</p>
                                     </div>
                                 </div>
-                                
+
                                 <div className="flex items-start space-x-3">
                                     <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0 mt-0.5">
                                         <Icons.Link size={16} className="text-purple-400" />
@@ -4929,12 +4968,12 @@ export const Wallet: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <p className="text-slate-500 text-xs text-center">
                                 All three work seamlessly in the app. Switch anytime!
                             </p>
                         </div>
-                        
+
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-800">
                             <Button fullWidth onClick={() => { setShowWhyThreeWallets(false); setShowWalletHelp(true); }}>Got it</Button>
@@ -4942,9 +4981,9 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Wallet Help Modal */}
-            <WalletHelpModal 
+            <WalletHelpModal
                 isOpen={showWalletHelp}
                 onClose={() => setShowWalletHelp(false)}
                 onLightningClick={() => { setShowWalletHelp(false); setReturnToWalletHelp(true); setShowLightningExplainer(true); }}
@@ -4953,9 +4992,9 @@ export const Wallet: React.FC = () => {
                 onSatoshiClick={() => { setShowWalletHelp(false); setShowWhatIsSatoshi(true); }}
                 showNewToBitcoin={walletBalance > 0}
             />
-            
+
             {/* ====== SATOSHI RABBIT HOLE ====== */}
-            
+
             {/* Satoshi Level 1: What is a Satoshi? */}
             {showWhatIsSatoshi && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowWhatIsSatoshi(false)}>
@@ -4977,7 +5016,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content */}
                         <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                             <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
@@ -4985,7 +5024,7 @@ export const Wallet: React.FC = () => {
                                     A <span className="text-orange-400 font-bold">Satoshi</span> (or "sat") is the smallest unit of Bitcoin — named after Bitcoin's pseudonymous creator, Satoshi Nakamoto.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">The Math</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -4998,7 +5037,7 @@ export const Wallet: React.FC = () => {
                                     At today's price, a single sat is worth a fraction of a cent. Perfect for small payments.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">Why Sats Matter</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -5008,7 +5047,7 @@ export const Wallet: React.FC = () => {
                                     As Bitcoin's value rises, we'll use smaller and smaller fractions. Sats make that practical.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border border-orange-500/30 rounded-xl p-4">
                                 <p className="text-white font-bold text-sm mb-2">Think About It</p>
                                 <p className="text-slate-300 text-xs leading-relaxed">
@@ -5018,9 +5057,9 @@ export const Wallet: React.FC = () => {
                                     Today, a burger costs <span className="text-orange-400">~20,000 sats</span>. In the future? Maybe <span className="text-green-400">200 sats</span>. Bitcoin gets stronger.
                                 </p>
                             </div>
-                            
+
                             <p className="text-center pt-2">
-                                <button 
+                                <button
                                     onClick={() => { setShowWhatIsSatoshi(false); setShowSatoshiPricing(true); }}
                                     className="text-xs text-slate-500 hover:text-orange-400 transition-colors"
                                 >
@@ -5028,7 +5067,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </p>
                         </div>
-                        
+
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-800">
                             <Button fullWidth onClick={() => setShowWhatIsSatoshi(false)}>Got it</Button>
@@ -5036,7 +5075,7 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Satoshi Level 2: Pricing in Sats vs Dollars */}
             {showSatoshiPricing && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowSatoshiPricing(false)}>
@@ -5058,7 +5097,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content */}
                         <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                             <div className="bg-gradient-to-br from-red-500/10 to-slate-800 border border-red-500/30 rounded-xl p-4">
@@ -5070,7 +5109,7 @@ export const Wallet: React.FC = () => {
                                     This feels normal because you've never known anything else.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-gradient-to-br from-green-500/10 to-slate-800 border border-green-500/30 rounded-xl p-4">
                                 <p className="text-green-400 font-bold text-sm mb-2">Life Priced in Sats</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -5080,7 +5119,7 @@ export const Wallet: React.FC = () => {
                                     This is how money is supposed to work.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">The Great Reversal</p>
                                 <div className="grid grid-cols-2 gap-3 mt-2">
@@ -5098,7 +5137,7 @@ export const Wallet: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">
                                 <p className="text-slate-300 text-xs leading-relaxed">
                                     <span className="text-amber-400 font-bold">Price your life in Bitcoin</span> and everything gets cheaper over time.
@@ -5107,9 +5146,9 @@ export const Wallet: React.FC = () => {
                                     <span className="text-red-400 font-bold">Price your life in dollars</span> and everything gets more expensive.
                                 </p>
                             </div>
-                            
+
                             <p className="text-center pt-2">
-                                <button 
+                                <button
                                     onClick={() => { setShowSatoshiPricing(false); setShowDollarCollapse(true); }}
                                     className="text-xs text-slate-500 hover:text-orange-400 transition-colors"
                                 >
@@ -5117,7 +5156,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </p>
                         </div>
-                        
+
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-800">
                             <Button fullWidth onClick={() => setShowSatoshiPricing(false)}>Got it</Button>
@@ -5125,7 +5164,7 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Satoshi Level 3: Dollar Collapse Over Time */}
             {showDollarCollapse && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowDollarCollapse(false)}>
@@ -5147,7 +5186,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content */}
                         <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                             {/* The Big Number */}
@@ -5158,14 +5197,14 @@ export const Wallet: React.FC = () => {
                                     What cost <span className="text-white">$1</span> in 1913 now costs <span className="text-red-400">$31</span>
                                 </p>
                             </div>
-                            
+
                             {/* What $100 Bought - Visual Timeline */}
                             <div className="bg-slate-800/50 rounded-xl p-4">
                                 <p className="text-white font-bold text-sm mb-3 text-center">What $100 Could Buy</p>
                                 <div className="relative">
                                     {/* Vertical line */}
                                     <div className="absolute left-[52px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-green-500 via-yellow-500 to-red-500"></div>
-                                    
+
                                     <div className="space-y-3">
                                         <div className="flex items-center">
                                             <span className="text-green-400 text-xs font-bold w-12">1913</span>
@@ -5190,7 +5229,7 @@ export const Wallet: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             {/* The Silent Theft */}
                             <div className="bg-slate-800/50 rounded-xl p-4">
                                 <p className="text-white font-bold text-sm mb-2">The Silent Theft</p>
@@ -5203,7 +5242,7 @@ export const Wallet: React.FC = () => {
                                     You're not lazier. The money keeps getting weaker.
                                 </p>
                             </div>
-                            
+
                             {/* Austrian Economist Quote */}
                             <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-4">
                                 <p className="text-slate-300 text-xs leading-relaxed italic">
@@ -5216,7 +5255,7 @@ export const Wallet: React.FC = () => {
                                     Nobel Prize in Economics, 1974
                                 </p>
                             </div>
-                            
+
                             {/* The Double Theft */}
                             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                                 <p className="text-white font-bold text-sm mb-2">The Double Theft</p>
@@ -5227,9 +5266,9 @@ export const Wallet: React.FC = () => {
                                     The number in your account stays the same. The value doesn't.
                                 </p>
                             </div>
-                            
+
                             <p className="text-center pt-2">
-                                <button 
+                                <button
                                     onClick={() => { setShowDollarCollapse(false); setShowEmpiresFall(true); }}
                                     className="text-xs text-slate-500 hover:text-orange-400 transition-colors"
                                 >
@@ -5237,7 +5276,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </p>
                         </div>
-                        
+
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-800">
                             <Button fullWidth onClick={() => setShowDollarCollapse(false)}>Got it</Button>
@@ -5245,7 +5284,7 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Satoshi Level 4: Empires Fall */}
             {showEmpiresFall && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowEmpiresFall(false)}>
@@ -5267,7 +5306,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content */}
                         <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                             <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
@@ -5275,7 +5314,7 @@ export const Wallet: React.FC = () => {
                                     History teaches a pattern: <span className="text-amber-400 font-bold">the money dies first, then the empire follows</span>. Not the other way around.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">The Roman Denarius</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -5285,7 +5324,7 @@ export const Wallet: React.FC = () => {
                                     The Roman Empire "officially" fell in 476 AD — 200 years after the money died.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">Every. Single. Time.</p>
                                 <div className="space-y-2 text-xs">
@@ -5295,7 +5334,7 @@ export const Wallet: React.FC = () => {
                                     <p className="text-slate-400"><span className="text-amber-400">Zimbabwe:</span> Currency dies 2008, regime change 2017</p>
                                 </div>
                             </div>
-                            
+
                             <div className="bg-gradient-to-br from-red-500/10 to-amber-500/10 border border-red-500/30 rounded-xl p-4">
                                 <p className="text-white font-bold text-sm mb-2">The Pattern</p>
                                 <ol className="text-slate-400 text-xs space-y-1 ml-4 list-decimal">
@@ -5309,15 +5348,15 @@ export const Wallet: React.FC = () => {
                                     The money is always the first domino.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 text-center">
                                 <p className="text-slate-400 text-xs leading-relaxed">
                                     The US dollar has lost 97% of its value in 110 years. What happens when it loses the last 3%?
                                 </p>
                             </div>
-                            
+
                             <p className="text-center pt-2">
-                                <button 
+                                <button
                                     onClick={() => { setShowEmpiresFall(false); setShowBitcoinForever(true); }}
                                     className="text-xs text-slate-500 hover:text-orange-400 transition-colors"
                                 >
@@ -5325,7 +5364,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </p>
                         </div>
-                        
+
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-800">
                             <Button fullWidth onClick={() => setShowEmpiresFall(false)}>Got it</Button>
@@ -5333,7 +5372,7 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Satoshi Level 5: Bitcoin Cannot Be Debased + Fourth Wall Break */}
             {showBitcoinForever && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowBitcoinForever(false)}>
@@ -5355,7 +5394,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Content */}
                         <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
                             {/* Big Number */}
@@ -5367,13 +5406,13 @@ export const Wallet: React.FC = () => {
                                     The number that changes everything
                                 </p>
                             </div>
-                            
+
                             <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
                                 <p className="text-slate-300 text-sm leading-relaxed">
                                     Bitcoin <span className="text-orange-400 font-bold">cannot be debased</span>. There will only ever be 21 million Bitcoin. No emperor, president, or committee can change this.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">Why It's Different</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -5383,7 +5422,7 @@ export const Wallet: React.FC = () => {
                                     Bitcoin is controlled by <span className="text-orange-400">mathematics</span>. Math doesn't take bribes. Math doesn't have elections. Math doesn't need to fund a war.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
                                 <p className="text-white font-bold text-sm">The Promise</p>
                                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -5393,14 +5432,14 @@ export const Wallet: React.FC = () => {
                                     Where working hard and saving money is rewarded, not punished by inflation.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border border-orange-500/30 rounded-xl p-4">
                                 <p className="text-white font-bold text-sm mb-2">This Is the End of the Pattern</p>
                                 <p className="text-slate-300 text-xs leading-relaxed">
                                     For 5,000 years, empires rose and fell on the back of debased money. Bitcoin breaks the cycle. Not because it's better technology — because it <span className="text-orange-400 font-bold">removes the humans</span> from monetary policy.
                                 </p>
                             </div>
-                            
+
                             <div className="bg-slate-800/50 rounded-xl p-4 text-center">
                                 <p className="text-slate-300 text-xs leading-relaxed italic">
                                     Every sat you hold is a vote for a different future. A future where money cannot be weaponized against you.
@@ -5408,8 +5447,8 @@ export const Wallet: React.FC = () => {
                                 <p className="text-orange-400 text-sm font-bold mt-3">
                                     21 million. Forever.
                                 </p>
-                                <button 
-                                    onClick={() => { 
+                                <button
+                                    onClick={() => {
                                         // Start transmission immediately - overlay has z-[99999] so it covers the modal
                                         setTransmissionPhase(1);
                                         // Then schedule the subsequent phases
@@ -5424,7 +5463,7 @@ export const Wallet: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-800">
                             <Button fullWidth onClick={() => setShowBitcoinForever(false)}>
@@ -5434,10 +5473,10 @@ export const Wallet: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Satoshi Final: The Transmission - Fourth Wall Break */}
             {transmissionPhase > 0 && (
-                <div 
+                <div
                     className="fixed inset-0 z-[99999] bg-black cursor-pointer select-none overflow-hidden"
                     onClick={() => transmissionPhase >= 3 ? setTransmissionPhase(0) : null}
                     style={{ fontFamily: 'monospace' }}
@@ -5459,7 +5498,7 @@ export const Wallet: React.FC = () => {
                             </div>
                         </div>
                     )}
-                    
+
                     {/* Phase 2: Decoding */}
                     {transmissionPhase === 2 && (
                         <div className="absolute inset-0 flex items-center justify-center p-8">
@@ -5474,25 +5513,25 @@ export const Wallet: React.FC = () => {
                             </div>
                         </div>
                     )}
-                    
+
                     {/* Phase 3: The Message */}
                     {transmissionPhase === 3 && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 animate-in fade-in duration-1000">
                             {/* Subtle orange glow */}
                             <div className="absolute inset-0 bg-gradient-radial from-orange-900/10 via-transparent to-transparent pointer-events-none" />
-                            
+
                             {/* Header - looks like archived transmission */}
                             <div className="absolute top-8 left-0 right-0 text-center">
                                 <p className="text-orange-500/20 text-[8px] tracking-[0.3em]">
                                     ARCHIVED TRANSMISSION • ORIGIN: UNKNOWN • TIMESTAMP: ████████
                                 </p>
                             </div>
-                            
+
                             <div className="relative z-10 max-w-md text-center space-y-6">
                                 <p className="text-orange-500/60 text-xs tracking-widest animate-in slide-in-from-top-4 duration-500">
                                     MESSAGE FROM THE FUTURE
                                 </p>
-                                
+
                                 <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500 delay-300">
                                     <p className="text-orange-400 text-xl font-bold leading-relaxed">
                                         We made it.
@@ -5501,7 +5540,7 @@ export const Wallet: React.FC = () => {
                                         The transition was hard. The old system fought until the end. But here, on the other side, we want you to know:
                                     </p>
                                 </div>
-                                
+
                                 <div className="py-4 animate-in slide-in-from-bottom-4 duration-500 delay-500">
                                     <p className="text-white text-lg font-medium leading-relaxed">
                                         You were right to stack.
@@ -5513,7 +5552,7 @@ export const Wallet: React.FC = () => {
                                         You were not crazy.
                                     </p>
                                 </div>
-                                
+
                                 <div className="pt-2 animate-in slide-in-from-bottom-4 duration-500 delay-700">
                                     <p className="text-slate-500 text-xs">
                                         The sats you stack today echo through generations.
@@ -5522,20 +5561,20 @@ export const Wallet: React.FC = () => {
                                         Your great-grandchildren thank you.
                                     </p>
                                 </div>
-                                
+
                                 <div className="pt-6 animate-in fade-in duration-500 delay-1000">
                                     <Icons.Bitcoin size={40} className="text-orange-500 mx-auto drop-shadow-[0_0_20px_rgba(249,115,22,0.4)]" />
                                 </div>
-                                
+
                                 <p className="text-orange-500/40 text-xs pt-4 animate-in fade-in duration-500 delay-1500 tracking-widest">
                                     21 MILLION. FOREVER.
                                 </p>
-                                
+
                                 <p className="text-slate-700 text-xs pt-6 animate-in fade-in duration-500 delay-2000">
                                     [ tap anywhere to return ]
                                 </p>
                             </div>
-                            
+
                             {/* Scan lines effect */}
                             <div className="absolute inset-0 pointer-events-none opacity-5" style={{
                                 backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(249,115,22,0.1) 2px, rgba(249,115,22,0.1) 4px)'
@@ -5544,30 +5583,30 @@ export const Wallet: React.FC = () => {
                     )}
                 </div>
             )}
-            
+
             {/* THE MATRIX - Level 3: Rock Bottom */}
             {rabbitHoleLevel === 3 && (
-                <div 
+                <div
                     className="fixed inset-0 z-[99999] bg-black cursor-pointer select-none"
                     onClick={handleMatrixExit}
                     style={{ touchAction: 'none' }}
                 >
                     {/* CRT Scanlines */}
-                    <div 
+                    <div
                         className="absolute inset-0 pointer-events-none opacity-10"
                         style={{
                             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,255,0,0.03) 1px, rgba(0,255,0,0.03) 2px)',
                             backgroundSize: '100% 2px'
                         }}
                     />
-                    
+
                     {/* Blinking cursor / Matrix terminal */}
                     <div className="absolute top-8 left-6 right-6 font-mono text-green-500 text-sm leading-relaxed">
                         {/* Blinking cursor before text starts */}
                         {!matrixText && (
                             <span className="animate-pulse">█</span>
                         )}
-                        
+
                         {/* Typewriter text with blinking cursor */}
                         <div className="whitespace-pre-wrap">
                             {matrixText}
@@ -5575,7 +5614,7 @@ export const Wallet: React.FC = () => {
                                 <span className="animate-pulse">█</span>
                             )}
                         </div>
-                        
+
                         {/* Click to exit prompt */}
                         {matrixClickable && (
                             <div className="mt-8 animate-pulse text-green-400/60 text-xs">
@@ -5583,9 +5622,9 @@ export const Wallet: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    
+
                     {/* Subtle CRT glow effect */}
-                    <div 
+                    <div
                         className="absolute inset-0 pointer-events-none"
                         style={{
                             background: 'radial-gradient(ellipse at center, rgba(0,255,0,0.03) 0%, transparent 70%)',
@@ -5593,7 +5632,7 @@ export const Wallet: React.FC = () => {
                     />
                 </div>
             )}
-            
+
         </div >
     );
 };

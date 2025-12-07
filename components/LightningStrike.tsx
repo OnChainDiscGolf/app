@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 
 interface LightningStrikeProps {
     amount: number;
@@ -243,7 +243,13 @@ export const LightningStrikeNotification: React.FC<LightningStrikeProps> = ({
     const config = useMemo(() => getIntensityConfig(amount), [amount]);
     const bolts = useMemo(() => generateBolts(config), [config]);
 
-    // Animation sequence
+    // Use a ref for the callback to prevent the animation useEffect from
+    // restarting when the parent re-renders and passes a new callback reference
+    const onCompleteRef = useRef(onComplete);
+    onCompleteRef.current = onComplete;
+
+    // Animation sequence - only depends on config, NOT on onComplete
+    // This prevents the animation from restarting when parent re-renders
     useEffect(() => {
         const { duration, hasMultipleWaves, hasAfterGlow } = config;
 
@@ -280,10 +286,10 @@ export const LightningStrikeNotification: React.FC<LightningStrikeProps> = ({
             setPhase('fade');
         }, flashDuration + showDuration + afterglowDuration);
 
-        // Complete
+        // Complete - use ref to call the current callback
         const completeTimer = setTimeout(() => {
             setPhase('complete');
-            onComplete();
+            onCompleteRef.current();
         }, flashDuration + showDuration + afterglowDuration + fadeDuration);
 
         return () => {
@@ -293,17 +299,16 @@ export const LightningStrikeNotification: React.FC<LightningStrikeProps> = ({
             clearTimeout(fadeTimer);
             clearTimeout(completeTimer);
         };
-    }, [config, onComplete]);
+    }, [config]); // Removed onComplete from dependencies - using ref instead
 
     if (phase === 'complete') return null;
 
     const showBolts = phase === 'flash' || (phase === 'show' && config.tier !== 'minimal');
 
     return (
-        <div 
-            className={`fixed inset-0 z-[200] pointer-events-none overflow-hidden ${
-                config.hasShake && phase === 'flash' ? 'animate-shake' : ''
-            }`}
+        <div
+            className={`fixed inset-0 z-[200] pointer-events-none overflow-hidden ${config.hasShake && phase === 'flash' ? 'animate-shake' : ''
+                }`}
         >
             {/* Screen flash effect */}
             <div
@@ -475,10 +480,9 @@ export const LightningStrikeNotification: React.FC<LightningStrikeProps> = ({
 
                         {/* Amount */}
                         <div
-                            className={`font-black text-white tracking-tight ${
-                                config.tier === 'massive' ? 'text-6xl' : 
-                                config.tier === 'very-high' ? 'text-5xl' : 'text-5xl'
-                            }`}
+                            className={`font-black text-white tracking-tight ${config.tier === 'massive' ? 'text-6xl' :
+                                    config.tier === 'very-high' ? 'text-5xl' : 'text-5xl'
+                                }`}
                             style={{
                                 fontFamily: 'system-ui, -apple-system, sans-serif',
                                 textShadow: `0 0 ${config.tier === 'massive' ? 40 : 20}px ${config.glowColor}, 
@@ -491,9 +495,8 @@ export const LightningStrikeNotification: React.FC<LightningStrikeProps> = ({
 
                         {/* SATS label */}
                         <div
-                            className={`font-bold tracking-widest mt-1 ${
-                                config.tier === 'massive' ? 'text-xl' : 'text-lg'
-                            }`}
+                            className={`font-bold tracking-widest mt-1 ${config.tier === 'massive' ? 'text-xl' : 'text-lg'
+                                }`}
                             style={{
                                 color: config.glowColor,
                                 textShadow: `0 0 10px ${config.glowColor}90, 0 1px 2px rgba(0,0,0,0.8)`,
