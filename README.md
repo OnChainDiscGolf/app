@@ -19,7 +19,7 @@ Ironically, despite the name, all payments are actually *off-chain*. ;)
 **Please exercise caution:**
 - Start with small amounts until you're comfortable
 - Back up your nsec (secret key) — it controls your account
-- Report bugs via [GitHub Issues](https://github.com/OnChainDiscGolf/app/issues)
+- Report bugs via the in-app feedback found on the gear icon. 
 
 *Self-custody means self-responsibility. That's empowering.*
 
