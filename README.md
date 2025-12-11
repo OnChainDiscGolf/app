@@ -2,7 +2,7 @@
 
 > *"We'll settle up after the round!"* — Famous last words.
 
-**On-Chain Disc Golf** is a disc golf scorecard app with integrated Bitcoin payments. No banks. No IOUs. No "Venmo is acting weird." Just pay when you start, get paid when you finish.
+**On-Chain Disc Golf** is a disc golf scorecard app with integrated Bitcoin payments. No banks. No IOUs. No "Venmo is acting weird." Automatic round settlement, instant and hassle-free.
 
 Ironically, despite the name, all payments are actually *off-chain*. ;)
 
@@ -12,17 +12,16 @@ Ironically, despite the name, all payments are actually *off-chain*. ;)
 
 ---
 
-## ⚠️ Experimental Software
+## ⚠️ Early Access Software
 
 **This app is in active development.** While we've done our best to make it reliable, bugs happen. The wallet functionality involves real Bitcoin.
 
 **Please exercise caution:**
-- Don't store more sats than you're willing to lose
-- Back up your nsec (secret key) — it's your money
-- Test with small amounts first
+- Start with small amounts until you're comfortable
+- Back up your nsec (secret key) — it controls your account
 - Report bugs via [GitHub Issues](https://github.com/OnChainDiscGolf/app/issues)
 
-*You are the bank now. That's scary and liberating at the same time.*
+*Self-custody means self-responsibility. That's empowering.*
 
 ---
 
@@ -31,7 +30,7 @@ Ironically, despite the name, all payments are actually *off-chain*. ;)
 Think [UDisc](https://udisc.com), but with **freedom technology**:
 
 - **🥏 Disc Golf Scorekeeping** — Track rounds with friends, just like you'd expect
-- **⚡ Instant Bitcoin Payments** — Entry fees, ace pots, and payouts. Automatic. Unstoppable.
+- **⚡ Instant Bitcoin Settlement** — Round entries and prize pools settle automatically. No waiting. No chasing people down.
 - **🔑 Self-Sovereign Identity** — Your Nostr key = your identity. No account creation. No password resets. No Big Tech overlords.
 - **🌐 Serverless Architecture** — Runs on distributed Nostr relays. Nobody can shut it down. *Nobody can censor your disc golf game.*
 
@@ -39,11 +38,11 @@ Think [UDisc](https://udisc.com), but with **freedom technology**:
 
 Every disc golfer knows the chaos:
 - Tournament directors juggling cash, Venmo, and PayPal
-- Accounts flagged for "suspicious gambling activity" (it's a $5 ace pot, Mr.IRS Agent)
+- Payment app delays and holds
 - The guy who "forgot his wallet" and will "get you next time"
 - League organizers spending more time on spreadsheets, collecting payments and counting scores than throwing discs
 
-**On-Chain Disc Golf fixes this.** Entry fees are collected automatically when players join. Payouts happen instantly when the round ends. No human required.
+**On-Chain Disc Golf fixes this.** Round entries are collected automatically when players join. Settlement happens instantly when the round ends. No human required.
 
 ---
 
@@ -54,9 +53,9 @@ Every disc golfer knows the chaos:
 | Layer | Technology | Why |
 |-------|------------|-----|
 | **Identity** | [Nostr](https://nostr.com) | Decentralized identity. You own your keys, you own your account. |
-| **Payments** | [Cashu](https://cashu.space) eCash + [Lightning](https://lightning.network) | Instant, private, permissionless Bitcoin payments |
+| **Payments** | [Breez SDK](https://breez.technology) + [Lightning](https://lightning.network) | Self-custodial Lightning wallet built right into the app |
 | **Data** | Nostr Relays | Serverless. Your rounds sync across relays worldwide. |
-| **Static Address** | [npub.cash](https://npub.cash) | Lightning address derived from your Nostr pubkey |
+| **Static Address** | [Breez](https://breez.technology) | Human-readable Lightning address: `yourname@breez.tips` |
 
 ### Payment Flow
 
@@ -64,33 +63,33 @@ Every disc golfer knows the chaos:
 ┌─────────────────────────────────────────────────────────────────┐
 │  1. OPEN APP                                                     │
 │     └─→ Nostr keypair auto-generated (or import existing)       │
-│     └─→ Your nsec IS your wallet. Guard it with your life.      │
+│     └─→ Your nsec IS your identity. Guard it carefully.         │
 │                                                                   │
 │  2. RECEIVE PAYMENTS                                             │
-│     └─→ Your Lightning address: npub...@npubx.cash              │
-│     └─→ npub.cash converts incoming Lightning → Cashu eCash     │
-│     └─→ Real-time WebSocket notifies you instantly              │
+│     └─→ Your Lightning address: yourname@breez.tips             │
+│     └─→ Self-custodial via Breez SDK                            │
+│     └─→ Funds arrive instantly in your wallet                   │
 │                                                                   │
 │  3. SEND PAYMENTS                                                │
-│     └─→ Cashu tokens sent directly (peer-to-peer)               │
-│     └─→ Or pay any Lightning invoice (melts eCash → Lightning)  │
+│     └─→ Pay any Lightning address or invoice                    │
+│     └─→ Direct peer-to-peer, no intermediaries                  │
 │                                                                   │
 │  4. JOIN A ROUND                                                 │
-│     └─→ Pay entry fee automatically from Cashu balance          │
-│     └─→ Round creator receives eCash instantly                  │
+│     └─→ Round entry collected automatically from your balance   │
+│     └─→ Round creator receives funds instantly                  │
 │                                                                   │
 │  5. ROUND ENDS                                                   │
 │     └─→ Scores calculated, winner determined                    │
-│     └─→ Pot distributed automatically via Cashu                 │
+│     └─→ Prize pool distributed automatically                    │
 │     └─→ No spreadsheets. No arguments. No "I'll pay you later." │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Wallet Options
 
-1. **Built-in Cashu Wallet** (default) — eCash stored locally, backed up to Nostr
+1. **Breez SDK Wallet** (default) — Self-custodial Lightning wallet with `@breez.tips` address
 2. **Nostr Wallet Connect (NWC)** — Connect your own Lightning wallet (Alby, etc.)
-3. **Breeze SDK** *(coming soon)* — Self-custodial Lightning node in your pocket
+3. **Cashu eCash** — Privacy-focused eCash option for smaller amounts
 
 ---
 
@@ -155,15 +154,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full development guidelines.
 ## 🗺️ Roadmap
 
 - [x] Core scorekeeping functionality
-- [x] Cashu eCash wallet integration
+- [x] Breez SDK wallet integration (self-custodial)
 - [x] NWC (Nostr Wallet Connect) support
-- [x] Lightning address receiving via npub.cash
+- [x] Lightning address receiving via Breez
 - [x] Round invites via QR code
+- [x] Cashu eCash wallet option
 - [ ] Native iOS/Android apps (Capacitor)
-- [ ] Breeze SDK wallet option
 - [ ] Buy Bitcoin directly in-app
 - [ ] League management tools
-- [ ] Tournament brackets & payouts
+- [ ] Tournament brackets & prize distribution
 - [ ] Player statistics & handicaps
 - [ ] Course community boards
 
@@ -186,9 +185,8 @@ The short version:
 Built with love and these awesome projects:
 
 - [Nostr](https://nostr.com) — The decentralized social protocol
+- [Breez SDK](https://breez.technology) — Self-custodial Lightning infrastructure
 - [Cashu](https://cashu.space) — Chaumian eCash for Bitcoin
-- [npub.cash](https://npub.cash) — Lightning ↔ Cashu bridge
-- [Minibits](https://minibits.cash) — Cashu mint
 - [nostr-tools](https://github.com/nbd-wtf/nostr-tools) — Nostr SDK for JavaScript
 
 ---
