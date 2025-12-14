@@ -10,6 +10,9 @@ Ironically, despite the name, all payments are actually *off-chain*. ;)
 [![Built with Nostr](https://img.shields.io/badge/Built%20with-Nostr-purple.svg)](https://nostr.com)
 [![Powered by Bitcoin](https://img.shields.io/badge/Powered%20by-Bitcoin-orange.svg)](https://bitcoin.org)
 
+[![Download APK](https://img.shields.io/badge/📱_Download_APK-Android-brightgreen?style=for-the-badge)](https://github.com/OnChainDiscGolf/app/releases/latest)
+[![Open Web App](https://img.shields.io/badge/🌐_Open_Web_App-PWA-blue?style=for-the-badge)](https://app.onchaindiscgolf.com)
+
 ---
 
 ## ⚠️ Early Access Software
