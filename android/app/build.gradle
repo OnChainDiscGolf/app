@@ -3,6 +3,12 @@ apply plugin: 'com.android.application'
 android {
     namespace "app.onchain.discgolf"
     compileSdk rootProject.ext.compileSdkVersion
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
     defaultConfig {
         applicationId "app.onchain.discgolf"
         minSdkVersion rootProject.ext.minSdkVersion
