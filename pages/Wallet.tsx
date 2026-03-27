@@ -15,6 +15,7 @@ import {
     isBreezInitialized,
     getSparkAddress,
     createInvoice as createBreezInvoice,
+    createOnchainAddress,
     prepareSendPayment,
     sendPayment as sendBreezPayment,
     parseInput as parseBreezInput,
@@ -726,6 +727,13 @@ export const Wallet: React.FC = () => {
     const [breezReceiveMode, setBreezReceiveMode] = useState<'address' | 'invoice'>('address');
     const [breezInvoiceAmount, setBreezInvoiceAmount] = useState('');
     const [breezInvoice, setBreezInvoice] = useState<string | null>(null);
+
+    // On-chain receive state
+    const [showOnchainReceive, setShowOnchainReceive] = useState(false);
+    const [onchainAddress, setOnchainAddress] = useState<string | null>(null);
+    const [onchainFee, setOnchainFee] = useState(0);
+    const [isLoadingOnchain, setIsLoadingOnchain] = useState(false);
+    const [onchainError, setOnchainError] = useState<string | null>(null);
     const [breezSparkAddress, setBreezSparkAddress] = useState<string | null>(null);
     const [breezLnAddress, setBreezLnAddress] = useState<string | null>(null);
     const [isGeneratingBreezInvoice, setIsGeneratingBreezInvoice] = useState(false);
@@ -2403,113 +2411,265 @@ export const Wallet: React.FC = () => {
                         )}
                     </div>
                     <div className="flex items-center justify-center space-x-2 mb-2">
-                        <h2 className="text-2xl font-bold">Lightning Address</h2>
-                        <button
-                            onClick={() => setHelpModal({
-                                isOpen: true,
-                                title: "Lightning Address",
-                                text: `
-                                <p class="mb-3">Think of this like your <strong>email address for money</strong>. It's permanent and reusable!</p>
-                                
-                                <p class="font-bold text-white mb-2">✅ You can:</p>
-                                <ul class="list-disc ml-5 mb-4 space-y-1">
-                                    <li>Share it with anyone to receive payments</li>
-                                    <li>Post it on social media</li>
-                                    <li>Use the same address forever</li>
-                                </ul>
-                                
-                                <p class="font-bold text-white mb-2">📱 How others pay you:</p>
-                                <ol class="list-decimal ml-5 mb-4 space-y-1">
-                                    <li>They scan your QR code or copy your address</li>
-                                    <li>Enter the amount to send</li>
-                                    <li>You receive sats instantly!</li>
-                                </ol>
-                                
-                                <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                                    <p class="text-xs text-slate-300">💡 <strong>Tip:</strong> Unlike an invoice, your Lightning Address never expires. Share it freely!</p>
-                                </div>
-                            `
-                            })}
-                            className="text-slate-500 hover:text-blue-400 transition-colors"
-                        >
-                            <Icons.Help size={20} />
-                        </button>
+                        <h2 className="text-2xl font-bold">{showOnchainReceive ? 'Bitcoin Deposit' : 'Lightning Address'}</h2>
+                        {!showOnchainReceive && (
+                            <button
+                                onClick={() => setHelpModal({
+                                    isOpen: true,
+                                    title: "Lightning Address",
+                                    text: `
+                                    <p class="mb-3">Think of this like your <strong>email address for money</strong>. It's permanent and reusable!</p>
+
+                                    <p class="font-bold text-white mb-2">✅ You can:</p>
+                                    <ul class="list-disc ml-5 mb-4 space-y-1">
+                                        <li>Share it with anyone to receive payments</li>
+                                        <li>Post it on social media</li>
+                                        <li>Use the same address forever</li>
+                                    </ul>
+
+                                    <p class="font-bold text-white mb-2">📱 How others pay you:</p>
+                                    <ol class="list-decimal ml-5 mb-4 space-y-1">
+                                        <li>They scan your QR code or copy your address</li>
+                                        <li>Enter the amount to send</li>
+                                        <li>You receive sats instantly!</li>
+                                    </ol>
+
+                                    <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                                        <p class="text-xs text-slate-300">💡 <strong>Tip:</strong> Unlike an invoice, your Lightning Address never expires. Share it freely!</p>
+                                    </div>
+                                `
+                                })}
+                                className="text-slate-500 hover:text-blue-400 transition-colors"
+                            >
+                                <Icons.Help size={20} />
+                            </button>
+                        )}
                     </div>
                     <p className="text-slate-400 text-sm mb-6 max-w-xs mx-auto">
-                        Your permanent address for receiving payments. Share it like a username.
+                        {showOnchainReceive
+                            ? 'Send Bitcoin from any exchange or wallet. Paste this address as the destination.'
+                            : 'Your permanent address for receiving payments. Share it like a username.'}
                     </p>
 
                     {breezDisplayAddress ? (
                         <>
-                            <div className="p-1 rounded-2xl shadow-2xl mb-6 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-blue-500/20">
-                                <div className="bg-white p-3 rounded-xl">
-                                    <img src={breezQrUrl} alt="Lightning Address QR Code" className="w-48 h-48" loading="eager" />
-                                </div>
-                            </div>
-
-                            <div className="w-full max-w-xs mb-6">
-                                <button
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(breezDisplayAddress);
-                                    }}
-                                    className="w-full flex items-center justify-between bg-slate-800 p-4 rounded-xl border border-slate-700 hover:border-blue-500 transition-all group"
-                                >
-                                    <div className="flex items-center space-x-3 overflow-hidden">
-                                        <div className="p-2 rounded-lg bg-blue-500/10">
-                                            <Icons.Zap size={18} className="text-blue-400" />
-                                        </div>
-                                        <div className="flex flex-col items-start overflow-hidden">
-                                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Your Address</span>
-                                            <span className="text-sm text-white font-mono truncate w-full text-left">
-                                                {breezDisplayAddress.length > 25
-                                                    ? breezDisplayAddress.substring(0, 12) + '...' + breezDisplayAddress.substring(breezDisplayAddress.length - 12)
-                                                    : breezDisplayAddress}
-                                            </span>
+                            {!showOnchainReceive ? (
+                                <>
+                                    {/* === Lightning Address View (default) === */}
+                                    <div className="p-1 rounded-2xl shadow-2xl mb-6 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-blue-500/20">
+                                        <div className="bg-white p-3 rounded-xl">
+                                            <img src={breezQrUrl} alt="Lightning Address QR Code" className="w-48 h-48" loading="eager" />
                                         </div>
                                     </div>
-                                    <Icons.Copy size={18} className="text-slate-500 group-hover:text-white transition-colors" />
-                                </button>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => {
-                                        if (navigator.share) {
-                                            navigator.share({
-                                                title: 'My Lightning Address',
-                                                text: breezDisplayAddress,
-                                                url: `lightning:${breezDisplayAddress}`
-                                            }).catch(console.error);
-                                        } else {
-                                            navigator.clipboard.writeText(breezDisplayAddress);
-                                        }
-                                    }}
-                                >
-                                    <Icons.Share size={18} className="mr-2" /> Share
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => setBreezReceiveMode('invoice')}
-                                >
-                                    <Icons.Plus size={18} className="mr-2" /> Invoice
-                                </Button>
-                            </div>
+                                    <div className="w-full max-w-xs mb-6">
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(breezDisplayAddress);
+                                            }}
+                                            className="w-full flex items-center justify-between bg-slate-800 p-4 rounded-xl border border-slate-700 hover:border-blue-500 transition-all group"
+                                        >
+                                            <div className="flex items-center space-x-3 overflow-hidden">
+                                                <div className="p-2 rounded-lg bg-blue-500/10">
+                                                    <Icons.Zap size={18} className="text-blue-400" />
+                                                </div>
+                                                <div className="flex flex-col items-start overflow-hidden">
+                                                    <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Your Address</span>
+                                                    <span className="text-sm text-white font-mono truncate w-full text-left">
+                                                        {breezDisplayAddress.length > 25
+                                                            ? breezDisplayAddress.substring(0, 12) + '...' + breezDisplayAddress.substring(breezDisplayAddress.length - 12)
+                                                            : breezDisplayAddress}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <Icons.Copy size={18} className="text-slate-500 group-hover:text-white transition-colors" />
+                                        </button>
+                                    </div>
 
-                            <div className="mt-6 w-full flex flex-col items-center space-y-4">
-                                <div className="flex items-center space-x-2 animate-pulse text-blue-400">
-                                    <Icons.Zap size={18} />
-                                    <span className="text-sm font-bold">Waiting for payment...</span>
-                                </div>
+                                    <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => {
+                                                if (navigator.share) {
+                                                    navigator.share({
+                                                        title: 'My Lightning Address',
+                                                        text: breezDisplayAddress,
+                                                        url: `lightning:${breezDisplayAddress}`
+                                                    }).catch(console.error);
+                                                } else {
+                                                    navigator.clipboard.writeText(breezDisplayAddress);
+                                                }
+                                            }}
+                                        >
+                                            <Icons.Share size={18} className="mr-2" /> Share
+                                        </Button>
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => setBreezReceiveMode('invoice')}
+                                        >
+                                            <Icons.Plus size={18} className="mr-2" /> Invoice
+                                        </Button>
+                                    </div>
 
-                                {/* Don't have Bitcoin link */}
-                                <button
-                                    onClick={() => setShowFundingGuide(true)}
-                                    className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                                >
-                                    Don't have Bitcoin yet? Fund with Cash App or Strike
-                                </button>
-                            </div>
+                                    {/* On-chain receive link */}
+                                    <button
+                                        onClick={() => {
+                                            setShowOnchainReceive(true);
+                                            if (!onchainAddress && !isLoadingOnchain) {
+                                                setIsLoadingOnchain(true);
+                                                setOnchainError(null);
+                                                createOnchainAddress()
+                                                    .then(result => {
+                                                        if (result) {
+                                                            setOnchainAddress(result.address);
+                                                            setOnchainFee(result.feeSats);
+                                                        } else {
+                                                            setOnchainError('Could not generate address. Please try again.');
+                                                        }
+                                                    })
+                                                    .catch(() => setOnchainError('Failed to generate address.'))
+                                                    .finally(() => setIsLoadingOnchain(false));
+                                            }
+                                        }}
+                                        className="mt-5 text-xs text-slate-500 hover:text-orange-400 transition-colors"
+                                    >
+                                        Receiving from Coinbase or an exchange?
+                                    </button>
+
+                                    <div className="mt-4 w-full flex flex-col items-center space-y-4">
+                                        <div className="flex items-center space-x-2 animate-pulse text-blue-400">
+                                            <Icons.Zap size={18} />
+                                            <span className="text-sm font-bold">Waiting for payment...</span>
+                                        </div>
+
+                                        {/* Don't have Bitcoin link */}
+                                        <button
+                                            onClick={() => setShowFundingGuide(true)}
+                                            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                                        >
+                                            Don't have Bitcoin yet? Fund with Cash App or Strike
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    {/* === Bitcoin Deposit Address View === */}
+                                    {isLoadingOnchain ? (
+                                        <div className="flex flex-col items-center justify-center py-12">
+                                            <div className="w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center mb-4 animate-pulse">
+                                                <Icons.Bitcoin size={28} className="text-orange-400" />
+                                            </div>
+                                            <p className="text-slate-400 text-sm">Generating your Bitcoin address...</p>
+                                        </div>
+                                    ) : onchainError ? (
+                                        <div className="flex flex-col items-center justify-center py-12">
+                                            <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+                                                <Icons.Close size={28} className="text-red-400" />
+                                            </div>
+                                            <p className="text-red-300 text-sm mb-3">{onchainError}</p>
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => {
+                                                    setOnchainAddress(null);
+                                                    setOnchainError(null);
+                                                    setIsLoadingOnchain(true);
+                                                    createOnchainAddress()
+                                                        .then(result => {
+                                                            if (result) {
+                                                                setOnchainAddress(result.address);
+                                                                setOnchainFee(result.feeSats);
+                                                            } else {
+                                                                setOnchainError('Could not generate address.');
+                                                            }
+                                                        })
+                                                        .catch(() => setOnchainError('Failed to generate address.'))
+                                                        .finally(() => setIsLoadingOnchain(false));
+                                                }}
+                                            >
+                                                Try Again
+                                            </Button>
+                                        </div>
+                                    ) : onchainAddress ? (
+                                        <>
+                                            <div className="p-1 rounded-2xl shadow-2xl mb-6 bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 shadow-orange-500/20">
+                                                <div className="bg-white p-3 rounded-xl">
+                                                    <img
+                                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(onchainAddress)}&bgcolor=ffffff&color=000000&margin=2`}
+                                                        alt="Bitcoin Deposit Address QR Code"
+                                                        className="w-48 h-48"
+                                                        loading="eager"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="w-full max-w-xs mb-4">
+                                                <button
+                                                    onClick={() => navigator.clipboard.writeText(onchainAddress)}
+                                                    className="w-full flex items-center justify-between bg-slate-800 p-4 rounded-xl border border-slate-700 hover:border-orange-500 transition-all group"
+                                                >
+                                                    <div className="flex items-center space-x-3 overflow-hidden">
+                                                        <div className="p-2 rounded-lg bg-orange-500/10">
+                                                            <Icons.Bitcoin size={18} className="text-orange-400" />
+                                                        </div>
+                                                        <div className="flex flex-col items-start overflow-hidden">
+                                                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Bitcoin Deposit Address</span>
+                                                            <span className="text-sm text-white font-mono truncate w-full text-left">
+                                                                {onchainAddress.length > 25
+                                                                    ? onchainAddress.substring(0, 12) + '...' + onchainAddress.substring(onchainAddress.length - 12)
+                                                                    : onchainAddress}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <Icons.Copy size={18} className="text-slate-500 group-hover:text-white transition-colors" />
+                                                </button>
+                                            </div>
+
+                                            {/* Timing + fee note */}
+                                            <div className="w-full max-w-xs bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 mb-4">
+                                                <p className="text-xs text-orange-200/90 text-center leading-snug">
+                                                    Arrives in <span className="font-bold">10-30 minutes</span> after sending.
+                                                    {onchainFee > 0 && <span className="text-orange-300/60"> Swap fee: ~{onchainFee.toLocaleString()} sats.</span>}
+                                                </p>
+                                            </div>
+
+                                            <div className="w-full max-w-xs">
+                                                <Button
+                                                    variant="secondary"
+                                                    fullWidth
+                                                    onClick={() => {
+                                                        if (navigator.share) {
+                                                            navigator.share({
+                                                                title: 'My Bitcoin Address',
+                                                                text: onchainAddress,
+                                                            }).catch(console.error);
+                                                        } else {
+                                                            navigator.clipboard.writeText(onchainAddress);
+                                                        }
+                                                    }}
+                                                >
+                                                    <Icons.Share size={18} className="mr-2" /> Share
+                                                </Button>
+                                            </div>
+
+                                            <div className="mt-6 w-full flex flex-col items-center space-y-4">
+                                                <div className="flex items-center space-x-2 animate-pulse text-orange-400">
+                                                    <Icons.Bitcoin size={18} className="text-orange-400" />
+                                                    <span className="text-sm font-bold">Waiting for deposit...</span>
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : null}
+
+                                    {/* Back to Lightning Address */}
+                                    <button
+                                        onClick={() => setShowOnchainReceive(false)}
+                                        className="mt-4 text-xs text-slate-500 hover:text-blue-400 transition-colors flex items-center space-x-1"
+                                    >
+                                        <Icons.Back size={14} />
+                                        <span>Back to Lightning Address</span>
+                                    </button>
+                                </>
+                            )}
                         </>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center">
