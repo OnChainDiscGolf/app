@@ -85,7 +85,7 @@ export const setupDeepLinkHandler = (
 
   // Return cleanup function
   return () => {
-    urlOpenListener.remove();
+    urlOpenListener.then(handle => handle.remove());
     deepLinkListenerActive = false;
   };
 };
@@ -118,7 +118,7 @@ export const setupAppStateListener = (
     }
   });
 
-  return () => resumeListener.remove();
+  return () => { resumeListener.then(handle => handle.remove()); };
 };
 
 // ==========================================
@@ -404,8 +404,8 @@ export const setupKeyboardListeners = (
   });
 
   return () => {
-    showListener.remove();
-    hideListener.remove();
+    showListener.then(handle => handle.remove());
+    hideListener.then(handle => handle.remove());
   };
 };
 

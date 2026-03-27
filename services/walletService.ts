@@ -46,9 +46,9 @@ export class WalletService {
         try {
             // Load the keyset to get the public key
             const keysets = await this.mint.getKeySets();
-            if (keysets && keysets.length > 0) {
+            if (keysets && keysets.keysets.length > 0) {
                 // Return the first active keyset's public key
-                return keysets[0].keys['02']; // The public key for amount 2 (DER encoded)
+                return keysets.keysets[0].id;
             }
             return null;
         } catch (e) {

@@ -44,7 +44,8 @@ import {
   Link2,
   Gem,
   Trophy as LucideTrophy,
-  UsersRound
+  UsersRound,
+  Download
 } from 'lucide-react';
 
 // Custom Disc Golf Basket Icon matching Lucide style
@@ -258,4 +259,5 @@ export const Icons = {
   AlertTriangle,
   Diamond: Gem,
   League: UsersRound,
+  Download,
 };

@@ -128,7 +128,7 @@ export interface AppState {
   contacts: DisplayProfile[]; // Nostr Contact List
   isAuthenticated: boolean;
   isGuest: boolean;
-  authMethod: 'local' | 'nip46' | null;
+  authMethod: 'local' | 'nip46' | 'amber' | null;
   walletMode: 'cashu' | 'nwc' | 'breez';
   nwcString: string;
 }

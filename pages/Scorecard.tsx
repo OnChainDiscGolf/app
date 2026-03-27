@@ -354,6 +354,7 @@ export const Scorecard: React.FC = () => {
         const secondHalf = reviewHoles.slice(holesPerRow, holesPerRow * 2);
         const thirdRow = reviewHoles.slice(holesPerRow * 2);
 
+        const rangeEnd = Math.max(...reviewHoles);
         const reviewSortedPlayers = [...players].sort((a, b) => {
             const aTotal = getPlayerTotalText(a.scores, a.handicap, rangeEnd);
             const bTotal = getPlayerTotalText(b.scores, b.handicap, rangeEnd);

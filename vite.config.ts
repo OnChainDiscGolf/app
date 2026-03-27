@@ -99,6 +99,10 @@ export default defineConfig(({ mode }) => {
             'vendor-react': ['react', 'react-dom', 'react-router-dom'],
             'vendor-nostr': ['nostr-tools'],
             'vendor-cashu': ['@cashu/cashu-ts'],
+            'vendor-breez': ['@breeztech/breez-sdk-spark'],
+            'vendor-crypto': ['@noble/hashes', '@scure/bip32', '@scure/bip39'],
+            'vendor-pdf': ['jspdf', 'html2canvas'],
+            'vendor-qr': ['qrcode', 'jsqr'],
           }
         }
       }

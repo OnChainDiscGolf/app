@@ -242,8 +242,8 @@ const payViaBreez = async (
     return {
         success: result.success,
         method: 'breez',
-        txId: result.payment?.id,
-        feeSats: result.payment ? Number(result.payment.fees) : undefined,
+        txId: result.paymentHash,
+        feeSats: result.feeSats,
         error: result.error
     };
 };

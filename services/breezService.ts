@@ -274,7 +274,7 @@ export const initializeBreez = async (
         // Get default config and customize it with API key
         // Network must be 'mainnet' or 'testnet' (lowercase)
         console.log('⚡ Building SDK configuration...');
-        const network = config.environment === 'production' ? 'mainnet' : 'testnet';
+        const network = config.environment === 'production' ? 'mainnet' : 'regtest';
         const sdkConfig = defaultConfig(network);
         
         // Add API key to config - this authenticates with Breez services

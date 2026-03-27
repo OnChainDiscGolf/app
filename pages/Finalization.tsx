@@ -33,6 +33,7 @@ import {
     getLightningAddress,
     registerLightningAddress
 } from '../services/breezService';
+import { BREEZ_API_KEY } from '../constants';
 import { UserProfile } from '../types';
 
 export const Finalization: React.FC = () => {
@@ -152,7 +153,11 @@ export const Finalization: React.FC = () => {
 
                 // Start Breez initialization in background - don't await
                 // This allows onboarding to complete while Breez initializes
-                initializeBreez(identity.mnemonic).then(async (success) => {
+                const breezConfig = {
+                    apiKey: BREEZ_API_KEY,
+                    environment: 'production' as const
+                };
+                initializeBreez(identity.mnemonic, breezConfig).then(async (success) => {
                     if (success) {
                         console.log('✅ [Finalization] Breez SDK initialized in background');
 

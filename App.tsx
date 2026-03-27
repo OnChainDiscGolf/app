@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { OnboardingProvider, useOnboarding } from './context/OnboardingContext';
@@ -6,19 +6,28 @@ import { BottomNav } from './components/BottomNav';
 import { SplashScreen } from './components/SplashScreen';
 import { LightningStrikeNotification } from './components/LightningStrike';
 import { RoundSummaryModal } from './components/RoundSummaryModal';
-import { Home } from './pages/Home';
-import { Scorecard } from './pages/Scorecard';
-import { Wallet } from './pages/Wallet';
-import { Profile } from './pages/Profile';
-import { InviteHandler } from './pages/InviteHandler';
-import { ProfileSetup } from './pages/ProfileSetup';
-import { RoundDetails } from './pages/RoundDetails';
-import { Onboarding } from './pages/Onboarding';
-import { Finalization } from './pages/Finalization';
-import { RoundHistory } from './pages/RoundHistory';
+import { DiscGolfBasketLoader } from './components/DiscGolfBasketLoader';
 import { useSwipeBack } from './hooks/useSwipeBack';
 import { initErrorCapture, trackNavigation } from './services/feedbackService';
 import { initializeCapacitor, setupAppStateListener, isNative } from './services/capacitorService';
+
+// Lazy-loaded page components — each becomes its own chunk
+const Home = React.lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
+const Wallet = React.lazy(() => import('./pages/Wallet').then(m => ({ default: m.Wallet })));
+const Scorecard = React.lazy(() => import('./pages/Scorecard').then(m => ({ default: m.Scorecard })));
+const Profile = React.lazy(() => import('./pages/Profile').then(m => ({ default: m.Profile })));
+const Finalization = React.lazy(() => import('./pages/Finalization'));
+const Onboarding = React.lazy(() => import('./pages/Onboarding'));
+const ProfileSetup = React.lazy(() => import('./pages/ProfileSetup').then(m => ({ default: m.ProfileSetup })));
+const RoundDetails = React.lazy(() => import('./pages/RoundDetails').then(m => ({ default: m.RoundDetails })));
+const RoundHistory = React.lazy(() => import('./pages/RoundHistory').then(m => ({ default: m.RoundHistory })));
+const InviteHandler = React.lazy(() => import('./pages/InviteHandler').then(m => ({ default: m.InviteHandler })));
+
+const PageLoader: React.FC = () => (
+  <div className="flex-1 flex items-center justify-center">
+    <DiscGolfBasketLoader />
+  </div>
+);
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useSwipeBack(); // Enable global swipe-to-back
@@ -205,17 +214,19 @@ const App: React.FC = () => {
         <BrowserRouter>
           <div className={`transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
             <Layout>
-              <Routes>
-                <Route path="/" element={<HomeOrOnboarding />} />
-                <Route path="/play" element={<Scorecard />} />
-                <Route path="/wallet" element={<Wallet />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/invite" element={<InviteHandler />} />
-                <Route path="/profile-setup" element={<ProfileSetup />} />
-                <Route path="/finalization" element={<Finalization />} />
-                <Route path="/round-details" element={<RoundDetails />} />
-                <Route path="/history" element={<RoundHistory />} />
-              </Routes>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/" element={<HomeOrOnboarding />} />
+                  <Route path="/play" element={<Scorecard />} />
+                  <Route path="/wallet" element={<Wallet />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/invite" element={<InviteHandler />} />
+                  <Route path="/profile-setup" element={<ProfileSetup />} />
+                  <Route path="/finalization" element={<Finalization />} />
+                  <Route path="/round-details" element={<RoundDetails />} />
+                  <Route path="/history" element={<RoundHistory />} />
+                </Routes>
+              </Suspense>
             </Layout>
           </div>
           <SplashScreen isVisible={showSplash} isTransitioning={isTransitioning} />
