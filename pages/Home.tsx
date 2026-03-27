@@ -10,6 +10,7 @@ const ActiveLogo = Logo;
 import { InfoModal } from '../components/InfoModal';
 import { FeedbackModal, FeedbackButton } from '../components/FeedbackModal';
 import { GuidedTour, TourStep, useTourStatus } from '../components/GuidedTour';
+import { FundingGuide } from '../components/FundingGuide';
 import { useNavigate } from 'react-router-dom';
 import { getPool, getRelays, listEvents, lookupUser, lookupByPDGA, publishProfileWithKey, getMagicLightningAddress, updateContactList } from '../services/nostrService';
 import { NOSTR_KIND_ROUND, DisplayProfile } from '../types';
@@ -123,6 +124,7 @@ export const Home: React.FC = () => {
     const [isPayingWallet, setIsPayingWallet] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [paymentError, setPaymentError] = useState<string | null>(null);
+    const [showFundingGuide, setShowFundingGuide] = useState(false);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const [startHole, setStartHole] = useState(1);
@@ -954,9 +956,8 @@ export const Home: React.FC = () => {
         setPaymentError(null);
 
         if (walletBalance < totalAmount) {
-            setPaymentError(`Insufficient balance. Need ${totalAmount.toLocaleString()} sats.`);
-            // Auto-dismiss error after 5 seconds
-            setTimeout(() => setPaymentError(null), 5000);
+            const shortfall = totalAmount - walletBalance;
+            setPaymentError(`Insufficient balance. Need ${shortfall.toLocaleString()} more sats.`);
             return;
         }
 
@@ -998,9 +999,8 @@ export const Home: React.FC = () => {
 
         // Double-check balance
         if (walletBalance < totalAmount) {
-            setPaymentError(`Insufficient balance. Need ${totalAmount.toLocaleString()} sats.`);
-            // Auto-dismiss error after 5 seconds
-            setTimeout(() => setPaymentError(null), 5000);
+            const shortfall = totalAmount - walletBalance;
+            setPaymentError(`Insufficient balance. Need ${shortfall.toLocaleString()} more sats.`);
             return;
         }
 
@@ -1968,12 +1968,32 @@ export const Home: React.FC = () => {
                                             Complete the entry fee payment for <span className="text-white font-bold">{paymentTarget.name}</span>.
                                         </p>
 
-                                        {/* Error Banner */}
+                                        {/* Error Banner with Fund Wallet CTA */}
                                         {paymentError && (
-                                            <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 flex items-start space-x-2 text-left animate-in fade-in slide-in-from-top-2">
-                                                <Icons.Close className="text-red-500 shrink-0 mt-0.5" size={16} />
-                                                <p className="text-xs text-red-200 font-bold leading-tight">{paymentError}</p>
+                                            <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 animate-in fade-in slide-in-from-top-2">
+                                                <div className="flex items-start space-x-2 text-left">
+                                                    <Icons.Close className="text-red-500 shrink-0 mt-0.5" size={16} />
+                                                    <p className="text-xs text-red-200 font-bold leading-tight">{paymentError}</p>
+                                                </div>
+                                                {paymentError.includes('Insufficient') && (
+                                                    <button
+                                                        onClick={() => setShowFundingGuide(true)}
+                                                        className="mt-2 w-full py-2 bg-emerald-500/20 border border-emerald-500/40 rounded-lg text-xs font-bold text-emerald-400 hover:bg-emerald-500/30 transition-colors flex items-center justify-center space-x-1.5"
+                                                    >
+                                                        <Icons.Zap size={14} />
+                                                        <span>Fund Wallet with Cash App or Strike</span>
+                                                    </button>
+                                                )}
                                             </div>
+                                        )}
+
+                                        {/* Funding Guide Modal */}
+                                        {showFundingGuide && (
+                                            <FundingGuide
+                                                lightningAddress={userProfile.lud16 || getMagicLightningAddress(currentUserPubkey)}
+                                                amountNeeded={Math.max(0, (entryFee + acePot) - walletBalance)}
+                                                onClose={() => setShowFundingGuide(false)}
+                                            />
                                         )}
 
                                         {/* Amount Display - Moved BEFORE QR Code */}

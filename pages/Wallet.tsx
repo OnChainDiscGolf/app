@@ -6,6 +6,7 @@ import { sendGiftWrap, getMagicLightningAddress } from '../services/nostrService
 import { Button } from '../components/Button';
 import { Icons } from '../components/Icons';
 import { FeedbackModal, FeedbackButton } from '../components/FeedbackModal';
+import { FundingGuide } from '../components/FundingGuide';
 import { useNavigate } from 'react-router-dom';
 import { getBtcPrice, satsToUsd } from '../services/priceService';
 import { generateMnemonic, storeMnemonicEncrypted, retrieveMnemonicEncrypted, hasStoredMnemonic, hasUnifiedSeed } from '../services/mnemonicService';
@@ -940,7 +941,8 @@ export const Wallet: React.FC = () => {
     const [isFetchingPrice, setIsFetchingPrice] = useState(false);
     const usdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Fund wallet modal
+    // Fund wallet modals
+    const [showFundingGuide, setShowFundingGuide] = useState(false);
     const [showFundModal, setShowFundModal] = useState(false);
     const [rabbitHoleLevel, setRabbitHoleLevel] = useState(0); // 0 = main, 1 = deeper, 2 = deepest, 3 = matrix
     const [showGlitch, setShowGlitch] = useState(false);
@@ -2502,10 +2504,10 @@ export const Wallet: React.FC = () => {
 
                                 {/* Don't have Bitcoin link */}
                                 <button
-                                    onClick={() => setShowFundModal(true)}
+                                    onClick={() => setShowFundingGuide(true)}
                                     className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
                                 >
-                                    Don't have Bitcoin yet? Learn how to buy
+                                    Don't have Bitcoin yet? Fund with Cash App or Strike
                                 </button>
                             </div>
                         </>
@@ -2737,15 +2739,23 @@ export const Wallet: React.FC = () => {
 
                     {/* Don't have Bitcoin link */}
                     <button
-                        onClick={() => setShowFundModal(true)}
+                        onClick={() => setShowFundingGuide(true)}
                         className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
                     >
-                        Don't have Bitcoin yet? Learn how to buy
+                        Don't have Bitcoin yet? Fund with Cash App or Strike
                     </button>
                 </div>
                 {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => {
                     if (action === 'lightning-explainer') { setHelpModal(null); setReturnToWalletHelp(false); setShowLightningExplainer(true); }
                 }} />}
+
+                {/* Funding Guide - step-by-step Cash App / Strike / Other */}
+                {showFundingGuide && (
+                    <FundingGuide
+                        lightningAddress={receiveAddress}
+                        onClose={() => setShowFundingGuide(false)}
+                    />
+                )}
 
                 {/* Fund Modal also available from receive view */}
                 {showFundModal && (
@@ -3631,20 +3641,20 @@ export const Wallet: React.FC = () => {
                     {/* Zero Balance Prompt - Shows immediately if balance is 0 (don't wait for loading) */}
                     {displayBalance === 0 && (
                         <button
-                            onClick={() => setShowFundModal(true)}
-                            className="w-full mb-3 p-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-orange-500/30 rounded-xl transition-all group"
+                            onClick={() => setShowFundingGuide(true)}
+                            className="w-full mb-3 p-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-emerald-500/30 rounded-xl transition-all group"
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
-                                    <div className="w-9 h-9 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                                        <Icons.Bitcoin size={20} className="text-orange-500" />
+                                    <div className="w-9 h-9 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                                        <Icons.Zap size={20} className="text-emerald-400" />
                                     </div>
                                     <div className="text-left">
-                                        <p className="text-sm font-medium text-white">New to Bitcoin?</p>
-                                        <p className="text-xs text-slate-400">Learn how to add sats</p>
+                                        <p className="text-sm font-medium text-white">Fund with Cash App or Strike</p>
+                                        <p className="text-xs text-slate-400">Step-by-step guide to add sats</p>
                                     </div>
                                 </div>
-                                <Icons.Next size={18} className="text-slate-500 group-hover:text-orange-500 transition-colors" />
+                                <Icons.Next size={18} className="text-slate-500 group-hover:text-emerald-400 transition-colors" />
                             </div>
                         </button>
                     )}
@@ -5037,7 +5047,7 @@ export const Wallet: React.FC = () => {
                 onClose={() => setShowWalletHelp(false)}
                 onLightningClick={() => { setShowWalletHelp(false); setReturnToWalletHelp(true); setShowLightningExplainer(true); }}
                 onWhyThreeClick={() => { setShowWalletHelp(false); setShowWhyThreeWallets(true); }}
-                onNewToBitcoinClick={() => { setShowWalletHelp(false); setShowFundModal(true); }}
+                onNewToBitcoinClick={() => { setShowWalletHelp(false); setShowFundingGuide(true); }}
                 onSatoshiClick={() => { setShowWalletHelp(false); setShowWhatIsSatoshi(true); }}
                 showNewToBitcoin={walletBalance > 0}
             />
