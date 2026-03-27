@@ -93,7 +93,7 @@ export const RoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 id: playerPubkey,
                 name: 'Loading...',
                 handicap: 0,
-                paid: true,
+                paid: false, // Don't mark as paid until payment is confirmed via ecash-received-from-player event
                 paysEntry: true,
                 paysAce: true,
                 scores: content.scores,

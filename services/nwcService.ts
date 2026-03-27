@@ -60,8 +60,28 @@ export class NWCService {
     async payInvoice(invoice: string): Promise<{ preimage: string }> {
         if (!this.connection) throw new Error("NWC not connected");
 
-        const result = await this.executeCommand('pay_invoice', { invoice });
-        return { preimage: result.preimage };
+        try {
+            const result = await this.executeCommand('pay_invoice', { invoice });
+            return { preimage: result.preimage };
+        } catch (e) {
+            // On timeout, check if the payment actually went through before reporting failure
+            if (e instanceof Error && e.message === "NWC Timeout") {
+                console.log("⏱️ NWC pay_invoice timed out, checking if payment succeeded...");
+                try {
+                    // Try lookup_invoice to see if it was actually paid
+                    const lookupResult = await this.executeCommand('lookup_invoice', { invoice });
+                    if (lookupResult?.preimage || lookupResult?.paid) {
+                        console.log("✅ Payment actually succeeded despite timeout");
+                        return { preimage: lookupResult.preimage || '' };
+                    }
+                } catch (lookupErr) {
+                    console.warn("Lookup after timeout also failed:", lookupErr);
+                }
+                // Still no confirmation - throw the original timeout
+                throw e;
+            }
+            throw e;
+        }
     }
 
     async makeInvoice(amountSats: number, description?: string): Promise<{ invoice: string, paymentHash: string }> {

@@ -20,6 +20,8 @@ import { disconnectBreez } from '../services/breezService';
 import { registerWithAllGateways } from '../services/npubCashService';
 import { AuthSource } from '../services/mnemonicService';
 import { NWCService } from '../services/nwcService';
+import { calculatePayouts } from '../utils/payoutCalculations';
+import { processPayouts, PayoutRecipient, PaymentResult } from '../services/paymentRouter';
 
 import { AuthProvider, useAuth, AuthContextType } from './AuthContext';
 import { WalletProvider, useWallet, WalletContextType } from './WalletContext';
@@ -374,10 +376,28 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
     if (fee > 0 && hostPubkey) {
       try {
         token = await wallet.createToken(fee);
+      } catch (e) {
+        console.error("Failed to create entry fee token", e);
+        return false;
+      }
+
+      try {
         await sendDirectMessage(hostPubkey, `Payment for round ${roundData?.name || 'Disc Golf'}: ${token}`);
         wallet.addTransaction('send', fee, `Entry Fee: ${roundData?.name || 'Round'}`);
       } catch (e) {
-        console.error("Failed to pay entry fee", e);
+        // DM failed - reclaim the token so funds aren't lost
+        console.error("Failed to send entry fee DM, reclaiming token...", e);
+        try {
+          await wallet.receiveEcash(token);
+          console.log("✅ Token reclaimed successfully after DM failure");
+        } catch (reclaimErr) {
+          console.error("❌ CRITICAL: Failed to reclaim token after DM failure. Token:", token, reclaimErr);
+          alert(
+            `Entry fee payment failed and automatic recovery failed. ` +
+            `Your ${fee} sat token may still be claimable. ` +
+            `Please go to Wallet and paste this token to recover your funds:\n\n${token}`
+          );
+        }
         return false;
       }
     }
@@ -462,21 +482,101 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
       return;
     }
 
-    const sortedPlayers = [...round.players].sort((a, b) => (a.totalScore || 0) - (b.totalScore || 0));
-    const winner = sortedPlayers[0];
-    const potSize = (round.activeRound.entryFeeSats || 0) * round.players.length;
-    const prize = Math.floor(potSize * 0.8);
-    const acePotAmount = round.activeRound.acePotFeeSats ? round.activeRound.acePotFeeSats * round.players.length : 0;
-    const par = round.activeRound.par || (round.activeRound.holeCount * 3);
+    // --- Tie-breaking sort: lowest total first, then hole-by-hole from last hole back ---
+    const totalHoles = round.activeRound.holeCount;
+    const sortedPlayers = [...round.players].sort((a, b) => {
+      const diff = (a.totalScore || 0) - (b.totalScore || 0);
+      if (diff !== 0) return diff;
+      // Tiebreaker: compare hole-by-hole from last hole backwards
+      for (let h = totalHoles; h >= 1; h--) {
+        const aH = a.scores[h] || 0;
+        const bH = b.scores[h] || 0;
+        if (aH !== bH) return aH - bH;
+      }
+      return 0;
+    });
 
-    // Detect aces
+    // --- Calculate pots using granular payment selections (matching Scorecard.tsx) ---
+    const entryPayers = round.players.filter(p => p.paysEntry);
+    const acePayers = round.players.filter(p => p.paysAce);
+    const entryPot = (round.activeRound.entryFeeSats || 0) * entryPayers.length;
+    const acePotAmount = (round.activeRound.acePotFeeSats || 0) * acePayers.length;
+    const totalPot = entryPot + acePotAmount;
+    const par = round.activeRound.par || (round.activeRound.holeCount * 3);
+    const payoutConfig = round.activeRound.payoutConfig;
+
+    // --- Calculate entry pot payouts using calculatePayouts() (no more hardcoded 80%) ---
+    const entryPayoutsMap = entryPot > 0
+      ? calculatePayouts(round.players, entryPot, payoutConfig)
+      : new Map<string, number>();
+
+    // --- Detect aces ---
     const aceWinners: { name: string; hole: number }[] = [];
+    const aceWinnerPlayers: Player[] = [];
     round.players.forEach(player => {
+      let hasAce = false;
       Object.entries(player.scores || {}).forEach(([hole, score]) => {
         if (score === 1) {
           aceWinners.push({ name: player.name, hole: parseInt(hole) });
+          hasAce = true;
         }
       });
+      if (hasAce) aceWinnerPlayers.push(player);
+    });
+
+    // --- Calculate ace pot payouts ---
+    const acePayoutsMap = new Map<string, number>();
+    let acePotRemainder = acePotAmount;
+
+    if (acePotAmount > 0) {
+      if (aceWinnerPlayers.length > 0) {
+        // Split ace pot among ace winners with remainder handling
+        const perAceWinner = Math.floor(acePotAmount / aceWinnerPlayers.length);
+        let distributed = 0;
+        aceWinnerPlayers.forEach((p, idx) => {
+          if (idx === aceWinnerPlayers.length - 1) {
+            acePayoutsMap.set(p.id, acePotAmount - distributed);
+          } else {
+            acePayoutsMap.set(p.id, perAceWinner);
+            distributed += perAceWinner;
+          }
+        });
+        acePotRemainder = 0;
+      } else {
+        // No aces - handle redistribution
+        const redistribution = payoutConfig?.acePotRedistribution || 'add-to-entry-pot';
+        if (redistribution === 'add-to-entry-pot' && entryPot > 0) {
+          const combinedPot = entryPot + acePotAmount;
+          const combined = calculatePayouts(round.players, combinedPot, payoutConfig);
+          combined.forEach((amount, id) => entryPayoutsMap.set(id, amount));
+          acePotRemainder = 0;
+        } else if (redistribution === 'redistribute-to-participants') {
+          const acePaying = round.players.filter(p => p.paysAce);
+          if (acePaying.length > 0) {
+            const perPlayer = Math.floor(acePotAmount / acePaying.length);
+            let distributed = 0;
+            acePaying.forEach((p, idx) => {
+              if (idx === acePaying.length - 1) {
+                acePayoutsMap.set(p.id, acePotAmount - distributed);
+              } else {
+                acePayoutsMap.set(p.id, perPlayer);
+                distributed += perPlayer;
+              }
+            });
+            acePotRemainder = 0;
+          }
+        }
+        // 'forfeit' mode: pot rolls over, acePotRemainder stays
+      }
+    }
+
+    // --- Merge all payouts per player ---
+    const totalPayoutsMap = new Map<string, number>();
+    entryPayoutsMap.forEach((amount, id) => {
+      totalPayoutsMap.set(id, (totalPayoutsMap.get(id) || 0) + amount);
+    });
+    acePayoutsMap.forEach((amount, id) => {
+      totalPayoutsMap.set(id, (totalPayoutsMap.get(id) || 0) + amount);
     });
 
     // Show summary modal immediately
@@ -487,57 +587,74 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
       payouts: [],
       aceWinners,
       acePotAmount,
-      totalPot: potSize,
+      totalPot: totalPot,
       par,
-      isProcessingPayments: prize > 0 && winner && !winner.isCurrentUser
+      isProcessingPayments: totalPot > 0
     });
 
     const payoutsMade: { playerName: string; amount: number; isCurrentUser: boolean }[] = [];
+    const failedPayouts: { playerName: string; playerId: string; amount: number }[] = [];
 
-    // Pay main pot
-    if (prize > 0 && winner) {
-      if (winner.isCurrentUser) {
-        wallet.addTransaction('payout', prize, `Won Round: ${round.activeRound.name}`);
-        payoutsMade.push({ playerName: winner.name, amount: prize, isCurrentUser: true });
-        setRoundSummary(prev => prev ? { ...prev, payouts: payoutsMade, isProcessingPayments: false } : null);
-      } else {
-        try {
-          const winnerLightningAddress = winner.lightningAddress || getMagicLightningAddress(winner.id);
-          if (!winnerLightningAddress) throw new Error("Winner has no Lightning Address configured");
+    // --- Process payouts using routePayment with fallbacks ---
+    if (totalPot > 0) {
+      // Build recipients list from merged payouts
+      const recipients: { player: Player; amount: number }[] = [];
+      totalPayoutsMap.forEach((amount, playerId) => {
+        if (amount <= 0) return;
+        const player = round.players.find(p => p.id === playerId);
+        if (player) recipients.push({ player, amount });
+      });
 
-          console.log(`💸 Paying ${prize} sats to winner ${winner.name} at ${winnerLightningAddress}`);
-          const invoice = await resolveLightningAddress(winnerLightningAddress, prize);
-          if (!invoice) throw new Error(`Could not get invoice from ${winnerLightningAddress}`);
-
-          const success = await wallet.sendFunds(prize, invoice);
-          if (success) {
-            console.log(`✅ Successfully paid ${prize} sats to ${winner.name}`);
-            wallet.addTransaction('payout', prize, `Payout to ${winner.name}`);
-            payoutsMade.push({ playerName: winner.name, amount: prize, isCurrentUser: false });
-          } else {
-            throw new Error("Payment failed");
-          }
-        } catch (e) {
-          console.error("Failed to pay winner", e);
-          const errorMessage = e instanceof Error ? e.message : String(e);
-          alert(`Failed to pay winner: ${errorMessage}. Please pay manually.`);
+      for (const { player, amount } of recipients) {
+        if (player.isCurrentUser) {
+          // Current user won - just record it, no payment needed
+          wallet.addTransaction('payout', amount, `Won Round: ${round.activeRound.name}`);
+          payoutsMade.push({ playerName: player.name, amount, isCurrentUser: true });
+          continue;
         }
 
-        setRoundSummary(prev => prev ? { ...prev, payouts: payoutsMade, isProcessingPayments: false } : null);
+        try {
+          // Use processPayouts/routePayment for smart routing with fallbacks
+          const result = await processPayouts(
+            [{ pubkey: player.id, amountSats: amount, name: player.name }],
+            wallet.sendFunds.bind(null, amount),
+            wallet.createToken,
+            (completed, total, current) => {
+              console.log(`💸 Paying ${current.name}: ${completed + 1}/${total}`);
+            }
+          );
+
+          const paymentResult = result.results.get(player.id);
+          if (paymentResult?.success) {
+            console.log(`✅ Paid ${amount} sats to ${player.name} via ${paymentResult.method}`);
+            wallet.addTransaction('payout', amount, `Payout to ${player.name}`);
+            payoutsMade.push({ playerName: player.name, amount, isCurrentUser: false });
+          } else {
+            console.error(`❌ Failed to pay ${player.name}: ${paymentResult?.error}`);
+            failedPayouts.push({ playerName: player.name, playerId: player.id, amount });
+          }
+        } catch (e) {
+          console.error(`Failed to pay ${player.name}:`, e);
+          failedPayouts.push({ playerName: player.name, playerId: player.id, amount });
+        }
       }
+
+      // Update summary with results
+      setRoundSummary(prev => prev ? { ...prev, payouts: payoutsMade, isProcessingPayments: false } : null);
+
+      // --- If any payouts failed, alert and DO NOT finalize ---
+      if (failedPayouts.length > 0) {
+        const failedList = failedPayouts.map(f => `${f.playerName}: ${f.amount} sats`).join('\n');
+        alert(
+          `Some payouts failed. The round has NOT been finalized so you can retry.\n\nFailed payouts:\n${failedList}\n\nPlease check your wallet balance and try finalizing again.`
+        );
+        return; // Do NOT finalize - allow retry
+      }
+    } else {
+      setRoundSummary(prev => prev ? { ...prev, isProcessingPayments: false } : null);
     }
 
-    // Ace pot
-    if (aceWinners.length > 0 && acePotAmount > 0) {
-      const aceWinner = round.players.find(p =>
-        p.scores && Object.values(p.scores).includes(1)
-      );
-      if (aceWinner) {
-        const aceShare = Math.floor(acePotAmount / aceWinners.length);
-        console.log(`🎯 Ace pot: ${aceShare} sats to ${aceWinner.name}`);
-      }
-    }
-
+    // --- Only finalize after all payments succeed ---
     if (round.activeRound.pubkey === auth.currentUserPubkey) {
       try {
         await publishRound({ ...round.activeRound, isFinalized: true });
@@ -561,7 +678,7 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
         payouts: payoutsMade,
         aceWinners,
         acePotAmount,
-        totalPot: potSize,
+        totalPot,
         entryFeeSats: round.activeRound.entryFeeSats,
         acePotFeeSats: round.activeRound.acePotFeeSats,
         finalizedAt: Date.now()

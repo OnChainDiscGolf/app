@@ -434,16 +434,33 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           allValidProofs = [...allValidProofs, ...validWithUrl];
 
           if (validProofs.length !== mintProofs.length) {
-            console.log(`Found spent proofs for ${mintUrl}. (${mintProofs.length} -> ${validProofs.length})`);
+            const lostProofCount = mintProofs.length - validProofs.length;
+            const lostAmount = WalletService.calculateBalance(mintProofs) - WalletService.calculateBalance(validProofs);
+            console.log(`Found ${lostProofCount} spent proofs for ${mintUrl}. (${mintProofs.length} -> ${validProofs.length}, ${lostAmount} sats removed)`);
             hasChanges = true;
+            if (lostAmount > 0) {
+              // Notify user of the balance change
+              console.warn(`⚠️ ${lostAmount} sats worth of spent proofs removed from wallet`);
+              addTransaction('send', lostAmount, `Spent proofs cleared (${mintUrl.split('/').pop()})`, 'cashu', { status: 'complete' });
+            }
           }
         } catch (e) {
           const errorMsg = e instanceof Error ? e.message : String(e);
           console.warn(`Failed to verify proofs for ${mintUrl}:`, errorMsg);
 
           if (errorMsg.includes('different units') || errorMsg.includes('keyset') || errorMsg.includes('unknown keyset')) {
-            console.warn(`Keyset mismatch for ${mintUrl}. Clearing invalid proofs.`);
-            hasChanges = true;
+            // Keyset mismatch: keep proofs instead of clearing them.
+            // The mint may have rotated keys but the proofs could still be valid
+            // once the keyset is refreshed. Warn user instead of silently wiping.
+            const lostAmount = WalletService.calculateBalance(mintProofs);
+            console.warn(`⚠️ Keyset mismatch for ${mintUrl}. Keeping ${mintProofs.length} proofs (${lostAmount} sats) - may need manual migration.`);
+            allValidProofs = [...allValidProofs, ...mintProofs];
+            // Alert user so they can take action
+            alert(
+              `Your wallet mint "${mintUrl}" has updated its keyset. ` +
+              `${lostAmount} sats may need to be migrated. ` +
+              `Try swapping to a different mint or contact support if your balance looks wrong.`
+            );
             continue;
           }
 
@@ -897,10 +914,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (tokens) {
             for (const token of tokens) {
               try {
+                // Extract amount from token before redeeming
+                let tokenAmount = 0;
+                try {
+                  const decoded = getDecodedToken(token) as any;
+                  tokenAmount = decoded.token?.[0]?.proofs?.reduce((s: number, p: any) => s + (p.amount || 0), 0) || 0;
+                } catch { /* amount extraction failed, will still redeem */ }
+
                 const success = await receiveEcash(token);
                 if (success) {
-                  console.log("Auto-redeemed token from Gift Wrap!");
-                  handleIncomingPayment('cashu', 0, 'Received via Lightning Bridge');
+                  console.log(`Auto-redeemed ${tokenAmount} sats from Gift Wrap!`);
+                  if (tokenAmount > 0) {
+                    handleIncomingPayment('cashu', tokenAmount, 'Received via Lightning Bridge', event.id);
+                  }
                 }
               } catch (e) {
                 console.warn("Failed to redeem token from Gift Wrap", e);
@@ -974,12 +1000,20 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               for (let i = 0; i < tokens.length; i++) {
                 const token = tokens[i];
                 try {
+                  // Extract amount from token before redeeming
+                  let tokenAmount = 0;
+                  try {
+                    const decoded = getDecodedToken(token) as any;
+                    tokenAmount = decoded.token?.[0]?.proofs?.reduce((s: number, p: any) => s + (p.amount || 0), 0) || 0;
+                  } catch { /* amount extraction failed, will still redeem */ }
+
                   const success = await receiveEcash(token);
                   if (success) {
-                    console.log("Auto-redeemed token from Lightning gift-wrap!");
-                    const amount = 0;
-                    handleIncomingPayment('cashu', amount, 'Received via Lightning Gateway', `${event.id}-${i}`);
-                    setPaymentNotification({ amount: amount || 0, context: 'wallet_receive' });
+                    console.log(`Auto-redeemed ${tokenAmount} sats from Lightning gift-wrap!`);
+                    if (tokenAmount > 0) {
+                      handleIncomingPayment('cashu', tokenAmount, 'Received via Lightning Gateway', `${event.id}-${i}`);
+                      setPaymentNotification({ amount: tokenAmount, context: 'wallet_receive' });
+                    }
                   }
                 } catch (e) {
                   console.warn("Failed to redeem token from Lightning gift-wrap", e);
@@ -1238,10 +1272,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const errorMsg = e instanceof Error ? e.message : String(e);
       if (errorMsg.includes('different units') || errorMsg.includes('keyset') || errorMsg.includes('unknown keyset')) {
-        console.warn("Cashu keyset mismatch detected. Clearing invalid proofs.");
-        setProofs([]);
-        localStorage.removeItem('cdg_proofs');
-        alert("Your Cashu wallet has been reset due to a mint keyset change. Any previous balance has been cleared.");
+        console.warn("Cashu keyset mismatch detected during send. Proofs kept for manual migration.");
+        alert(
+          "This payment failed because the mint updated its keyset. " +
+          "Your funds are still safe. Try refreshing your wallet or switching to a different mint."
+        );
         return false;
       }
 

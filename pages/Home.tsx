@@ -125,7 +125,6 @@ export const Home: React.FC = () => {
     const [paymentError, setPaymentError] = useState<string | null>(null);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    const [isCustomExpanded, setIsCustomExpanded] = useState(false);
     const [startHole, setStartHole] = useState(1);
     const [trackPenalties, setTrackPenalties] = useState(false);
     const [hideOverallScore, setHideOverallScore] = useState(false);
@@ -1551,22 +1550,13 @@ export const Home: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Customize Your Round - Only visible on Advanced tab */}
-                            {customizeTab === 'settings' && (
-                            <>
-                            <button
-                                onClick={() => setIsCustomExpanded(!isCustomExpanded)}
-                                className="w-full flex items-center justify-between px-5 py-3 border-t border-white/5 hover:bg-white/5 transition-colors"
-                            >
-                                <div className="flex items-center space-x-2">
-                                    <Icons.Settings size={14} className="text-blue-400/80" />
-                                    <span className="text-xs font-bold text-slate-400">Customize Round</span>
-                                </div>
-                                <Icons.Next size={16} className={`text-slate-400 transition-transform duration-300 ${isCustomExpanded ? '-rotate-90' : 'rotate-90'}`} />
-                            </button>
+                        </div>
+                    )}
 
-                            {isCustomExpanded && (
-                                <div className="px-5 pb-5 space-y-4 border-t border-white/5 bg-black/20">
+                    {/* Round Settings - Only visible on Settings tab */}
+                    {customizeTab === 'settings' && (
+                        <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-2xl border border-white/10 backdrop-blur-sm mb-3 overflow-hidden">
+                            <div className="p-5 space-y-4">
                                     {/* Payout Distribution Mode */}
                                     {hasEntryFee && entryFee > 0 && (
                                         <div className="space-y-3 pt-4">
@@ -1782,10 +1772,7 @@ export const Home: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                            )}
-                            </>
-                            )}
+                            </div>
                         </div>
                     )}
 

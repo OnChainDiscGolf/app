@@ -145,12 +145,24 @@ export const Scorecard: React.FC = () => {
     };
 
     const confirmFinalize = async () => {
+        // Hard-block: check all holes are complete before allowing finalization
+        const allHoles = getHolesInPlayOrder(activeRound?.startingHole || 1, activeRound?.holeCount || 18);
+        const incompleteHoles = allHoles.filter(h => !isHoleComplete(h));
+        if (incompleteHoles.length > 0) {
+            setToast(`Cannot finalize: holes ${incompleteHoles.join(', ')} are incomplete`);
+            setTimeout(() => setToast(null), 4000);
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             await publishCurrentScores();
             await finalizeRound();
         } catch (e) {
             console.error("Failed to finalize round:", e);
+            const errorMsg = e instanceof Error ? e.message : String(e);
+            setToast(`Finalization failed: ${errorMsg}`);
+            setTimeout(() => setToast(null), 5000);
         } finally {
             setIsSubmitting(false);
             setShowConfirmFinalize(false);
@@ -208,40 +220,49 @@ export const Scorecard: React.FC = () => {
         return holes;
     };
 
-    const handleNext = () => {
+    const [isPublishing, setIsPublishing] = useState(false);
+
+    const handleNext = async () => {
         const startingHole = activeRound.startingHole || 1;
         const totalHoles = activeRound.holeCount;
         const finalHole = getFinalHole(startingHole, totalHoles);
         const holesPlayed = getHolesPlayedCount(viewHole, startingHole, totalHoles);
-        
+
         // Check if current hole is incomplete
         if (!isHoleComplete(viewHole)) {
             setToast(`Hole ${viewHole} incomplete`);
             setTimeout(() => setToast(null), 2500);
         }
-        
+
         // Halfway review: show after half the holes are played
         const halfwayPoint = Math.floor(totalHoles / 2);
         if (holesPlayed === halfwayPoint && totalHoles >= 10 && !showHalfwayReview) {
             setShowHalfwayReview(true);
             return;
         }
-        
+
         if (showHalfwayReview) {
             setShowHalfwayReview(false);
             setViewHole(getNextHole(viewHole, totalHoles));
             return;
         }
-        
+
         // Final review: show when we've completed the final hole (one before starting)
         if (viewHole === finalHole && !showFinalReview) {
             setShowFinalReview(true);
             return;
         }
-        
-        // Normal progression with wrap-around
+
+        // Normal progression with wrap-around - await score sync before navigating
         if (holesPlayed < totalHoles) {
-            publishCurrentScores();
+            setIsPublishing(true);
+            try {
+                await publishCurrentScores();
+            } catch (e) {
+                console.warn("Score sync failed, continuing navigation:", e);
+            } finally {
+                setIsPublishing(false);
+            }
             setViewHole(getNextHole(viewHole, totalHoles));
         }
     };
