@@ -143,7 +143,7 @@ export const Home: React.FC = () => {
     const [handicapEnabled, setHandicapEnabled] = useState(false); // Toggle for handicap feature
     const [startHoleEnabled, setStartHoleEnabled] = useState(false); // Toggle for custom starting hole
     const [useHonorSystem, setUseHonorSystem] = useState(true); // Sort by previous hole performance
-    const [customizeTab, setCustomizeTab] = useState<'basic' | 'advanced'>('basic');
+    const [customizeTab, setCustomizeTab] = useState<'players' | 'settings'>('players');
 
     const [joinError, setJoinError] = useState('');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -1495,27 +1495,27 @@ export const Home: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Basic / Advanced Tab Switcher */}
+                    {/* Players / Settings Tab Switcher */}
                     <div className="flex bg-black/30 backdrop-blur-sm p-1 rounded-xl mb-3 border border-white/10">
                         <button
-                            onClick={() => setCustomizeTab('basic')}
+                            onClick={() => setCustomizeTab('players')}
                             className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition-all duration-300 ${
-                                customizeTab === 'basic'
+                                customizeTab === 'players'
                                     ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50 shadow-[0_0_15px_rgba(251,146,60,0.2)]'
                                     : 'text-slate-400 hover:text-white border border-transparent'
                             }`}
                         >
-                            Basic
+                            Players
                         </button>
                         <button
-                            onClick={() => setCustomizeTab('advanced')}
+                            onClick={() => setCustomizeTab('settings')}
                             className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition-all duration-300 ${
-                                customizeTab === 'advanced'
+                                customizeTab === 'settings'
                                     ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50 shadow-[0_0_15px_rgba(251,146,60,0.2)]'
                                     : 'text-slate-400 hover:text-white border border-transparent'
                             }`}
                         >
-                            Advanced
+                            Settings
                         </button>
                     </div>
 
@@ -1552,7 +1552,7 @@ export const Home: React.FC = () => {
                             </div>
 
                             {/* Customize Your Round - Only visible on Advanced tab */}
-                            {customizeTab === 'advanced' && (
+                            {customizeTab === 'settings' && (
                             <>
                             <button
                                 onClick={() => setIsCustomExpanded(!isCustomExpanded)}
@@ -1790,7 +1790,7 @@ export const Home: React.FC = () => {
                     )}
 
                     {/* === BASIC TAB: Player list, payments, start button === */}
-                    {customizeTab === 'basic' && (<>
+                    {customizeTab === 'players' && (<>
                     <div className="flex-1 overflow-y-auto space-y-3">
                         <div className="space-y-3">
                             {allPlayers.map((p, idx) => {
@@ -1909,7 +1909,7 @@ export const Home: React.FC = () => {
                     </>)}
 
                     {/* === ADVANCED TAB: Player list with handicap controls === */}
-                    {customizeTab === 'advanced' && (
+                    {customizeTab === 'settings' && (
                     <div className="flex-1 overflow-y-auto space-y-3">
                         <div className="space-y-3">
                             {allPlayers.map((p, idx) => {
