@@ -44,22 +44,9 @@ export const Onboarding: React.FC = () => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    // Animation State for welcome screen
-    const [activeIcon, setActiveIcon] = useState(0);
-
     // Modal states
     const [showWhyModal, setShowWhyModal] = useState(false);
     const [showExistingOptionsModal, setShowExistingOptionsModal] = useState(false);
-
-    // Icon animation loop
-    useEffect(() => {
-        if (step === 'welcome') {
-            const interval = setInterval(() => {
-                setActiveIcon(prev => (prev + 1) % 3);
-            }, 3000);
-            return () => clearInterval(interval);
-        }
-    }, [step]);
 
     // Mark that we're in onboarding
     useEffect(() => {
@@ -148,87 +135,63 @@ export const Onboarding: React.FC = () => {
     if (step === 'welcome') {
         return (
             <div className="min-h-screen bg-brand-dark flex flex-col">
-                {/* Header */}
-                <div className="bg-slate-900/80 backdrop-blur-md p-4">
-                    <div className="max-w-md mx-auto text-center">
-                        <p className="golden-shimmer text-base mb-2 font-semibold">Welcome to..</p>
-                        <h1 className="font-extrabold tracking-tight leading-tight">
-                            <div className="text-7xl mb-1">
-                                <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">On-Chain</span>
-                            </div>
-                            <div className="text-6xl">
-                                <span className="text-white">Disc Golf</span>
-                            </div>
-                        </h1>
-                    </div>
-                </div>
-
-                <div className="flex-1 flex flex-col items-center justify-between p-4 text-center">
+                {/* Hero */}
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                     <div className="max-w-md w-full">
-                        {/* Animated Icon Container */}
-                        <div className="relative w-28 h-28 flex items-center justify-center mx-auto mb-4">
-                            {/* Disc Golf */}
-                            <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ${activeIcon === 0 ? 'opacity-100' : 'opacity-0'}`}>
-                                <div className="w-24 h-24 bg-brand-primary/20 rounded-full flex items-center justify-center border-2 border-brand-primary shadow-[0_0_30px_rgba(45,212,191,0.3)]">
-                                    <Icons.Trophy className="text-brand-primary" size={60} strokeWidth={1.5} />
-                                </div>
-                            </div>
+                        {/* App Icon */}
+                        <div className="mb-6">
+                            <img
+                                src="/icon.jpg"
+                                alt="On-Chain Disc Golf"
+                                className="w-28 h-28 rounded-3xl shadow-2xl shadow-brand-primary/20 mx-auto"
+                            />
+                        </div>
 
-                            {/* Bitcoin */}
-                            <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ${activeIcon === 1 ? 'opacity-100' : 'opacity-0'}`}>
-                                <div className="w-24 h-24 bg-orange-500/20 rounded-full flex items-center justify-center border-2 border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.3)]">
-                                    <Icons.Bitcoin className="text-orange-500" size={56} strokeWidth={2} />
-                                </div>
-                            </div>
+                        {/* Title */}
+                        <h1 className="font-extrabold tracking-tight leading-tight mb-2">
+                            <span className="text-5xl bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">On-Chain</span>
+                            <span className="text-5xl text-white"> Disc Golf</span>
+                        </h1>
 
-                            {/* Nostr */}
-                            <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ${activeIcon === 2 ? 'opacity-100' : 'opacity-0'}`}>
-                                <div className="w-24 h-24 bg-purple-500/20 rounded-full flex items-center justify-center border-2 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.3)]">
-                                    <Icons.Key className="text-purple-500" size={48} strokeWidth={2} />
-                                </div>
+                        {/* Value Prop */}
+                        <p className="text-slate-300 text-base leading-relaxed mb-2">
+                            Scorecard. Entry fees. Instant payouts.
+                        </p>
+                        <p className="text-slate-500 text-sm mb-8">
+                            No IOUs. No chasing people down. No "I'll get you next time."
+                        </p>
+
+                        {/* Feature Pills */}
+                        <div className="flex justify-center gap-2 mb-8">
+                            <div className="px-3 py-1.5 bg-slate-800/60 border border-slate-700/50 rounded-full flex items-center space-x-1.5">
+                                <Icons.Trophy size={14} className="text-brand-primary" />
+                                <span className="text-xs text-slate-300">Keep Score</span>
+                            </div>
+                            <div className="px-3 py-1.5 bg-slate-800/60 border border-slate-700/50 rounded-full flex items-center space-x-1.5">
+                                <Icons.Zap size={14} className="text-amber-400" />
+                                <span className="text-xs text-slate-300">Collect Fees</span>
+                            </div>
+                            <div className="px-3 py-1.5 bg-slate-800/60 border border-slate-700/50 rounded-full flex items-center space-x-1.5">
+                                <Icons.Send size={14} className="text-emerald-400" />
+                                <span className="text-xs text-slate-300">Auto Payout</span>
                             </div>
                         </div>
 
-                        {/* Tagline */}
-                        <div className="space-y-2 mb-6">
-                            <p className="text-slate-300 text-sm font-medium">This app uses</p>
-                            <p className="text-lg font-bold">
-                                <span className={`text-brand-primary transition-all duration-500 ${activeIcon === 0 ? 'drop-shadow-[0_0_12px_rgba(45,212,191,0.8)] scale-110 inline-block' : ''}`}>
-                                    Disc Golf
-                                </span>
-                                {' + '}
-                                <span className={`text-orange-500 transition-all duration-500 ${activeIcon === 1 ? 'drop-shadow-[0_0_12px_rgba(249,115,22,0.8)] scale-110 inline-block' : ''}`}>
-                                    Bitcoin
-                                </span>
-                                {' + '}
-                                <span className={`text-purple-500 transition-all duration-500 ${activeIcon === 2 ? 'drop-shadow-[0_0_12px_rgba(168,85,247,0.8)] scale-110 inline-block' : ''}`}>
-                                    Nostr
-                                </span>
-                            </p>
-                            <button
-                                onClick={() => setShowWhyModal(true)}
-                                className="text-slate-400 text-xs hover:text-white transition-colors border-b border-dashed border-slate-600 hover:border-white pb-0.5"
-                            >
-                                Learn why
-                            </button>
-                        </div>
-
-                        {/* Main CTA: Create New Account */}
+                        {/* Main CTA */}
                         <button
                             onClick={handleCreateNewAccount}
-                            className="w-full py-4 bg-gradient-to-r from-brand-primary to-cyan-400 text-black font-bold rounded-xl hover:opacity-90 transition-all transform hover:scale-[1.02] shadow-lg shadow-brand-primary/30 flex items-center justify-center space-x-2 mb-4"
+                            className="w-full py-4 bg-gradient-to-r from-brand-primary to-cyan-400 text-black font-bold rounded-xl hover:opacity-90 transition-all transform hover:scale-[1.02] shadow-lg shadow-brand-primary/30 flex items-center justify-center space-x-2 mb-3"
                         >
-                            <Icons.Plus size={20} />
-                            <span>Create New Account</span>
+                            <span>Get Started</span>
+                            <Icons.Next size={18} />
                         </button>
 
-                        {/* Secondary Options */}
+                        {/* Secondary */}
                         <button
                             onClick={() => setShowExistingOptionsModal(true)}
-                            className="w-full py-3 bg-slate-800/50 border border-slate-700 text-white font-medium rounded-xl hover:bg-slate-800 transition-colors flex items-center justify-center space-x-2"
+                            className="w-full py-3 bg-slate-800/50 border border-slate-700 text-white font-medium rounded-xl hover:bg-slate-800 transition-colors"
                         >
-                            <Icons.Key size={18} className="text-slate-400" />
-                            <span>I already have an account</span>
+                            I already have an account
                         </button>
 
                         {/* Error display */}
@@ -238,6 +201,20 @@ export const Onboarding: React.FC = () => {
                             </div>
                         )}
                     </div>
+                </div>
+
+                {/* Powered By Footer — tappable for curious users */}
+                <div className="pb-8 pt-2 text-center">
+                    <button
+                        onClick={() => setShowWhyModal(true)}
+                        className="text-slate-600 text-xs hover:text-slate-400 transition-colors inline-flex items-center space-x-1.5"
+                    >
+                        <span>Powered by</span>
+                        <span className="text-orange-500/70">Bitcoin</span>
+                        <span>&</span>
+                        <span className="text-purple-500/70">Nostr</span>
+                        <Icons.ChevronDown size={12} className="text-slate-600" />
+                    </button>
                 </div>
 
                 {/* Why Modal */}
@@ -612,48 +589,80 @@ const OnboardingProfileSetup: React.FC<OnboardingProfileSetupProps> = ({
 const WhyModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full max-h-[75vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-5">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-white">Why This Combo?</h3>
+                    <h3 className="text-xl font-bold text-white">How It Works</h3>
                     <button onClick={onClose} className="text-slate-400 hover:text-white">
                         <Icons.Close size={24} />
                     </button>
                 </div>
-                <div className="space-y-4 text-slate-300 leading-relaxed text-sm">
+
+                {/* The pitch — lead with the problem */}
+                <div className="space-y-3 text-slate-300 leading-relaxed text-sm">
                     <p className="text-brand-primary font-semibold italic">
                         "We'll settle up after the round!"
                     </p>
                     <p>
-                        Famous last words. Every disc golfer knows the awkward shuffle at the parking lot, someone doesn't have cash, Venmo is "acting weird," and somehow those $5 ace pot donations just... evaporate into the ether.
+                        Famous last words. Someone doesn't have cash, Venmo is "acting weird," and those ace pot dollars just... disappear.
                     </p>
-                    <p>
-                        This app fixes that. Pay when you start. Automatic payouts when you finish. No excuses, no IOUs, no "I swear I'll get you next time."
-                    </p>
-                    <p className="font-semibold text-white">
-                        But why <span className="text-orange-500">Bitcoin</span>?
-                    </p>
-                    <p>
-                        Because traditional money is broken. Banks print it endlessly, devaluing your savings. They freeze accounts, charge fees, and track every transaction.
-                    </p>
-                    <p>
-                        <strong className="text-orange-500">Bitcoin</strong> is different. It's un-inflatable, unstoppable money that <em className="text-slate-200">you</em> truly own.
-                    </p>
-                    <p className="font-semibold text-white">
-                        And <span className="text-purple-500">Nostr</span>?
-                    </p>
-                    <p>
-                        Big Tech owns your identity. They decide what you see, who sees you, and whether you even get to speak.
-                    </p>
-                    <p>
-                        <strong className="text-purple-500">Nostr</strong> gives that power back to you. Your identity, your content, your network—nobody can take it away.
-                    </p>
-                    <p className="italic text-brand-primary text-center pt-2">
-                        Disc golf, financial sovereignty, and digital freedom. Now let's play.
+                    <p className="text-white font-medium">
+                        This app fixes that. Entry fees collected upfront. Payouts sent automatically when the round ends. Zero hassle.
                     </p>
                 </div>
+
+                {/* How it works — simple steps */}
+                <div className="space-y-2">
+                    <div className="flex items-start space-x-3 p-3 bg-slate-800/50 rounded-xl">
+                        <div className="w-8 h-8 bg-brand-primary/20 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                            <span className="text-brand-primary font-bold text-sm">1</span>
+                        </div>
+                        <div>
+                            <p className="text-white font-medium text-sm">Create a round</p>
+                            <p className="text-slate-400 text-xs">Set the course, entry fee, and invite players</p>
+                        </div>
+                    </div>
+                    <div className="flex items-start space-x-3 p-3 bg-slate-800/50 rounded-xl">
+                        <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                            <span className="text-amber-400 font-bold text-sm">2</span>
+                        </div>
+                        <div>
+                            <p className="text-white font-medium text-sm">Play and score</p>
+                            <p className="text-slate-400 text-xs">Track every hole, see live standings</p>
+                        </div>
+                    </div>
+                    <div className="flex items-start space-x-3 p-3 bg-slate-800/50 rounded-xl">
+                        <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                            <span className="text-emerald-400 font-bold text-sm">3</span>
+                        </div>
+                        <div>
+                            <p className="text-white font-medium text-sm">Winners get paid instantly</p>
+                            <p className="text-slate-400 text-xs">Payouts sent the moment the round is finalized</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Tech section — available but not dominant */}
+                <div className="border-t border-slate-700/50 pt-4">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-3">Under the Hood</p>
+                    <div className="space-y-2">
+                        <div className="flex items-center space-x-3">
+                            <Icons.Zap size={16} className="text-orange-500 shrink-0" />
+                            <p className="text-xs text-slate-400">
+                                <span className="text-orange-400 font-medium">Bitcoin Lightning</span> — Instant, low-fee payments. Your money, your wallet. No bank needed.
+                            </p>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                            <Icons.Key size={16} className="text-purple-500 shrink-0" />
+                            <p className="text-xs text-slate-400">
+                                <span className="text-purple-400 font-medium">Nostr</span> — Your identity travels with you. No company controls your account.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <button
                     onClick={onClose}
-                    className="w-full py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 transition-colors mt-4"
+                    className="w-full py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 transition-colors"
                 >
                     Got it
                 </button>
