@@ -143,6 +143,7 @@ export const Home: React.FC = () => {
     const [handicapEnabled, setHandicapEnabled] = useState(false); // Toggle for handicap feature
     const [startHoleEnabled, setStartHoleEnabled] = useState(false); // Toggle for custom starting hole
     const [useHonorSystem, setUseHonorSystem] = useState(true); // Sort by previous hole performance
+    const [customizeTab, setCustomizeTab] = useState<'basic' | 'advanced'>('basic');
 
     const [joinError, setJoinError] = useState('');
     const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -1494,6 +1495,30 @@ export const Home: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Basic / Advanced Tab Switcher */}
+                    <div className="flex bg-black/30 backdrop-blur-sm p-1 rounded-xl mb-3 border border-white/10">
+                        <button
+                            onClick={() => setCustomizeTab('basic')}
+                            className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition-all duration-300 ${
+                                customizeTab === 'basic'
+                                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50 shadow-[0_0_15px_rgba(251,146,60,0.2)]'
+                                    : 'text-slate-400 hover:text-white border border-transparent'
+                            }`}
+                        >
+                            Basic
+                        </button>
+                        <button
+                            onClick={() => setCustomizeTab('advanced')}
+                            className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition-all duration-300 ${
+                                customizeTab === 'advanced'
+                                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50 shadow-[0_0_15px_rgba(251,146,60,0.2)]'
+                                    : 'text-slate-400 hover:text-white border border-transparent'
+                            }`}
+                        >
+                            Advanced
+                        </button>
+                    </div>
+
                     {/* Dynamic Pot Totals with integrated Customize Round */}
                     {hasEntryFee && (entryFee > 0 || acePot > 0) && (
                         <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-2xl border border-white/10 backdrop-blur-sm mb-3 overflow-hidden">
@@ -1526,7 +1551,9 @@ export const Home: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Customize Your Round - Collapsible section integrated into pot tile */}
+                            {/* Customize Your Round - Only visible on Advanced tab */}
+                            {customizeTab === 'advanced' && (
+                            <>
                             <button
                                 onClick={() => setIsCustomExpanded(!isCustomExpanded)}
                                 className="w-full flex items-center justify-between px-5 py-3 border-t border-white/5 hover:bg-white/5 transition-colors"
@@ -1757,9 +1784,13 @@ export const Home: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                            </>
+                            )}
                         </div>
                     )}
 
+                    {/* === BASIC TAB: Player list, payments, start button === */}
+                    {customizeTab === 'basic' && (<>
                     <div className="flex-1 overflow-y-auto space-y-3">
                         <div className="space-y-3">
                             {allPlayers.map((p, idx) => {
@@ -1875,6 +1906,56 @@ export const Home: React.FC = () => {
                             );
                         })()}
                     </div>
+                    </>)}
+
+                    {/* === ADVANCED TAB: Player list with handicap controls === */}
+                    {customizeTab === 'advanced' && (
+                    <div className="flex-1 overflow-y-auto space-y-3">
+                        <div className="space-y-3">
+                            {allPlayers.map((p, idx) => {
+                                const isHost = (p as any).isHost;
+
+                                return (
+                                    <div key={p.pubkey} className="bg-slate-800 rounded-xl p-3 border border-slate-700">
+                                        <div className="flex items-start justify-between gap-3">
+                                            {/* Player Info */}
+                                            <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                                <span className="font-bold text-sm text-slate-500 w-5">{idx + 1}</span>
+                                                <div className="w-9 h-9 rounded-full bg-slate-700 overflow-hidden shrink-0">
+                                                    {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <Icons.Users className="p-2 text-slate-500" />}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-bold text-sm truncate text-white leading-tight">{p.name} {isHost && '(You)'}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Handicap Controls - shown only when enabled */}
+                                            {handicapEnabled && (
+                                                <div className="flex items-center space-x-1 mr-1 shrink-0">
+                                                    <button
+                                                        onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.max(-3, (prev[p.pubkey] || 0) - 1) }))}
+                                                        className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <div className="w-8 h-6 flex items-center justify-center bg-slate-900 border border-slate-600 rounded text-xs font-bold text-white">
+                                                        {playerHandicaps[p.pubkey] || 0}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.min(3, (prev[p.pubkey] || 0) + 1) }))}
+                                                        className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    )}
 
                     {/* PAYMENT MODAL */}
                     {

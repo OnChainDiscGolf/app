@@ -1,14 +1,14 @@
 /**
  * MnemonicBackup Component
- * 
+ *
  * Displays 12/24 word mnemonic phrase for user backup.
  * Includes multiple backup options:
  * - Copy to clipboard
  * - QR Code with branding
  * - PDF Wallet Card with memory story
  * - Nostr encrypted backup
- * 
- * NO VERIFICATION STEP - Users may be on the disc golf course ready to play!
+ *
+ * Users must complete at least one backup action before continuing.
  */
 
 import React, { useState } from 'react';
@@ -36,7 +36,11 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
     subtitle = "This recovery phrase is the only way to recover your account and Bitcoin wallet."
 }) => {
     const [copied, setCopied] = useState(false);
-    
+    const [hasBackedUp, setHasBackedUp] = useState(false);
+    const [showWords, setShowWords] = useState(false);
+
+    const words = splitMnemonicToWords(mnemonic);
+
     // Backup option states
     const [showNostrModal, setShowNostrModal] = useState(false);
     const [nostrPassword, setNostrPassword] = useState('');
@@ -48,15 +52,18 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
     const handleCopy = () => {
         navigator.clipboard.writeText(mnemonic);
         setCopied(true);
+        setHasBackedUp(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
     const handleDownloadQR = async () => {
         await downloadQRCode(mnemonic);
+        setHasBackedUp(true);
     };
 
     const handleDownloadPDF = async () => {
         await downloadWalletCardPDF(mnemonic);
+        setHasBackedUp(true);
     };
 
     const handleNostrBackup = async () => {
@@ -76,6 +83,7 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
             const success = await backupToNostr(mnemonic, nostrPassword);
             if (success) {
                 setNostrBackupSuccess(true);
+                setHasBackedUp(true);
                 setTimeout(() => {
                     setShowNostrModal(false);
                     setNostrBackupSuccess(false);
@@ -124,6 +132,49 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                         <strong className="block mb-1">Never share these words with anyone!</strong>
                         Anyone with these words can steal your funds. We will NEVER ask for them.
                     </div>
+                </div>
+            </div>
+
+            {/* Word Grid with Reveal Toggle */}
+            <div className="mx-4 mb-4">
+                <div className="relative">
+                    {!showWords && (
+                        <div
+                            className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-md rounded-xl z-10 cursor-pointer"
+                            onClick={() => setShowWords(true)}
+                        >
+                            <div className="text-center">
+                                <Icons.Eye className="mx-auto text-slate-400 mb-2" size={24} />
+                                <p className="text-slate-300 text-sm">Tap to reveal your 12 words</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-3 gap-2 p-3 bg-slate-800/50 rounded-xl border border-slate-700">
+                        {words.map((word, index) => (
+                            <div
+                                key={index}
+                                className="flex items-center bg-slate-900/50 rounded-lg p-2 border border-slate-700"
+                            >
+                                <span className="text-slate-500 text-xs font-mono w-5 shrink-0">
+                                    {index + 1}.
+                                </span>
+                                <span className="text-white font-mono text-xs">
+                                    {showWords ? word : '\u2022\u2022\u2022\u2022\u2022'}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {showWords && (
+                        <button
+                            onClick={() => setShowWords(false)}
+                            className="mt-2 w-full py-1.5 flex items-center justify-center space-x-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors"
+                        >
+                            <Icons.EyeOff className="text-slate-400" size={14} />
+                            <span className="text-slate-400 text-xs">Hide words</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -200,10 +251,15 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
             <div className="p-4 space-y-3">
                 <button
                     onClick={onComplete}
-                    className="w-full py-3.5 bg-gradient-to-r from-brand-primary to-cyan-400 text-black font-bold rounded-xl hover:opacity-90 transition-all flex items-center justify-center space-x-2 shadow-lg shadow-brand-primary/20"
+                    disabled={!hasBackedUp}
+                    className={`w-full py-3.5 font-bold rounded-xl transition-all flex items-center justify-center space-x-2 ${
+                        hasBackedUp
+                            ? 'bg-gradient-to-r from-brand-primary to-cyan-400 text-black hover:opacity-90 shadow-lg shadow-brand-primary/20'
+                            : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                    }`}
                 >
-                    <span>Continue</span>
-                    <Icons.Next size={18} />
+                    <span>{hasBackedUp ? 'Continue' : 'Save your phrase first'}</span>
+                    {hasBackedUp && <Icons.Next size={18} />}
                 </button>
             </div>
 

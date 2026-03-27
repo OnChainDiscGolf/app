@@ -23,7 +23,7 @@ import { useApp } from '../context/AppContext';
 import { useOnboarding } from '../context/OnboardingContext';
 import { Icons } from '../components/Icons';
 import { MnemonicBackup, MnemonicRecoveryInput } from '../components/MnemonicBackup';
-import { loginWithMnemonic, loginWithNsec, uploadProfileImageWithKey } from '../services/nostrService';
+import { uploadProfileImageWithKey } from '../services/nostrService';
 import { isNative, getPlatform } from '../services/capacitorService';
 import { nip19 } from 'nostr-tools';
 
@@ -37,7 +37,7 @@ type OnboardingStep =
 
 export const Onboarding: React.FC = () => {
     const navigate = useNavigate();
-    const { loginNsec: appLoginNsec, loginAmber } = useApp();
+    const { loginNsec: appLoginNsec, loginMnemonic: appLoginMnemonic, loginAmber } = useApp();
     const { identity, profile, generateIdentity, setProfileData, setIsOnboarding, lightningAddressType, setLightningAddressType } = useOnboarding();
 
     const [step, setStep] = useState<OnboardingStep>('welcome');
@@ -104,7 +104,7 @@ export const Onboarding: React.FC = () => {
         setError('');
 
         try {
-            loginWithMnemonic(mnemonic);
+            await appLoginMnemonic(mnemonic);
             // Recovery flow: go to profile setup with recovery flag
             navigate('/profile-setup', { state: { isRecovery: true } });
         } catch (e) {
@@ -120,7 +120,6 @@ export const Onboarding: React.FC = () => {
         setError('');
 
         try {
-            loginWithNsec(nsec);
             await appLoginNsec(nsec);
             // NSEC flow: go to profile setup with recovery flag
             navigate('/profile-setup', { state: { isRecovery: true } });

@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Button } from '../components/Button';
 import { Icons } from '../components/Icons';
 import { DEFAULT_PAR, DEFAULT_HOLE_COUNT } from '../constants';
 import { useNavigate } from 'react-router-dom';
+import { calculatePayouts } from '../utils/payoutCalculations';
 
 export const Scorecard: React.FC = () => {
     const { activeRound, players, updateScore, publishCurrentScores, finalizeRound, isAuthenticated, userProfile, currentUserPubkey } = useApp();
@@ -332,6 +333,92 @@ export const Scorecard: React.FC = () => {
         const bTotal = getPlayerTotalText(b.scores, b.handicap);
         return aTotal.total - bTotal.total;
     });
+
+    // Compute payout preview for the finalization modal
+    const payoutPreview = useMemo(() => {
+        if (entryPot <= 0 && acePot <= 0) return null;
+
+        const payoutConfig = activeRound?.payoutConfig;
+        const rankedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
+
+        // Entry pot payouts
+        const entryPayouts = entryPot > 0
+            ? calculatePayouts(players, entryPot, payoutConfig)
+            : new Map<string, number>();
+
+        // Detect ace winners: any player who scored 1 on any hole
+        const aceWinners = players.filter(p =>
+            Object.values(p.scores).some(s => s === 1)
+        );
+
+        // Ace pot distribution
+        let acePayouts = new Map<string, number>();
+        let acePotRemainder = acePot;
+        let acePotRedistributionMode: string | null = null;
+
+        if (acePot > 0) {
+            if (aceWinners.length > 0) {
+                const perAceWinner = Math.floor(acePot / aceWinners.length);
+                let distributed = 0;
+                aceWinners.forEach((p, idx) => {
+                    if (idx === aceWinners.length - 1) {
+                        acePayouts.set(p.id, acePot - distributed);
+                    } else {
+                        acePayouts.set(p.id, perAceWinner);
+                        distributed += perAceWinner;
+                    }
+                });
+                acePotRemainder = 0;
+            } else {
+                // No aces hit - apply redistribution rule
+                const redistribution = payoutConfig?.acePotRedistribution || 'add-to-entry-pot';
+                acePotRedistributionMode = redistribution;
+                if (redistribution === 'add-to-entry-pot' && entryPot > 0) {
+                    // Recalculate entry payouts with ace pot added
+                    const combinedPot = entryPot + acePot;
+                    const combined = calculatePayouts(players, combinedPot, payoutConfig);
+                    // Replace entry payouts with combined
+                    combined.forEach((amount, id) => entryPayouts.set(id, amount));
+                    acePotRemainder = 0;
+                } else if (redistribution === 'redistribute-to-participants') {
+                    const acePaying = players.filter(p => p.paysAce);
+                    if (acePaying.length > 0) {
+                        const perPlayer = Math.floor(acePot / acePaying.length);
+                        let distributed = 0;
+                        acePaying.forEach((p, idx) => {
+                            if (idx === acePaying.length - 1) {
+                                acePayouts.set(p.id, acePot - distributed);
+                            } else {
+                                acePayouts.set(p.id, perPlayer);
+                                distributed += perPlayer;
+                            }
+                        });
+                        acePotRemainder = 0;
+                    }
+                }
+                // 'forfeit' mode: acePotRemainder stays, pot rolls over
+            }
+        }
+
+        // Merge total payouts per player
+        const totalPayouts = new Map<string, number>();
+        entryPayouts.forEach((amount, id) => {
+            totalPayouts.set(id, (totalPayouts.get(id) || 0) + amount);
+        });
+        acePayouts.forEach((amount, id) => {
+            totalPayouts.set(id, (totalPayouts.get(id) || 0) + amount);
+        });
+
+        return {
+            rankedPlayers,
+            entryPayouts,
+            acePayouts,
+            aceWinners,
+            acePotRemainder,
+            acePotRedistributionMode,
+            totalPayouts,
+        };
+    }, [players, entryPot, acePot, activeRound?.payoutConfig]);
 
     // --- REVIEW UI (Shared for Halfway and Final) ---
     if (showHalfwayReview || showFinalReview) {
@@ -661,40 +748,164 @@ export const Scorecard: React.FC = () => {
                             </div>
 
                             {/* Content */}
-                            <div className="p-5 space-y-4">
+                            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
                                 <p className="text-slate-300 text-sm text-center leading-relaxed">
-                                    {totalPot > 0 
+                                    {totalPot > 0
                                         ? 'This will lock all scores and automatically send payouts to winners.'
                                         : 'This will lock all scores and complete the round.'}
                                 </p>
 
-                                {/* Quick Summary */}
-                                <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3 space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-slate-400">Players</span>
-                                        <span className="text-white font-medium">{players.length}</span>
-                                    </div>
-                                    {totalPot > 0 && (
-                                        <>
+                                {/* Payout Preview */}
+                                {payoutPreview && totalPot > 0 ? (
+                                    <div className="space-y-3">
+                                        {/* Pot Summary */}
+                                        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3 space-y-2">
                                             <div className="flex justify-between text-sm">
-                                                <span className="text-slate-400">Entry Pot</span>
-                                                <span className="text-emerald-400 font-bold">{entryPot.toLocaleString()} sats</span>
+                                                <span className="text-slate-400">Players</span>
+                                                <span className="text-white font-medium">{players.length}</span>
                                             </div>
+                                            {entryPot > 0 && (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-slate-400">Entry Pot</span>
+                                                    <span className="text-emerald-400 font-bold">{entryPot.toLocaleString()} sats</span>
+                                                </div>
+                                            )}
                                             {acePot > 0 && (
                                                 <div className="flex justify-between text-sm">
                                                     <span className="text-slate-400">Ace Pot</span>
                                                     <span className="text-amber-400 font-bold">{acePot.toLocaleString()} sats</span>
                                                 </div>
                                             )}
-                                        </>
-                                    )}
-                                    <div className="flex justify-between text-sm border-t border-slate-700/50 pt-2 mt-2">
-                                        <span className="text-slate-400">Leader</span>
-                                        <span className="text-amber-400 font-medium">
-                                            {reviewSortedPlayers[0]?.name || '-'}
-                                        </span>
+                                            {(entryPot > 0 && acePot > 0) && (
+                                                <div className="flex justify-between text-sm border-t border-slate-700/50 pt-2">
+                                                    <span className="text-slate-400 font-medium">Total Pot</span>
+                                                    <span className="text-white font-bold">{totalPot.toLocaleString()} sats</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Ranked Player Payouts */}
+                                        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+                                            <div className="px-3 py-2 border-b border-slate-700/50 bg-slate-800/80">
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payout Breakdown</p>
+                                            </div>
+                                            <div className="divide-y divide-slate-700/30">
+                                                {payoutPreview.rankedPlayers.map((p, idx) => {
+                                                    const payout = payoutPreview.totalPayouts.get(p.id) || 0;
+                                                    const isWinner = payout > 0;
+                                                    const hasAce = payoutPreview.acePayouts.has(p.id);
+                                                    const entryAmt = payoutPreview.entryPayouts.get(p.id) || 0;
+                                                    const aceAmt = payoutPreview.acePayouts.get(p.id) || 0;
+                                                    const totalInfo = getPlayerTotalText(p.scores, p.handicap);
+
+                                                    return (
+                                                        <div
+                                                            key={p.id}
+                                                            className={`flex items-center justify-between px-3 py-2.5 ${isWinner ? 'bg-emerald-500/5' : ''}`}
+                                                        >
+                                                            <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                                                    idx === 0 ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30'
+                                                                    : idx === 1 ? 'bg-slate-400/20 text-slate-300 ring-1 ring-slate-400/30'
+                                                                    : idx === 2 ? 'bg-amber-700/20 text-amber-600 ring-1 ring-amber-700/30'
+                                                                    : 'bg-slate-700/50 text-slate-500'
+                                                                }`}>
+                                                                    {idx + 1}
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-center space-x-1.5">
+                                                                        <span className="text-sm font-medium text-white truncate">{p.name}</span>
+                                                                        {p.isCurrentUser && (
+                                                                            <span className="text-[9px] text-emerald-400 bg-emerald-500/20 px-1 py-0.5 rounded shrink-0">YOU</span>
+                                                                        )}
+                                                                        {hasAce && (
+                                                                            <span className="text-[9px] text-amber-300 bg-amber-500/20 px-1 py-0.5 rounded shrink-0">ACE</span>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className={`text-xs ${parseInt(totalInfo.diff) < 0 ? 'text-emerald-400' : parseInt(totalInfo.diff) > 0 ? 'text-rose-400' : 'text-slate-500'}`}>
+                                                                        {totalInfo.diff} ({totalInfo.total})
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right shrink-0 ml-2">
+                                                                {isWinner ? (
+                                                                    <div>
+                                                                        <span className="text-sm font-bold text-emerald-400">
+                                                                            +{payout.toLocaleString()}
+                                                                            <span className="text-xs text-emerald-400/70 ml-0.5">sats</span>
+                                                                        </span>
+                                                                        {aceAmt > 0 && entryAmt > 0 && (
+                                                                            <p className="text-[10px] text-slate-500">{entryAmt.toLocaleString()} entry + {aceAmt.toLocaleString()} ace</p>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-xs text-slate-600">--</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Ace Pot Section */}
+                                        {acePot > 0 && (
+                                            <div className="bg-amber-500/5 rounded-xl border border-amber-500/20 p-3">
+                                                <div className="flex items-center space-x-2 mb-2">
+                                                    <div className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                                        <Icons.Zap size={12} className="text-amber-400" />
+                                                    </div>
+                                                    <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Ace Pot</p>
+                                                </div>
+                                                {payoutPreview.aceWinners.length > 0 ? (
+                                                    <div className="space-y-1.5">
+                                                        {payoutPreview.aceWinners.map(p => {
+                                                            const acePayout = payoutPreview.acePayouts.get(p.id) || 0;
+                                                            const aceHoles = Object.entries(p.scores)
+                                                                .filter(([, s]) => s === 1)
+                                                                .map(([h]) => h);
+                                                            return (
+                                                                <div key={p.id} className="flex items-center justify-between">
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <span className="text-sm text-white font-medium">{p.name}</span>
+                                                                        <span className="text-[10px] text-amber-300/70">
+                                                                            Hole{aceHoles.length > 1 ? 's' : ''} {aceHoles.join(', ')}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-sm font-bold text-amber-400">
+                                                                        +{acePayout.toLocaleString()} sats
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-xs text-amber-200/60">
+                                                        {payoutPreview.acePotRedistributionMode === 'add-to-entry-pot'
+                                                            ? 'No aces hit -- ace pot added to entry pot payouts above.'
+                                                            : payoutPreview.acePotRedistributionMode === 'redistribute-to-participants'
+                                                                ? 'No aces hit -- ace pot returned to ace participants.'
+                                                                : 'No aces hit -- ace pot rolls over to next round.'}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
+                                ) : (
+                                    /* No-pot summary fallback */
+                                    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3 space-y-2">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-400">Players</span>
+                                            <span className="text-white font-medium">{players.length}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm border-t border-slate-700/50 pt-2 mt-2">
+                                            <span className="text-slate-400">Leader</span>
+                                            <span className="text-amber-400 font-medium">
+                                                {reviewSortedPlayers[0]?.name || '-'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Warning */}
                                 <div className="flex items-start space-x-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
@@ -1039,34 +1250,164 @@ export const Scorecard: React.FC = () => {
                         </div>
 
                         {/* Content */}
-                        <div className="p-5 space-y-4">
+                        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
                             <p className="text-slate-300 text-sm text-center leading-relaxed">
-                                This will lock all scores and automatically send payouts to winners.
+                                {totalPot > 0
+                                    ? 'This will lock all scores and automatically send payouts to winners.'
+                                    : 'This will lock all scores and complete the round.'}
                             </p>
 
-                            {/* Quick Summary */}
-                            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3 space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-slate-400">Players</span>
-                                    <span className="text-white font-medium">{players.length}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-slate-400">Entry Pot</span>
-                                    <span className="text-emerald-400 font-bold">{entryPot.toLocaleString()} sats</span>
-                                </div>
-                                {acePot > 0 && (
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-slate-400">Ace Pot</span>
-                                        <span className="text-amber-400 font-bold">{acePot.toLocaleString()} sats</span>
+                            {/* Payout Preview */}
+                            {payoutPreview && totalPot > 0 ? (
+                                <div className="space-y-3">
+                                    {/* Pot Summary */}
+                                    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3 space-y-2">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-400">Players</span>
+                                            <span className="text-white font-medium">{players.length}</span>
+                                        </div>
+                                        {entryPot > 0 && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-slate-400">Entry Pot</span>
+                                                <span className="text-emerald-400 font-bold">{entryPot.toLocaleString()} sats</span>
+                                            </div>
+                                        )}
+                                        {acePot > 0 && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-slate-400">Ace Pot</span>
+                                                <span className="text-amber-400 font-bold">{acePot.toLocaleString()} sats</span>
+                                            </div>
+                                        )}
+                                        {(entryPot > 0 && acePot > 0) && (
+                                            <div className="flex justify-between text-sm border-t border-slate-700/50 pt-2">
+                                                <span className="text-slate-400 font-medium">Total Pot</span>
+                                                <span className="text-white font-bold">{totalPot.toLocaleString()} sats</span>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                                <div className="flex justify-between text-sm border-t border-slate-700/50 pt-2 mt-2">
-                                    <span className="text-slate-400">Leader</span>
-                                    <span className="text-amber-400 font-medium">
-                                        {sortedPlayers[0]?.name || '-'}
-                                    </span>
+
+                                    {/* Ranked Player Payouts */}
+                                    <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+                                        <div className="px-3 py-2 border-b border-slate-700/50 bg-slate-800/80">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payout Breakdown</p>
+                                        </div>
+                                        <div className="divide-y divide-slate-700/30">
+                                            {payoutPreview.rankedPlayers.map((p, idx) => {
+                                                const payout = payoutPreview.totalPayouts.get(p.id) || 0;
+                                                const isWinner = payout > 0;
+                                                const hasAce = payoutPreview.acePayouts.has(p.id);
+                                                const entryAmt = payoutPreview.entryPayouts.get(p.id) || 0;
+                                                const aceAmt = payoutPreview.acePayouts.get(p.id) || 0;
+                                                const totalInfo = getPlayerTotalText(p.scores, p.handicap);
+
+                                                return (
+                                                    <div
+                                                        key={p.id}
+                                                        className={`flex items-center justify-between px-3 py-2.5 ${isWinner ? 'bg-emerald-500/5' : ''}`}
+                                                    >
+                                                        <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                                                idx === 0 ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30'
+                                                                : idx === 1 ? 'bg-slate-400/20 text-slate-300 ring-1 ring-slate-400/30'
+                                                                : idx === 2 ? 'bg-amber-700/20 text-amber-600 ring-1 ring-amber-700/30'
+                                                                : 'bg-slate-700/50 text-slate-500'
+                                                            }`}>
+                                                                {idx + 1}
+                                                            </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex items-center space-x-1.5">
+                                                                    <span className="text-sm font-medium text-white truncate">{p.name}</span>
+                                                                    {p.isCurrentUser && (
+                                                                        <span className="text-[9px] text-emerald-400 bg-emerald-500/20 px-1 py-0.5 rounded shrink-0">YOU</span>
+                                                                    )}
+                                                                    {hasAce && (
+                                                                        <span className="text-[9px] text-amber-300 bg-amber-500/20 px-1 py-0.5 rounded shrink-0">ACE</span>
+                                                                    )}
+                                                                </div>
+                                                                <span className={`text-xs ${parseInt(totalInfo.diff) < 0 ? 'text-emerald-400' : parseInt(totalInfo.diff) > 0 ? 'text-rose-400' : 'text-slate-500'}`}>
+                                                                    {totalInfo.diff} ({totalInfo.total})
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right shrink-0 ml-2">
+                                                            {isWinner ? (
+                                                                <div>
+                                                                    <span className="text-sm font-bold text-emerald-400">
+                                                                        +{payout.toLocaleString()}
+                                                                        <span className="text-xs text-emerald-400/70 ml-0.5">sats</span>
+                                                                    </span>
+                                                                    {aceAmt > 0 && entryAmt > 0 && (
+                                                                        <p className="text-[10px] text-slate-500">{entryAmt.toLocaleString()} entry + {aceAmt.toLocaleString()} ace</p>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-slate-600">--</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Ace Pot Section */}
+                                    {acePot > 0 && (
+                                        <div className="bg-amber-500/5 rounded-xl border border-amber-500/20 p-3">
+                                            <div className="flex items-center space-x-2 mb-2">
+                                                <div className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                                    <Icons.Zap size={12} className="text-amber-400" />
+                                                </div>
+                                                <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Ace Pot</p>
+                                            </div>
+                                            {payoutPreview.aceWinners.length > 0 ? (
+                                                <div className="space-y-1.5">
+                                                    {payoutPreview.aceWinners.map(p => {
+                                                        const acePayout = payoutPreview.acePayouts.get(p.id) || 0;
+                                                        const aceHoles = Object.entries(p.scores)
+                                                            .filter(([, s]) => s === 1)
+                                                            .map(([h]) => h);
+                                                        return (
+                                                            <div key={p.id} className="flex items-center justify-between">
+                                                                <div className="flex items-center space-x-2">
+                                                                    <span className="text-sm text-white font-medium">{p.name}</span>
+                                                                    <span className="text-[10px] text-amber-300/70">
+                                                                        Hole{aceHoles.length > 1 ? 's' : ''} {aceHoles.join(', ')}
+                                                                    </span>
+                                                                </div>
+                                                                <span className="text-sm font-bold text-amber-400">
+                                                                    +{acePayout.toLocaleString()} sats
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-amber-200/60">
+                                                    {payoutPreview.acePotRedistributionMode === 'add-to-entry-pot'
+                                                        ? 'No aces hit -- ace pot added to entry pot payouts above.'
+                                                        : payoutPreview.acePotRedistributionMode === 'redistribute-to-participants'
+                                                            ? 'No aces hit -- ace pot returned to ace participants.'
+                                                            : 'No aces hit -- ace pot rolls over to next round.'}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
+                            ) : (
+                                /* No-pot summary fallback */
+                                <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3 space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-400">Players</span>
+                                        <span className="text-white font-medium">{players.length}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm border-t border-slate-700/50 pt-2 mt-2">
+                                        <span className="text-slate-400">Leader</span>
+                                        <span className="text-amber-400 font-medium">
+                                            {sortedPlayers[0]?.name || '-'}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Warning */}
                             <div className="flex items-start space-x-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
@@ -1099,7 +1440,7 @@ export const Scorecard: React.FC = () => {
                                             <span>Sending...</span>
                                         </span>
                                     ) : (
-                                        'Finalize & Pay'
+                                        totalPot > 0 ? 'Finalize & Pay' : 'Finalize'
                                     )}
                                 </Button>
                             </div>
