@@ -2749,14 +2749,6 @@ export const Wallet: React.FC = () => {
                     if (action === 'lightning-explainer') { setHelpModal(null); setReturnToWalletHelp(false); setShowLightningExplainer(true); }
                 }} />}
 
-                {/* Funding Guide - step-by-step Cash App / Strike / Other */}
-                {showFundingGuide && (
-                    <FundingGuide
-                        lightningAddress={receiveAddress}
-                        onClose={() => setShowFundingGuide(false)}
-                    />
-                )}
-
                 {/* Fund Modal also available from receive view */}
                 {showFundModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowFundModal(false)}>
@@ -4081,6 +4073,14 @@ export const Wallet: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Funding Guide - step-by-step Cash App / Strike / Other */}
+            {showFundingGuide && (
+                <FundingGuide
+                    lightningAddress={receiveAddress}
+                    onClose={() => setShowFundingGuide(false)}
+                />
             )}
 
             {/* Fund Wallet Modal */}

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icons } from './Icons';
+import { isBreezInitialized, createOnchainAddress } from '../services/breezService';
 
 interface FundingGuideProps {
   lightningAddress: string;
@@ -7,11 +8,39 @@ interface FundingGuideProps {
   onClose: () => void;
 }
 
-type FundingTab = 'cashapp' | 'strike' | 'other';
+type FundingTab = 'cashapp' | 'strike' | 'exchange';
 
 export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, amountNeeded, onClose }) => {
   const [activeTab, setActiveTab] = useState<FundingTab>('cashapp');
   const [copied, setCopied] = useState(false);
+  const [copiedBtc, setCopiedBtc] = useState(false);
+
+  // On-chain address state
+  const [btcAddress, setBtcAddress] = useState<string | null>(null);
+  const [btcFee, setBtcFee] = useState<number>(0);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
+
+  const breezAvailable = isBreezInitialized();
+
+  // Generate on-chain address when Exchange tab is selected
+  useEffect(() => {
+    if (activeTab === 'exchange' && breezAvailable && !btcAddress && !isLoadingAddress) {
+      setIsLoadingAddress(true);
+      setAddressError(null);
+      createOnchainAddress()
+        .then(result => {
+          if (result) {
+            setBtcAddress(result.address);
+            setBtcFee(result.feeSats);
+          } else {
+            setAddressError('Could not generate address. Please try again.');
+          }
+        })
+        .catch(() => setAddressError('Failed to generate address.'))
+        .finally(() => setIsLoadingAddress(false));
+    }
+  }, [activeTab, breezAvailable, btcAddress, isLoadingAddress]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(lightningAddress).catch(() => {});
@@ -19,9 +48,26 @@ export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, am
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleCopyBtc = () => {
+    if (!btcAddress) return;
+    navigator.clipboard.writeText(btcAddress).catch(() => {});
+    setCopiedBtc(true);
+    setTimeout(() => setCopiedBtc(false), 2000);
+  };
+
   const truncatedAddress = lightningAddress.length > 28
     ? lightningAddress.substring(0, 14) + '...' + lightningAddress.substring(lightningAddress.length - 14)
     : lightningAddress;
+
+  const truncatedBtc = btcAddress
+    ? btcAddress.length > 28
+      ? btcAddress.substring(0, 14) + '...' + btcAddress.substring(btcAddress.length - 14)
+      : btcAddress
+    : '';
+
+  // Show address section based on active tab
+  const showLightningAddress = activeTab !== 'exchange';
+  const showBtcAddress = activeTab === 'exchange' && breezAvailable;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
@@ -69,16 +115,18 @@ export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, am
           >
             Strike
           </button>
-          <button
-            onClick={() => setActiveTab('other')}
-            className={`flex-1 py-2.5 text-xs font-bold transition-all ${
-              activeTab === 'other'
-                ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-500/5'
-                : 'text-slate-400 hover:text-slate-300'
-            }`}
-          >
-            Other
-          </button>
+          {breezAvailable && (
+            <button
+              onClick={() => setActiveTab('exchange')}
+              className={`flex-1 py-2.5 text-xs font-bold transition-all ${
+                activeTab === 'exchange'
+                  ? 'text-orange-400 border-b-2 border-orange-400 bg-orange-500/5'
+                  : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              Coinbase & More
+            </button>
+          )}
         </div>
 
         {/* Content */}
@@ -152,61 +200,109 @@ export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, am
             </div>
           )}
 
-          {/* Other Wallets Guide */}
-          {activeTab === 'other' && (
+          {/* Exchange / Coinbase Guide */}
+          {activeTab === 'exchange' && (
             <div className="space-y-3">
               <p className="text-xs text-slate-400">
-                Any Lightning-compatible wallet works. Here's the general flow:
+                Have Bitcoin on an exchange? Send it directly to your wallet. Works with Coinbase, Robinhood, Kraken, Gemini, or any exchange.
               </p>
 
               <div className="space-y-2">
-                <Step number={1} color="purple-400">
-                  Open your Lightning wallet app
+                <Step number={1} color="orange-400">
+                  Open your exchange app (Coinbase, Robinhood, etc.) and find <span className="font-bold text-white">Send</span> or <span className="font-bold text-white">Withdraw</span>
                 </Step>
-                <Step number={2} color="purple-400">
-                  Find <span className="font-bold text-white">Send</span> or <span className="font-bold text-white">Pay</span>
+                <Step number={2} color="orange-400">
+                  Select <span className="font-bold text-white">Bitcoin</span> as the asset
                 </Step>
-                <Step number={3} color="purple-400">
-                  Paste the Lightning Address below (or scan from the Wallet tab)
+                <Step number={3} color="orange-400">
+                  Copy the deposit address below and paste it as the destination
                 </Step>
-                <Step number={4} color="purple-400">
-                  Enter the amount and confirm
+                <Step number={4} color="orange-400">
+                  Enter the amount and confirm the withdrawal
                 </Step>
               </div>
 
-              <div className="space-y-2 pt-1">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Popular Lightning wallets</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <WalletPill name="Phoenix" url="https://phoenix.acinq.co" />
-                  <WalletPill name="Muun" url="https://muun.com" />
-                  <WalletPill name="Zeus" url="https://zeusln.com" />
-                  <WalletPill name="Blink" url="https://blink.sv" />
+              {/* Timing note */}
+              <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3">
+                <div className="flex items-start space-x-2">
+                  <Icons.Zap size={14} className="text-orange-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs text-orange-200/90 leading-snug">
+                      <span className="font-bold">Arrives in 10-30 minutes</span> (Bitcoin network confirmation). Load up for the season — we recommend $10 or more.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Lightning Address - Always Visible */}
-          <div className="mt-4 pt-3 border-t border-slate-700/50">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Your Lightning Address</p>
-            <button
-              onClick={handleCopy}
-              className={`w-full p-3 rounded-xl border transition-all flex items-center justify-between ${
-                copied
-                  ? 'bg-emerald-500/10 border-emerald-500/30'
-                  : 'bg-slate-800/80 border-slate-700 hover:border-slate-600'
-              }`}
-            >
-              <span className={`text-xs font-mono ${copied ? 'text-emerald-400' : 'text-slate-300'}`}>
-                {copied ? 'Copied!' : truncatedAddress}
-              </span>
-              {copied ? (
-                <Icons.CheckMark size={16} className="text-emerald-400" />
-              ) : (
-                <Icons.Copy size={16} className="text-slate-400" />
+          {/* Lightning Address - visible on Cash App / Strike tabs */}
+          {showLightningAddress && (
+            <div className="mt-4 pt-3 border-t border-slate-700/50">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Your Lightning Address</p>
+              <button
+                onClick={handleCopy}
+                className={`w-full p-3 rounded-xl border transition-all flex items-center justify-between ${
+                  copied
+                    ? 'bg-emerald-500/10 border-emerald-500/30'
+                    : 'bg-slate-800/80 border-slate-700 hover:border-slate-600'
+                }`}
+              >
+                <span className={`text-xs font-mono ${copied ? 'text-emerald-400' : 'text-slate-300'}`}>
+                  {copied ? 'Copied!' : truncatedAddress}
+                </span>
+                {copied ? (
+                  <Icons.CheckMark size={16} className="text-emerald-400" />
+                ) : (
+                  <Icons.Copy size={16} className="text-slate-400" />
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Bitcoin Address - visible on Exchange tab */}
+          {showBtcAddress && (
+            <div className="mt-4 pt-3 border-t border-slate-700/50">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Your Bitcoin Deposit Address</p>
+              {isLoadingAddress ? (
+                <div className="w-full p-3 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center space-x-2">
+                  <Icons.Zap size={14} className="text-orange-400 animate-bounce" />
+                  <span className="text-xs text-slate-400">Generating address...</span>
+                </div>
+              ) : addressError ? (
+                <div className="w-full p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center">
+                  <p className="text-xs text-red-300">{addressError}</p>
+                  <button
+                    onClick={() => { setBtcAddress(null); setAddressError(null); }}
+                    className="text-xs text-red-400 underline mt-1"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : btcAddress ? (
+                <button
+                  onClick={handleCopyBtc}
+                  className={`w-full p-3 rounded-xl border transition-all flex items-center justify-between ${
+                    copiedBtc
+                      ? 'bg-orange-500/10 border-orange-500/30'
+                      : 'bg-slate-800/80 border-slate-700 hover:border-slate-600'
+                  }`}
+                >
+                  <span className={`text-xs font-mono ${copiedBtc ? 'text-orange-400' : 'text-slate-300'}`}>
+                    {copiedBtc ? 'Copied!' : truncatedBtc}
+                  </span>
+                  {copiedBtc ? (
+                    <Icons.CheckMark size={16} className="text-orange-400" />
+                  ) : (
+                    <Icons.Copy size={16} className="text-slate-400" />
+                  )}
+                </button>
+              ) : null}
+              {btcFee > 0 && btcAddress && (
+                <p className="text-[10px] text-slate-500 mt-1.5 text-center">Swap fee: ~{btcFee.toLocaleString()} sats</p>
               )}
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -228,7 +324,7 @@ export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, am
 const stepColors: Record<string, { bg: string; text: string }> = {
   '[#00D64F]': { bg: 'bg-[#00D64F]/20', text: 'text-[#00D64F]' },
   'blue-400': { bg: 'bg-blue-400/20', text: 'text-blue-400' },
-  'purple-400': { bg: 'bg-purple-400/20', text: 'text-purple-400' },
+  'orange-400': { bg: 'bg-orange-400/20', text: 'text-orange-400' },
 };
 
 const Step: React.FC<{ number: number; color: string; children: React.ReactNode }> = ({ number, color, children }) => {
@@ -259,16 +355,5 @@ const DownloadLink: React.FC<{ name: string; color: string; url: string; note: s
       </div>
       <Icons.Next size={16} className="text-slate-500 group-hover:text-slate-300 transition-colors" />
     </div>
-  </a>
-);
-
-const WalletPill: React.FC<{ name: string; url: string }> = ({ name, url }) => (
-  <a
-    href={url}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="flex items-center justify-center py-2 px-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-xs text-slate-300 font-medium hover:border-purple-500/30 hover:text-purple-300 transition-colors"
-  >
-    {name}
   </a>
 );

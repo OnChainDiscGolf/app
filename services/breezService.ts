@@ -639,6 +639,46 @@ export const createInvoice = async (
 };
 
 // ============================================================================
+// ON-CHAIN BITCOIN RECEIVE (via Breez submarine swap)
+// ============================================================================
+
+/**
+ * Generate a Bitcoin address for receiving on-chain payments.
+ * Breez handles the submarine swap automatically — the user sends BTC
+ * to this address, Breez converts it to Lightning, and it lands in
+ * the wallet balance.
+ *
+ * @returns Object with bitcoin address and fee, or null on failure
+ */
+export const createOnchainAddress = async (): Promise<{
+    address: string;
+    feeSats: number;
+} | null> => {
+    if (!isInitialized || !sdkInstance) {
+        console.warn('Breez SDK not initialized — cannot generate on-chain address');
+        return null;
+    }
+
+    try {
+        console.log('🔗 Generating on-chain Bitcoin receive address via Breez...');
+
+        const response = await sdkInstance.receivePayment({
+            paymentMethod: { type: 'bitcoinAddress' }
+        });
+
+        const address = response.paymentRequest;
+        const feeSats = Number(response.fee) / 1000; // fee is in msats
+
+        console.log(`✅ On-chain address generated: ${address} (swap fee: ${feeSats} sats)`);
+
+        return { address, feeSats };
+    } catch (error) {
+        console.error('Failed to generate on-chain address:', error);
+        return null;
+    }
+};
+
+// ============================================================================
 // SENDING PAYMENTS
 // ============================================================================
 
