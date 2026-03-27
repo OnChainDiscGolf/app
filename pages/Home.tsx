@@ -1793,7 +1793,7 @@ export const Home: React.FC = () => {
 
                                 return (
                                     <div key={p.pubkey} className="bg-slate-800 rounded-xl p-3 border border-slate-700">
-                                        <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-center justify-between gap-3">
                                             {/* Player Info */}
                                             <div className="flex items-center space-x-2 min-w-0 flex-1">
                                                 <span className="font-bold text-sm text-slate-500 w-5">{idx + 1}</span>
@@ -1811,42 +1811,18 @@ export const Home: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Handicap Controls - shown only when enabled */}
-                                            {handicapEnabled && (
-                                                <div className="flex items-center space-x-1 mr-1 shrink-0">
-                                                    <button
-                                                        onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.max(-3, (prev[p.pubkey] || 0) - 1) }))}
-                                                        className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
-                                                    >
-                                                        -
-                                                    </button>
-                                                    <div className="w-8 h-6 flex items-center justify-center bg-slate-900 border border-slate-600 rounded text-xs font-bold text-white">
-                                                        {playerHandicaps[p.pubkey] || 0}
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.min(3, (prev[p.pubkey] || 0) + 1) }))}
-                                                        className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
-                                                    >
-                                                        +
-                                                    </button>
-                                                </div>
-                                            )}
-
                                             {/* Payment Status */}
                                             <div className="flex items-center gap-2 shrink-0">
-                                                {/* Payment Status Icon */}
                                                 {hasEntryFee && owesAnything && (
                                                     <button
                                                         onClick={() => openPaymentModal(p)}
                                                         className="relative shrink-0"
                                                     >
                                                         {isPaid ? (
-                                                            // Green checkmark - static
                                                             <div className="w-8 h-8 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
                                                                 <Icons.CheckMark size={16} className="text-green-500" strokeWidth={3} />
                                                             </div>
                                                         ) : (
-                                                            // Red glowing dollar sign - payment due
                                                             <div className="w-8 h-8 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center animate-pulse">
                                                                 <Icons.Dollar size={14} className="text-red-500" strokeWidth={3} />
                                                             </div>
@@ -1855,6 +1831,36 @@ export const Home: React.FC = () => {
                                                 )}
                                             </div>
                                         </div>
+
+                                        {/* Handicap Controls - separate row below player info */}
+                                        {handicapEnabled && (
+                                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/50">
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Handicap</span>
+                                                <div className="flex items-center space-x-2">
+                                                    <button
+                                                        onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.max(-3, (prev[p.pubkey] || 0) - 1) }))}
+                                                        className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-500 rounded-lg text-white text-sm font-bold transition-colors"
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <div className={`w-10 h-8 flex items-center justify-center rounded-lg text-sm font-bold border ${
+                                                        (playerHandicaps[p.pubkey] || 0) > 0
+                                                            ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                                                            : (playerHandicaps[p.pubkey] || 0) < 0
+                                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                                                : 'bg-slate-900 border-slate-600 text-white'
+                                                    }`}>
+                                                        {(playerHandicaps[p.pubkey] || 0) > 0 ? '+' : ''}{playerHandicaps[p.pubkey] || 0}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.min(3, (prev[p.pubkey] || 0) + 1) }))}
+                                                        className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-500 rounded-lg text-white text-sm font-bold transition-colors"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
