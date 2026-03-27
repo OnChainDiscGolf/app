@@ -79,4 +79,4 @@ hooks/                # useQrScanner, useSwipeBack
 - No test suite exists
 - KeypairAnimations.tsx (1641 lines) sits in root - appears to be a standalone animation demo
 - Breez SDK requires WASM - custom Vite plugin handles copying/serving the .wasm file
-- The Breez API key (PEM cert) is in constants.ts - should be moved to env vars
+- The Breez API key (PEM cert) is loaded from `VITE_BREEZ_API_KEY` env var (see `.env.example`)

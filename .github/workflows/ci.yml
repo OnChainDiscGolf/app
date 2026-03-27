@@ -25,12 +25,13 @@ jobs:
       
       - name: Type check
         run: npm run typecheck
-        continue-on-error: true  # TODO: Fix type errors and remove this
-      
+
       - name: Lint
         run: npm run lint
-        continue-on-error: true  # TODO: Fix lint errors and remove this
+        continue-on-error: true  # TODO: Fix remaining lint warnings and remove this
       
       - name: Build
         run: npm run build
+        env:
+          VITE_BREEZ_API_KEY: ${{ secrets.VITE_BREEZ_API_KEY }}
 

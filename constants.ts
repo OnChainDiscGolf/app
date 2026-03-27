@@ -35,34 +35,10 @@ export const MOCK_QR_CODE = "lnurl1dp68gurn8ghj7um5v93kketj9ehx2amn9uh8wetvdskkk
 // ============================================================================
 
 /**
- * ⚠️ BREEZ SDK API KEY - HANDLE WITH CARE ⚠️
- * 
+ * Breez SDK API Key — loaded from VITE_BREEZ_API_KEY environment variable.
+ *
  * This is a PEM-encoded X.509 certificate used to authenticate with Breez services.
- * 
- * KEY INFORMATION:
- * - Organization: On-Chain Disc Golf
- * - Common Name: Garrett
- * - Valid: November 2025 - November 2035 (10 years)
- * - Network: MAINNET (production Bitcoin)
- * - Email: garrett@onchaindiscgolf.com
- * 
- * SECURITY NOTES:
- * - This key is tied to our Breez account and usage quotas
- * - Do NOT share this key publicly or commit to public repos
- * - If compromised, contact Breez to revoke and reissue
- * - The key grants access to Lightning Network operations
- * 
- * REPLACEMENT:
- * - If you need a new key, request from Breez: https://breez.technology/
- * - New keys must be in the same PEM certificate format
- * - Test thoroughly on testnet before mainnet deployment
- * 
- * USAGE:
- * - Imported in AppContext.tsx for SDK initialization
- * - Passed to breezService.initializeBreez() via config object
- * 
- * FORMAT:
- * - Base64-encoded DER certificate
- * - Must be passed as a single string (no line breaks in usage)
+ * Set it in your .env file (see .env.example). If missing, Breez wallet features
+ * will not initialize.
  */
-export const BREEZ_API_KEY = `MIIBfjCCATCgAwIBAgIHPq/TyrHw+TAFBgMrZXAwEDEOMAwGA1UEAxMFQnJlZXowHhcNMjUxMTMwMDQzNDMyWhcNMzUxMTI4MDQzNDMyWjAvMRswGQYDVQQKExJPbi1DaGFpbiBEaXNjIEdvbGYxEDAOBgNVBAMTB0dhcnJldHQwKjAFBgMrZXADIQDQg/XL3yA8HKIgyimHU/Qbpxy0tvzris1fDUtEs6ldd6OBiTCBhjAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH/BAIwADAdBgNVHQ4EFgQU2jmj7l5rSw0yVb/vlWAYkK/YBwkwHwYDVR0jBBgwFoAU3qrWklbzjed0khb8TLYgsmsomGswJgYDVR0RBB8wHYEbZ2FycmV0dEBvbmNoYWluZGlzY2dvbGYuY29tMAUGAytlcANBAKY87D8Nt1GXnfEStgYX3VGHXwAkMuS7CSs7XrdKllzF5iQfutyaiYipD6hjZih87Q2VQxIixsCUSr5dHNgyrg4=`;
+export const BREEZ_API_KEY = import.meta.env.VITE_BREEZ_API_KEY || '';
