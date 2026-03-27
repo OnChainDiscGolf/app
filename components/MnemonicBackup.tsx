@@ -167,13 +167,28 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                     </div>
 
                     {showWords && (
-                        <button
-                            onClick={() => setShowWords(false)}
-                            className="mt-2 w-full py-1.5 flex items-center justify-center space-x-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors"
-                        >
-                            <Icons.EyeOff className="text-slate-400" size={14} />
-                            <span className="text-slate-400 text-xs">Hide words</span>
-                        </button>
+                        <>
+                            <button
+                                onClick={() => setShowWords(false)}
+                                className="mt-2 w-full py-1.5 flex items-center justify-center space-x-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors"
+                            >
+                                <Icons.EyeOff className="text-slate-400" size={14} />
+                                <span className="text-slate-400 text-xs">Hide words</span>
+                            </button>
+
+                            {/* Manual write-down confirmation */}
+                            <label className="mt-3 flex items-start space-x-3 cursor-pointer group">
+                                <input
+                                    type="checkbox"
+                                    checked={hasBackedUp}
+                                    onChange={(e) => setHasBackedUp(e.target.checked)}
+                                    className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-brand-primary focus:ring-brand-primary/50 cursor-pointer"
+                                />
+                                <span className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors">
+                                    I've written down or saved my recovery phrase
+                                </span>
+                            </label>
+                        </>
                     )}
                 </div>
             </div>
