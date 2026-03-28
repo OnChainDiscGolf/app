@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Icons } from './Icons';
 import { Button } from './Button';
 import { Player } from '../types';
+import { publishNote } from '../services/nostrService';
 
 interface PayoutInfo {
     playerName: string;
@@ -45,12 +46,15 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
     par,
     isProcessingPayments = false
 }) => {
+    const [isSharing, setIsSharing] = useState(false);
+    const [shared, setShared] = useState(false);
+
     if (!isOpen) return null;
 
     const winner = standings[0];
     const hasAces = aceWinners.length > 0;
     const hasPayouts = totalPot > 0;
-    
+
     // Calculate total strokes for each player (sum of all hole scores)
     const getTotalStrokes = (player: Player): number => {
         return Object.values(player.scores || {}).reduce((sum, score) => sum + score, 0);
@@ -60,6 +64,50 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
     const getPlayerPayout = (playerName: string): number => {
         const payout = payouts.find(p => p.playerName === playerName);
         return payout?.amount || 0;
+    };
+
+    // Build and publish a Nostr note with round results
+    const handleShareToNostr = async () => {
+        setIsSharing(true);
+        try {
+            const lines: string[] = [];
+            lines.push(`Disc golf round complete! ${roundName}`);
+            lines.push('');
+
+            // Standings
+            standings.forEach((p, idx) => {
+                const strokes = getTotalStrokes(p);
+                const scoreInfo = formatScore(strokes, par);
+                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+                const payout = getPlayerPayout(p.name);
+                const payoutStr = payout > 0 ? ` (+${payout.toLocaleString()} sats)` : '';
+                lines.push(`${medal} ${p.name}: ${scoreInfo.diff} (${strokes})${payoutStr}`);
+            });
+
+            // Aces
+            if (hasAces) {
+                lines.push('');
+                aceWinners.forEach(ace => {
+                    lines.push(`🎯 Ace by ${ace.name} on hole ${ace.hole}!`);
+                });
+            }
+
+            // Pot info
+            if (totalPot > 0) {
+                lines.push('');
+                lines.push(`💰 Pot: ${totalPot.toLocaleString()} sats`);
+            }
+
+            lines.push('');
+            lines.push('⛓️ Scored & settled on-chain with #ChainLinks');
+
+            await publishNote(lines.join('\n'));
+            setShared(true);
+        } catch (e) {
+            console.error('Failed to share to Nostr:', e);
+        } finally {
+            setIsSharing(false);
+        }
     };
 
     return (
@@ -208,7 +256,35 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
                 </div>
 
                 {/* Fixed Footer */}
-                <div className="p-4 border-t border-slate-700/50 shrink-0">
+                <div className="p-4 border-t border-slate-700/50 shrink-0 space-y-2">
+                    {!isProcessingPayments && (
+                        <button
+                            onClick={handleShareToNostr}
+                            disabled={isSharing || shared}
+                            className={`w-full py-2.5 rounded-xl text-sm font-bold border transition-all flex items-center justify-center space-x-2 ${
+                                shared
+                                    ? 'bg-purple-500/20 border-purple-500/40 text-purple-400'
+                                    : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-purple-500/30 hover:text-purple-300'
+                            }`}
+                        >
+                            {shared ? (
+                                <>
+                                    <Icons.CheckMark size={16} />
+                                    <span>Shared to Nostr!</span>
+                                </>
+                            ) : isSharing ? (
+                                <>
+                                    <Icons.Zap size={16} className="animate-bounce" />
+                                    <span>Sharing...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Icons.Share size={16} />
+                                    <span>Share Results to Nostr</span>
+                                </>
+                            )}
+                        </button>
+                    )}
                     <Button fullWidth onClick={() => { onClose(); onDone?.(); }} variant="primary">
                         Done
                     </Button>

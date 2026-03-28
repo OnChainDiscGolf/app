@@ -820,6 +820,25 @@ export const publishRound = async (round: RoundSettings) => {
     return event;
 };
 
+/**
+ * Publish a Kind 1 text note to Nostr (for sharing round results, etc.)
+ */
+export const publishNote = async (content: string, tags?: string[][]): Promise<Event> => {
+    const event = await signEventWrapper({
+        kind: 1,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+            ['t', 'discgolf'],
+            ['client', 'ChainLinks'],
+            ...(tags || [])
+        ],
+        content,
+    });
+
+    await promiseAny(pool.publish(getRelays(), event));
+    return event;
+};
+
 export const publishScore = async (roundId: string, scores: Record<number, number>, totalScore: number) => {
     const content = JSON.stringify({
         scores,
