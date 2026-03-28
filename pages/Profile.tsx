@@ -8,6 +8,7 @@ import { FeedbackModal, FeedbackButton } from '../components/FeedbackModal';
 import { getSession, getRelays, addRelay, removeRelay, resetRelays, uploadProfileImage, getMagicLightningAddress } from '../services/nostrService';
 import { retrieveMnemonicEncrypted } from '../services/mnemonicService';
 import { downloadWalletCardPDF } from '../services/backupService';
+import { useDenomination, Denomination } from '../hooks/useDenomination';
 import { nip19 } from 'nostr-tools';
 import { bytesToHex } from '@noble/hashes/utils';
 import { DiscGolfBasketLoader } from '../components/DiscGolfBasketLoader';
@@ -20,6 +21,7 @@ export const Profile: React.FC = () => {
     } = useApp();
 
     const navigate = useNavigate();
+    const { denomination, setDenomination } = useDenomination();
 
     // Auth View States
     const [authView, setAuthView] = useState<'login' | 'create'>('create');
@@ -638,6 +640,50 @@ export const Profile: React.FC = () => {
                 </div>
 
                 <div className="space-y-4 pb-24">
+                    {/* Display Currency */}
+                    <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl border border-emerald-500/20 overflow-hidden">
+                        <div className="flex items-center justify-between p-4">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-9 h-9 bg-emerald-500/20 rounded-lg flex items-center justify-center border border-emerald-500/30">
+                                    <Icons.Zap size={18} className="text-emerald-400" />
+                                </div>
+                                <div className="text-left">
+                                    <span className="font-bold text-white block">Display Currency</span>
+                                    <span className="text-[10px] text-slate-500">How amounts are shown across the app</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="border-t border-emerald-500/10 p-4 bg-black/20">
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={() => setDenomination('sats')}
+                                    className={`py-3 px-4 rounded-xl text-sm font-bold border transition-all ${
+                                        denomination === 'sats'
+                                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                            : 'bg-slate-800/50 text-slate-400 border-slate-700 hover:border-slate-600'
+                                    }`}
+                                >
+                                    <div className="text-lg mb-0.5">₿</div>
+                                    Sats
+                                </button>
+                                <button
+                                    onClick={() => setDenomination('usd')}
+                                    className={`py-3 px-4 rounded-xl text-sm font-bold border transition-all ${
+                                        denomination === 'usd'
+                                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                            : 'bg-slate-800/50 text-slate-400 border-slate-700 hover:border-slate-600'
+                                    }`}
+                                >
+                                    <div className="text-lg mb-0.5">$</div>
+                                    USD
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-slate-500 text-center mt-2">
+                                {denomination === 'usd' ? 'Prices update every 5 minutes via mempool.space' : 'Showing native Bitcoin denomination'}
+                            </p>
+                        </div>
+                    </div>
+
                     {/* Nostr Relays - Purple theme */}
                     <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl border border-purple-500/20 overflow-hidden">
                         <button

@@ -7,11 +7,13 @@ import { Icons } from '../components/Icons';
 import { DEFAULT_PAR, DEFAULT_HOLE_COUNT } from '../constants';
 import { useNavigate } from 'react-router-dom';
 import { calculatePayouts } from '../utils/payoutCalculations';
+import { useDenomination } from '../hooks/useDenomination';
 
 export const Scorecard: React.FC = () => {
     const { activeRound, players, updateScore, publishCurrentScores, finalizeRound, isAuthenticated, userProfile, currentUserPubkey } = useApp();
     const { setActiveRound } = useRound();
     const navigate = useNavigate();
+    const { formatAmount } = useDenomination();
 
     const isHost = activeRound?.pubkey === currentUserPubkey;
 
@@ -1057,13 +1059,13 @@ export const Scorecard: React.FC = () => {
                                         {entryPot > 0 && (
                                             <div className={`bg-black/30 rounded-xl px-2 py-1 border border-orange-500/20 ${minWidth} text-center`}>
                                                 <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider leading-none">Entry</p>
-                                                <p className="text-sm font-bold text-orange-400 leading-tight">{entryPot.toLocaleString()}</p>
+                                                <p className="text-sm font-bold text-orange-400 leading-tight">{formatAmount(entryPot, { compact: true })}</p>
                                             </div>
                                         )}
                                         {acePot > 0 && (
                                             <div className={`bg-black/30 rounded-xl px-2 py-1 border border-emerald-500/20 ${minWidth} text-center`}>
                                                 <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider leading-none">Ace</p>
-                                                <p className="text-sm font-bold text-emerald-400 leading-tight">{acePot.toLocaleString()}</p>
+                                                <p className="text-sm font-bold text-emerald-400 leading-tight">{formatAmount(acePot, { compact: true })}</p>
                                             </div>
                                         )}
                                     </>

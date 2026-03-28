@@ -11,6 +11,7 @@ import { InfoModal } from '../components/InfoModal';
 import { FeedbackModal, FeedbackButton } from '../components/FeedbackModal';
 import { GuidedTour, TourStep, useTourStatus } from '../components/GuidedTour';
 import { FundingGuide } from '../components/FundingGuide';
+import { useDenomination } from '../hooks/useDenomination';
 import { useNavigate } from 'react-router-dom';
 import { getPool, getRelays, listEvents, lookupUser, lookupByPDGA, publishProfileWithKey, getMagicLightningAddress, updateContactList } from '../services/nostrService';
 import { NOSTR_KIND_ROUND, DisplayProfile } from '../types';
@@ -73,6 +74,7 @@ const clearRoundCreationState = () => {
 export const Home: React.FC = () => {
     const { activeRound, players, createRound, joinRoundAndPay, recentPlayers, contacts, userProfile, resetRound, isAuthenticated, isGuest, currentUserPubkey, addRecentPlayer, depositFunds, checkDepositStatus, confirmDeposit, sendFunds, walletBalance, walletBalances, refreshAllBalances, isBalanceLoading } = useApp();
     const navigate = useNavigate();
+    const { formatAmount } = useDenomination();
 
     // Local UI state for the creation wizard
     const [view, setView] = useState<'menu' | 'setup' | 'select_players' | 'customize' | 'scan_player' | 'settings'>('menu');
@@ -957,7 +959,7 @@ export const Home: React.FC = () => {
 
         if (walletBalance < totalAmount) {
             const shortfall = totalAmount - walletBalance;
-            setPaymentError(`Insufficient balance. Need ${shortfall.toLocaleString()} more sats.`);
+            setPaymentError(`Insufficient balance. Need ${formatAmount(shortfall)} more.`);
             return;
         }
 
@@ -1000,7 +1002,7 @@ export const Home: React.FC = () => {
         // Double-check balance
         if (walletBalance < totalAmount) {
             const shortfall = totalAmount - walletBalance;
-            setPaymentError(`Insufficient balance. Need ${shortfall.toLocaleString()} more sats.`);
+            setPaymentError(`Insufficient balance. Need ${formatAmount(shortfall)} more.`);
             return;
         }
 
@@ -1531,7 +1533,7 @@ export const Home: React.FC = () => {
                                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Pot</h3>
                                     </div>
                                     <div className="text-2xl font-bold text-white">
-                                        {(totalEntryPot + totalAcePot).toLocaleString()} <span className="text-sm text-slate-400">sats</span>
+                                        {formatAmount(totalEntryPot + totalAcePot)}
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
@@ -2008,8 +2010,8 @@ export const Home: React.FC = () => {
 
                                         {/* Amount Display - Moved BEFORE QR Code */}
                                         <div>
-                                            <p className="text-2xl font-bold text-brand-accent">{entryFee + acePot} SATS</p>
-                                            <p className="text-xs text-slate-500">Entry: {entryFee} | Ace Pot: {acePot}</p>
+                                            <p className="text-2xl font-bold text-brand-accent">{formatAmount(entryFee + acePot)}</p>
+                                            <p className="text-xs text-slate-500">Entry: {formatAmount(entryFee)} | Ace Pot: {formatAmount(acePot)}</p>
                                         </div>
 
                                         {/* Inline Copy Invoice */}
@@ -2061,7 +2063,7 @@ export const Home: React.FC = () => {
                                                 disabled={isPayingWallet}
                                             >
                                                 <div className="flex items-center justify-center space-x-2">
-                                                    <span>{isPayingWallet ? 'Processing...' : `Pay ${(entryFee + acePot).toLocaleString()} SATS with App Wallet`}</span>
+                                                    <span>{isPayingWallet ? 'Processing...' : `Pay ${formatAmount(entryFee + acePot)} with App Wallet`}</span>
                                                     <Icons.Wallet size={18} />
                                                 </div>
                                             </Button>
@@ -3650,7 +3652,7 @@ export const Home: React.FC = () => {
                             }}
                         />
                         <span className={`text-sm font-bold text-white ${isBalanceLoading ? 'balance-shimmer' : ''}`}>
-                            {totalWalletBalance.toLocaleString()} Sats
+                            {formatAmount(totalWalletBalance)}
                         </span>
                     </div>
                 </button>
