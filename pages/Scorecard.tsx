@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { useRound } from '../context/RoundContext';
 import { Button } from '../components/Button';
 import { Icons } from '../components/Icons';
 import { DEFAULT_PAR, DEFAULT_HOLE_COUNT } from '../constants';
@@ -9,6 +10,7 @@ import { calculatePayouts } from '../utils/payoutCalculations';
 
 export const Scorecard: React.FC = () => {
     const { activeRound, players, updateScore, publishCurrentScores, finalizeRound, isAuthenticated, userProfile, currentUserPubkey } = useApp();
+    const { setActiveRound } = useRound();
     const navigate = useNavigate();
 
     const isHost = activeRound?.pubkey === currentUserPubkey;
@@ -20,7 +22,9 @@ export const Scorecard: React.FC = () => {
     const [showConfirmFinalize, setShowConfirmFinalize] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
-    const [aceAnimation, setAceAnimation] = useState<string | null>(null); // Track which player just got an ace
+    const [aceAnimation, setAceAnimation] = useState<string | null>(null);
+    const [showHelpModal, setShowHelpModal] = useState(false);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
 
     // Calculate pots based on granular payment selections
     const entryPayers = players.filter(p => p.paysEntry);
@@ -1070,10 +1074,10 @@ export const Scorecard: React.FC = () => {
                     
                     {/* Right: Help & Settings */}
                     <div className="flex items-center space-x-1">
-                        <button className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+                        <button onClick={() => setShowHelpModal(true)} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
                             <Icons.Help size={18} />
                         </button>
-                        <button className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+                        <button onClick={() => setShowSettingsModal(true)} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
                             <Icons.Settings size={18} />
                         </button>
                     </div>
@@ -1253,6 +1257,190 @@ export const Scorecard: React.FC = () => {
 
             {/* Fixed spacer for BottomNav */}
             <div className="h-16"></div>
+
+            {/* Help Modal */}
+            {showHelpModal && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowHelpModal(false)}>
+                    <div className="bg-slate-900 border-t border-slate-700 rounded-t-2xl w-full max-w-md shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[70vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        {/* Handle */}
+                        <div className="flex justify-center pt-3 pb-1">
+                            <div className="w-10 h-1 bg-slate-700 rounded-full" />
+                        </div>
+
+                        <div className="px-5 pb-6 space-y-4">
+                            <h3 className="text-lg font-bold text-white text-center">Scoring Guide</h3>
+
+                            {/* Score Colors */}
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Score Colors</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="flex items-center space-x-2 bg-slate-800/50 rounded-lg p-2">
+                                        <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/50 flex items-center justify-center">
+                                            <span className="text-xs font-bold text-amber-300">1</span>
+                                        </div>
+                                        <span className="text-xs text-slate-300">Ace (hole-in-one)</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2 bg-slate-800/50 rounded-lg p-2">
+                                        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                                            <span className="text-xs font-bold text-emerald-400">2</span>
+                                        </div>
+                                        <span className="text-xs text-slate-300">Under par (birdie)</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2 bg-slate-800/50 rounded-lg p-2">
+                                        <div className="w-7 h-7 rounded-lg bg-slate-700/50 border border-slate-600 flex items-center justify-center">
+                                            <span className="text-xs font-bold text-white">3</span>
+                                        </div>
+                                        <span className="text-xs text-slate-300">Par</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2 bg-slate-800/50 rounded-lg p-2">
+                                        <div className="w-7 h-7 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center justify-center">
+                                            <span className="text-xs font-bold text-rose-400">4+</span>
+                                        </div>
+                                        <span className="text-xs text-slate-300">Over par (bogey+)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* How to Score */}
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">How to Score</p>
+                                <div className="bg-slate-800/50 rounded-xl p-3 space-y-2">
+                                    <p className="text-xs text-slate-300"><span className="text-white font-bold">Tap +/-</span> to adjust a player's score for the current hole.</p>
+                                    <p className="text-xs text-slate-300"><span className="text-white font-bold">First tap</span> defaults to par ({DEFAULT_PAR}). Adjust from there.</p>
+                                    <p className="text-xs text-slate-300"><span className="text-white font-bold">Tap the hole pills</span> at the bottom to jump to any hole.</p>
+                                </div>
+                            </div>
+
+                            {/* Standings */}
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Standings</p>
+                                <div className="bg-slate-800/50 rounded-xl p-3 space-y-2">
+                                    <p className="text-xs text-slate-300"><span className="text-emerald-400 font-bold">E</span> = even par. <span className="text-emerald-400 font-bold">-2</span> = 2 under. <span className="text-rose-400 font-bold">+3</span> = 3 over.</p>
+                                    <p className="text-xs text-slate-300">Lower is better. The leader has the lowest score relative to par.</p>
+                                </div>
+                            </div>
+
+                            {/* Honor System */}
+                            {activeRound?.useHonorSystem && (
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Honor System</p>
+                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
+                                        <p className="text-xs text-slate-300">Players are sorted by their previous hole score. Best score throws first.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Pot Info */}
+                            {(entryPot > 0 || acePot > 0) && (
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pot</p>
+                                    <div className="bg-slate-800/50 rounded-xl p-3 space-y-1">
+                                        {entryPot > 0 && <p className="text-xs text-slate-300">Entry pot: <span className="text-orange-400 font-bold">{entryPot.toLocaleString()} sats</span></p>}
+                                        {acePot > 0 && <p className="text-xs text-slate-300">Ace pot: <span className="text-emerald-400 font-bold">{acePot.toLocaleString()} sats</span></p>}
+                                        <p className="text-xs text-slate-300">Payouts are distributed automatically when the round is finalized.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <button onClick={() => setShowHelpModal(false)} className="w-full py-2.5 text-sm font-medium text-slate-400 hover:text-white transition-colors">
+                                Got it
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Settings Modal */}
+            {showSettingsModal && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowSettingsModal(false)}>
+                    <div className="bg-slate-900 border-t border-slate-700 rounded-t-2xl w-full max-w-md shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[70vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        {/* Handle */}
+                        <div className="flex justify-center pt-3 pb-1">
+                            <div className="w-10 h-1 bg-slate-700 rounded-full" />
+                        </div>
+
+                        <div className="px-5 pb-6 space-y-4">
+                            <h3 className="text-lg font-bold text-white text-center">Round Settings</h3>
+
+                            {/* Round Info */}
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Round Info</p>
+                                <div className="bg-slate-800/50 rounded-xl p-3 space-y-2">
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-400">Course</span>
+                                        <span className="text-white font-medium">{activeRound?.courseName || 'Unknown'}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-400">Holes</span>
+                                        <span className="text-white font-medium">{activeRound?.holeCount || 18}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-400">Par</span>
+                                        <span className="text-white font-medium">{activeRound?.par || (activeRound?.holeCount || 18) * 3}</span>
+                                    </div>
+                                    {activeRound?.startingHole && activeRound.startingHole > 1 && (
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-slate-400">Starting Hole</span>
+                                            <span className="text-white font-medium">{activeRound.startingHole}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-400">Players</span>
+                                        <span className="text-white font-medium">{players.length}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Toggles - Host only */}
+                            {isHost && (
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Display</p>
+                                    <div className="bg-slate-800/50 rounded-xl divide-y divide-slate-700/50">
+                                        {/* Hide Overall Score */}
+                                        <div className="flex items-center justify-between p-3">
+                                            <div>
+                                                <p className="text-sm text-white font-medium">Hide Overall Score</p>
+                                                <p className="text-[10px] text-slate-500">Players only see per-hole scores, not standings</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setActiveRound(prev => prev ? { ...prev, hideOverallScore: !prev.hideOverallScore } : null)}
+                                                className={`w-11 h-6 rounded-full p-0.5 transition-colors duration-300 ${activeRound?.hideOverallScore ? 'bg-emerald-500' : 'bg-slate-700'}`}
+                                            >
+                                                <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${activeRound?.hideOverallScore ? 'translate-x-5' : 'translate-x-0'}`} />
+                                            </button>
+                                        </div>
+
+                                        {/* Honor System */}
+                                        <div className="flex items-center justify-between p-3">
+                                            <div>
+                                                <p className="text-sm text-white font-medium">Honor System</p>
+                                                <p className="text-[10px] text-slate-500">Best score on previous hole throws first</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setActiveRound(prev => prev ? { ...prev, useHonorSystem: !prev.useHonorSystem } : null)}
+                                                className={`w-11 h-6 rounded-full p-0.5 transition-colors duration-300 ${activeRound?.useHonorSystem ? 'bg-emerald-500' : 'bg-slate-700'}`}
+                                            >
+                                                <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${activeRound?.useHonorSystem ? 'translate-x-5' : 'translate-x-0'}`} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Non-host read-only note */}
+                            {!isHost && (
+                                <div className="bg-slate-800/50 rounded-xl p-3">
+                                    <p className="text-xs text-slate-400 text-center">Only the round host can change settings.</p>
+                                </div>
+                            )}
+
+                            <button onClick={() => setShowSettingsModal(false)} className="w-full py-2.5 text-sm font-medium text-slate-400 hover:text-white transition-colors">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Confirm Finalize Modal */}
             {showConfirmFinalize && (
