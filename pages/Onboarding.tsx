@@ -76,6 +76,24 @@ export const Onboarding: React.FC = () => {
         }
     };
 
+    const handleQuickStart = () => {
+        setError('');
+
+        try {
+            // Generate identity silently
+            generateIdentity();
+
+            // Set a default profile name
+            setProfileData({ name: 'Disc Golfer' });
+
+            // Skip profile setup and backup — go straight to finalization
+            navigate('/finalization');
+        } catch (e) {
+            console.error('Quick start failed:', e);
+            setError('Failed to create account. Please try again.');
+        }
+    };
+
     const handleProfileSetupComplete = () => {
         // After profile setup, go to mnemonic backup
         setStep('backup');
@@ -184,6 +202,15 @@ export const Onboarding: React.FC = () => {
                         >
                             <span>Get Started</span>
                             <Icons.Next size={18} />
+                        </button>
+
+                        {/* Quick Start */}
+                        <button
+                            onClick={handleQuickStart}
+                            className="w-full py-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold rounded-xl hover:bg-emerald-500/20 transition-colors flex items-center justify-center space-x-2 mb-3"
+                        >
+                            <Icons.Play size={16} />
+                            <span>Just Keep Score</span>
                         </button>
 
                         {/* Secondary */}
