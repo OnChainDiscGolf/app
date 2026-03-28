@@ -1514,7 +1514,7 @@ export const Home: React.FC = () => {
                                     : 'text-slate-400 hover:text-white border border-transparent'
                             }`}
                         >
-                            Settings
+                            Round Settings
                         </button>
                     </div>
 
@@ -1902,7 +1902,7 @@ export const Home: React.FC = () => {
                     </>)}
 
                     {/* === ADVANCED TAB: Player list with handicap controls === */}
-                    {customizeTab === 'settings' && (
+                    {customizeTab === 'settings' && handicapEnabled && (
                     <div className="flex-1 overflow-y-auto space-y-3">
                         <div className="space-y-3">
                             {allPlayers.map((p, idx) => {
@@ -1910,7 +1910,7 @@ export const Home: React.FC = () => {
 
                                 return (
                                     <div key={p.pubkey} className="bg-slate-800 rounded-xl p-3 border border-slate-700">
-                                        <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-center justify-between gap-3">
                                             {/* Player Info */}
                                             <div className="flex items-center space-x-2 min-w-0 flex-1">
                                                 <span className="font-bold text-sm text-slate-500 w-5">{idx + 1}</span>
@@ -1922,26 +1922,30 @@ export const Home: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Handicap Controls - shown only when enabled */}
-                                            {handicapEnabled && (
-                                                <div className="flex items-center space-x-1 mr-1 shrink-0">
-                                                    <button
-                                                        onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.max(-3, (prev[p.pubkey] || 0) - 1) }))}
-                                                        className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
-                                                    >
-                                                        -
-                                                    </button>
-                                                    <div className="w-8 h-6 flex items-center justify-center bg-slate-900 border border-slate-600 rounded text-xs font-bold text-white">
-                                                        {playerHandicaps[p.pubkey] || 0}
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.min(3, (prev[p.pubkey] || 0) + 1) }))}
-                                                        className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-xs font-bold"
-                                                    >
-                                                        +
-                                                    </button>
+                                            {/* Handicap Controls */}
+                                            <div className="flex items-center space-x-2 shrink-0">
+                                                <button
+                                                    onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.max(-3, (prev[p.pubkey] || 0) - 1) }))}
+                                                    className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-500 rounded-lg text-white text-sm font-bold transition-colors"
+                                                >
+                                                    -
+                                                </button>
+                                                <div className={`w-10 h-8 flex items-center justify-center rounded-lg text-sm font-bold border ${
+                                                    (playerHandicaps[p.pubkey] || 0) > 0
+                                                        ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                                                        : (playerHandicaps[p.pubkey] || 0) < 0
+                                                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                                            : 'bg-slate-900 border-slate-600 text-white'
+                                                }`}>
+                                                    {(playerHandicaps[p.pubkey] || 0) > 0 ? '+' : ''}{playerHandicaps[p.pubkey] || 0}
                                                 </div>
-                                            )}
+                                                <button
+                                                    onClick={() => setPlayerHandicaps(prev => ({ ...prev, [p.pubkey]: Math.min(3, (prev[p.pubkey] || 0) + 1) }))}
+                                                    className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 active:bg-slate-500 rounded-lg text-white text-sm font-bold transition-colors"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 );
