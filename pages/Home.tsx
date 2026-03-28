@@ -2929,6 +2929,47 @@ export const Home: React.FC = () => {
 
                 <div className="flex-1 flex flex-col space-y-2.5 min-h-0">
 
+                    {/* Course Name Section */}
+                    <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-xl p-3.5 border border-white/10 backdrop-blur-sm">
+                        <div className="flex items-center text-slate-400 space-x-2 mb-2">
+                            <div className="w-6 h-6 bg-emerald-500/15 rounded-md flex items-center justify-center">
+                                <Icons.Location size={14} className="text-emerald-400/80" />
+                            </div>
+                            <span className="text-xs font-bold uppercase tracking-wider">Course</span>
+                        </div>
+
+                        <input
+                            type="text"
+                            value={courseName}
+                            onChange={(e) => setCourseName(e.target.value)}
+                            placeholder="Enter course name..."
+                            className="w-full bg-black/30 border border-white/10 rounded-lg p-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all placeholder:text-slate-600"
+                        />
+
+                        {/* Recent courses - show when input is empty or matches */}
+                        {recentCourses.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                {recentCourses
+                                    .filter(c => !courseName || c.toLowerCase().includes(courseName.toLowerCase()))
+                                    .slice(0, 5)
+                                    .map(c => (
+                                        <button
+                                            key={c}
+                                            onClick={() => setCourseName(c)}
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                                                courseName === c
+                                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                                    : 'bg-slate-800/50 text-slate-400 border-slate-700 hover:border-slate-600 hover:text-white'
+                                            }`}
+                                        >
+                                            {c}
+                                        </button>
+                                    ))
+                                }
+                            </div>
+                        )}
+                    </div>
+
                     {/* Holes Section - Compact */}
                     <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-xl p-3.5 border border-white/10 backdrop-blur-sm">
                         <div className="flex items-center text-slate-400 space-x-2 mb-2">
