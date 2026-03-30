@@ -1,16 +1,25 @@
 /**
- * Payment Router Service
- * 
- * Smart payout routing for round settlements.
- * 
- * Priority Order:
- * 1. Check recipient's kind 0 for lud16 (Lightning address)
- * 2. If no lud16 → Fallback to npub@npub.cash
- * 3. If Lightning payment fails → Send Cashu via Gift Wrap DM
- * 
- * Future Integration:
- * - When Breez SDK is active, use it as primary payment method
- * - Breez provides more reliable payments with better routing
+ * @fileoverview Payment Router Service -- Smart 4-tier payment routing for round settlements.
+ *
+ * Implements a cascading payment strategy that tries multiple methods to ensure
+ * payouts reach recipients regardless of their wallet setup:
+ *
+ * **Priority Order:**
+ * 1. **Breez SDK** (self-custodial Lightning) -- If initialized with sufficient balance
+ * 2. **LNURL via lud16** -- Resolve recipient's Kind 0 profile Lightning address
+ * 3. **npub.cash fallback** -- Use `npub@npubx.cash` if no lud16 in profile
+ * 4. **Cashu DM** -- Send eCash token via NIP-17 Gift Wrap as last resort
+ *
+ * The router also provides:
+ * - LNURL resolution (independent of Breez SDK)
+ * - Bolt11 invoice generation from LNURL callbacks
+ * - Batch payout processing with progress callbacks
+ * - Lightning address validation
+ * - Payment method display formatting
+ *
+ * @see breezService.ts -- Tier 1: Self-custodial Lightning
+ * @see walletService.ts -- Tier 2/3: Cashu melt for LNURL/npub.cash invoices
+ * @see giftWrapService.ts -- Tier 4: Cashu token via encrypted DM
  */
 
 import { fetchProfile, sendGiftWrap, getMagicLightningAddress } from './nostrService';
@@ -111,17 +120,27 @@ export const getInvoiceFromLnurl = async (
 // TYPES
 // =============================================================================
 
+/** Result of a payment attempt, including which method succeeded or why it failed */
 export interface PaymentResult {
+    /** Whether the payment was successfully delivered */
     success: boolean;
+    /** Which payment method was used (or 'failed' if all methods exhausted) */
     method: 'breez' | 'lnurl' | 'npubcash' | 'cashu_dm' | 'failed';
+    /** Transaction ID or payment hash (if available) */
     txId?: string;
+    /** Routing fee paid in satoshis (if available) */
     feeSats?: number;
+    /** Error message if payment failed */
     error?: string;
 }
 
+/** A recipient in a batch payout (e.g., round settlement) */
 export interface PayoutRecipient {
+    /** Recipient's Nostr public key (hex) */
     pubkey: string;
+    /** Amount to pay in satoshis */
     amountSats: number;
+    /** Display name for logging/UI */
     name?: string;
 }
 
@@ -286,7 +305,7 @@ const sendCashuViaDm = async (
             type: 'cashu_payment',
             amount: amountSats,
             token: cashuToken,
-            message: `You received ${amountSats} sats from a ChainLinks round!`
+            message: `You received ${amountSats} sats from an On-Chain Disc Golf round!`
         });
 
         await sendGiftWrap(recipientPubkey, message);
@@ -337,7 +356,7 @@ export const routePayment = async (
         const breezResult = await payViaBreez(
             address,
             recipient.amountSats,
-            `ChainLinks payout to ${recipient.name || 'player'}`
+            `On-Chain Disc Golf payout to ${recipient.name || 'player'}`
         );
 
         if (breezResult.success) {
@@ -352,7 +371,7 @@ export const routePayment = async (
     const invoice = await resolveAndGetInvoice(
         address,
         recipient.amountSats,
-        `ChainLinks payout`
+        `On-Chain Disc Golf payout`
     );
 
     if (invoice) {

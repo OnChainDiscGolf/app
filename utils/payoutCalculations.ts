@@ -1,6 +1,37 @@
+/**
+ * @file payoutCalculations.ts
+ * @description Payout distribution algorithms for disc golf round prize pools.
+ *
+ * Supports two distribution strategies:
+ * - **Top-heavy**: Winner gets a disproportionately large share, using
+ *   hardcoded ratios for 2-5 players and a harmonic decay formula
+ *   `weight = 1 / (rank + 1)` for larger groups.
+ * - **Linear**: Equal step-down distribution using weights `numWinners - rank`,
+ *   producing a straight-line gradient favoring top positions.
+ *
+ * The main entry point is {@link calculatePayouts} which sorts players by
+ * score, determines the number of winners from a percentage threshold,
+ * and distributes the pot using the chosen gradient. Rounding loss is
+ * given to the last-place winner.
+ */
+
 import { Player, PayoutConfig } from '../types';
 
-// Helper to generate top-heavy distribution percentages
+/**
+ * Generate top-heavy payout distribution percentages.
+ *
+ * For 2-5 winners, returns hardcoded ratios that give the winner 50-75% of
+ * the pot. For larger groups, uses harmonic decay: `weight(rank) = 1 / (rank + 1)`,
+ * normalized so all weights sum to 1.0.
+ *
+ * @param numWinners - Number of players receiving payouts.
+ * @returns Array of percentages (summing to ~1.0) ordered by rank (index 0 = 1st place).
+ *
+ * @example
+ * ```ts
+ * getTopHeavyDistribution(3) // [0.60, 0.25, 0.15]
+ * ```
+ */
 export function getTopHeavyDistribution(numWinners: number): number[] {
   if (numWinners <= 1) return [1.0];
 
@@ -30,8 +61,21 @@ export function getTopHeavyDistribution(numWinners: number): number[] {
   return weights.map(w => w / totalWeight);
 }
 
-// Helper to generate linear (flat but steep) distribution percentages
-// This creates a LINEAR gradient rather than exponential, but still favors top positions
+/**
+ * Generate linear payout distribution percentages.
+ *
+ * Each position receives a linearly decreasing weight: `weight(rank) = numWinners - rank`.
+ * For 3 winners, weights are [3, 2, 1], producing percentages [50%, 33%, 17%].
+ * Still favors top positions but with a constant step-down rather than exponential decay.
+ *
+ * @param numWinners - Number of players receiving payouts.
+ * @returns Array of percentages (summing to ~1.0) ordered by rank (index 0 = 1st place).
+ *
+ * @example
+ * ```ts
+ * getLinearDistribution(3) // [0.5, 0.333, 0.167]
+ * ```
+ */
 export function getLinearDistribution(numWinners: number): number[] {
   if (numWinners <= 1) return [1.0];
 
@@ -53,7 +97,26 @@ export function getLinearDistribution(numWinners: number): number[] {
   return weights.map(w => w / totalWeight);
 }
 
-// Helper function to calculate payout distribution based on configuration
+/**
+ * Calculate the payout distribution for a finished round.
+ *
+ * Players are sorted by `totalScore` ascending (lowest score wins in disc golf).
+ * The number of paid positions is determined by `config.percentageThreshold`
+ * (default 30%), meaning the top 30% of players split the pot. If no config
+ * is provided or `totalPot` is zero, the winner takes all.
+ *
+ * Distribution modes:
+ * - `'winner-take-all'` - First place gets everything.
+ * - `'top-heavy'` - Uses {@link getTopHeavyDistribution} percentages.
+ * - Any other (linear) - Equal per-winner share.
+ *
+ * Rounding loss from `Math.floor()` is absorbed by the last-place winner.
+ *
+ * @param players - Array of players with `id` and `totalScore`.
+ * @param totalPot - Total prize pool in sats.
+ * @param config - Optional payout configuration (mode, gradient, threshold).
+ * @returns A Map from player ID to payout amount in sats.
+ */
 export function calculatePayouts(
   players: Player[],
   totalPot: number,

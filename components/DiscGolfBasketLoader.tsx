@@ -1,5 +1,22 @@
+/**
+ * @file DiscGolfBasketLoader.tsx
+ * @description Animated loading indicator shaped like a disc golf basket.
+ * Displayed while the app syncs the user's profile from Nostr relays.
+ * The basket tray fills with an animated gradient to convey progress.
+ */
+
 import React from 'react';
 
+/**
+ * SVG-based disc golf basket loading animation.
+ *
+ * Renders a detailed disc golf basket illustration with an animated fill
+ * effect inside the catching tray, accompanied by "Syncing Profile..." and
+ * "Fetching from Nostr relays" text. Used as the loading state during
+ * initial profile hydration.
+ *
+ * @returns The basket loader UI with animation.
+ */
 export const DiscGolfBasketLoader: React.FC = () => {
     return (
         <div className="flex flex-col items-center">

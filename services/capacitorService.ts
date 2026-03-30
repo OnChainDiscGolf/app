@@ -1,8 +1,22 @@
 /**
- * Capacitor Service
- * 
- * Centralized service for all Capacitor/native functionality.
- * Provides platform detection and graceful fallbacks for web/PWA.
+ * @fileoverview Capacitor Service -- Native platform bridge for iOS/Android.
+ *
+ * Centralizes all Capacitor plugin access behind a single service with
+ * graceful web/PWA fallbacks. Every function is a no-op on web unless
+ * a browser equivalent exists (e.g., visibilitychange for app state).
+ *
+ * Capabilities:
+ * - **Platform detection** -- isNative(), getPlatform(), isPluginAvailable()
+ * - **Deep links** -- nostrconnect://, custom schemes, universal links
+ * - **App lifecycle** -- foreground/background state changes
+ * - **Status bar** -- Dark style, custom background color
+ * - **Splash screen** -- Hide after initialization
+ * - **Haptics** -- Light/medium/heavy impact, success/warning/error patterns
+ * - **Local notifications** -- Payment received, round invite, etc.
+ * - **Browser** -- Open external URLs in system browser
+ * - **Keyboard** -- Hide keyboard, listen for show/hide events
+ *
+ * @see notificationService.ts -- Higher-level notification dispatch that uses this service
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -19,21 +33,28 @@ import { Keyboard } from '@capacitor/keyboard';
 // ==========================================
 
 /**
- * Check if running in a native Capacitor app (iOS/Android)
+ * Check if running in a native Capacitor app (iOS/Android).
+ *
+ * @returns True if running inside a native shell, false for web/PWA
  */
 export const isNative = (): boolean => {
   return Capacitor.isNativePlatform();
 };
 
 /**
- * Get the current platform
+ * Get the current runtime platform.
+ *
+ * @returns 'ios', 'android', or 'web'
  */
 export const getPlatform = (): 'ios' | 'android' | 'web' => {
   return Capacitor.getPlatform() as 'ios' | 'android' | 'web';
 };
 
 /**
- * Check if a specific plugin is available
+ * Check if a specific Capacitor plugin is available on this platform.
+ *
+ * @param pluginName - Plugin name (e.g., 'Camera', 'Haptics')
+ * @returns True if the plugin is registered and available
  */
 export const isPluginAvailable = (pluginName: string): boolean => {
   return Capacitor.isPluginAvailable(pluginName);
@@ -47,11 +68,25 @@ type DeepLinkHandler = (url: string) => void;
 let deepLinkListenerActive = false;
 
 /**
- * Initialize deep link handling for Nostr Connect (Amber) and custom schemes
+ * Initialize deep link handling for multiple URL schemes.
+ *
+ * Routes incoming URLs to the appropriate handler based on scheme:
+ * - `nostrconnect://` -- NIP-46 Amber signer connection
+ * - `on-chain-dg://` or `app.onchain.discgolf://` -- Custom app scheme
+ * - `https://` -- Universal/App Links (round/tournament join URLs)
+ *
+ * Handles both warm-start (app already running) and cold-start (launched via URL) cases.
+ * No-op on web.
+ *
+ * @param onNostrConnect - Handler for nostrconnect:// deep links
+ * @param onCustomScheme - Optional handler for custom scheme deep links
+ * @param onWebUrl - Optional handler for https:// universal links
+ * @returns Cleanup function to remove listeners
  */
 export const setupDeepLinkHandler = (
   onNostrConnect: DeepLinkHandler,
-  onCustomScheme?: DeepLinkHandler
+  onCustomScheme?: DeepLinkHandler,
+  onWebUrl?: DeepLinkHandler
 ): (() => void) => {
   if (!isNative() || deepLinkListenerActive) {
     return () => {}; // No-op cleanup for web
@@ -59,27 +94,27 @@ export const setupDeepLinkHandler = (
 
   deepLinkListenerActive = true;
 
-  // Handle deep links when app is already running
-  const urlOpenListener = App.addListener('appUrlOpen', (event: URLOpenListenerEvent) => {
-    const url = event.url;
-    console.log('📱 Deep link received:', url);
-
+  const routeUrl = (url: string) => {
     if (url.startsWith('nostrconnect://')) {
       onNostrConnect(url);
-    } else if (url.startsWith('on-chain-dg://')) {
+    } else if (url.startsWith('on-chain-dg://') || url.startsWith('app.onchain.discgolf://')) {
       onCustomScheme?.(url);
+    } else if (url.startsWith('https://')) {
+      onWebUrl?.(url);
     }
+  };
+
+  // Handle deep links when app is already running
+  const urlOpenListener = App.addListener('appUrlOpen', (event: URLOpenListenerEvent) => {
+    console.log('📱 Deep link received:', event.url);
+    routeUrl(event.url);
   });
 
   // Check for deep link on cold start
   App.getLaunchUrl().then((result) => {
     if (result?.url) {
       console.log('📱 App launched with URL:', result.url);
-      if (result.url.startsWith('nostrconnect://')) {
-        onNostrConnect(result.url);
-      } else if (result.url.startsWith('on-chain-dg://')) {
-        onCustomScheme?.(result.url);
-      }
+      routeUrl(result.url);
     }
   });
 
@@ -91,7 +126,15 @@ export const setupDeepLinkHandler = (
 };
 
 /**
- * Listen for app state changes (foreground/background)
+ * Listen for app state changes (foreground/background).
+ *
+ * On native, uses Capacitor's appStateChange event. On web, falls back to
+ * the document visibilitychange API. Used to trigger wallet sync, relay
+ * reconnection, and action queue flush on resume.
+ *
+ * @param onResume - Called when the app comes to the foreground
+ * @param onPause - Called when the app goes to the background
+ * @returns Cleanup function to remove listeners
  */
 export const setupAppStateListener = (
   onResume: () => void,
@@ -126,7 +169,8 @@ export const setupAppStateListener = (
 // ==========================================
 
 /**
- * Configure the status bar for the app
+ * Configure the status bar with dark text style and slate background.
+ * Sets overlay to false so content is not obscured. No-op on web.
  */
 export const configureStatusBar = async (): Promise<void> => {
   if (!isNative()) return;
@@ -295,7 +339,11 @@ export const initializeNotifications = async (): Promise<boolean> => {
 };
 
 /**
- * Show a local notification
+ * Show a local notification on the device.
+ *
+ * @param title - Notification title
+ * @param body - Notification body text
+ * @param extra - Optional metadata (e.g., route for navigation on tap)
  */
 export const showLocalNotification = async (
   title: string,
@@ -325,7 +373,9 @@ export const showLocalNotification = async (
 };
 
 /**
- * Show a payment received notification
+ * Show a payment received notification with success haptic.
+ *
+ * @param amount - Amount received in satoshis
  */
 export const notifyPaymentReceived = async (amount: number): Promise<void> => {
   await showLocalNotification(
@@ -337,7 +387,10 @@ export const notifyPaymentReceived = async (amount: number): Promise<void> => {
 };
 
 /**
- * Show a round invite notification
+ * Show a round invitation notification with medium haptic.
+ *
+ * @param roundName - Name of the round
+ * @param hostName - Display name of the host who sent the invite
  */
 export const notifyRoundInvite = async (roundName: string, hostName: string): Promise<void> => {
   await showLocalNotification(
@@ -353,7 +406,11 @@ export const notifyRoundInvite = async (roundName: string, hostName: string): Pr
 // ==========================================
 
 /**
- * Open a URL in the system browser (not in-app)
+ * Open a URL in the system browser (not in-app webview).
+ *
+ * On native, uses the Capacitor Browser plugin. On web, opens a new tab.
+ *
+ * @param url - Full URL to open
  */
 export const openExternalUrl = async (url: string): Promise<void> => {
   if (isNative()) {
@@ -385,7 +442,14 @@ export const hideKeyboard = async (): Promise<void> => {
 };
 
 /**
- * Setup keyboard listeners for UI adjustments
+ * Set up keyboard show/hide listeners for native platforms.
+ *
+ * Used to adjust UI layout when the soft keyboard appears (e.g., scroll
+ * input into view, resize content area). No-op on web.
+ *
+ * @param onShow - Called with keyboard height when keyboard appears
+ * @param onHide - Called when keyboard is dismissed
+ * @returns Cleanup function to remove listeners
  */
 export const setupKeyboardListeners = (
   onShow: (keyboardHeight: number) => void,

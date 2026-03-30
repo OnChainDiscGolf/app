@@ -1,8 +1,26 @@
 /**
- * Amber Signer Service
- * 
- * NIP-46 remote signing integration for Amber (Android Nostr signer app)
- * Uses CLIENT-INITIATED connection flow with nostrconnect:// URI deep-linking
+ * @fileoverview Amber Signer Service -- NIP-46 remote signing via Android Amber app.
+ *
+ * Implements the CLIENT-INITIATED NIP-46 connection flow for delegating Nostr
+ * signing operations to the Amber app on Android. This allows users who already
+ * have a Nostr identity in Amber to use it with On-Chain Disc Golf without
+ * exposing their private key.
+ *
+ * Connection flow:
+ * 1. App generates an ephemeral keypair
+ * 2. App opens a `nostrconnect://` deep link to launch Amber
+ * 3. User approves the connection in Amber
+ * 4. App and Amber communicate via Kind 24133 events on a shared relay
+ * 5. All signing and encryption requests are sent to Amber via NIP-04 encrypted messages
+ *
+ * Supported NIP-46 methods:
+ * - `get_public_key` -- Retrieve the user's actual Nostr pubkey
+ * - `sign_event` -- Sign an arbitrary Nostr event template
+ * - `nip04_encrypt` / `nip04_decrypt` -- NIP-04 encryption/decryption
+ *
+ * @see https://github.com/nicklucas/amber -- Amber Android signer app
+ * @see NIP-46 https://github.com/nostr-protocol/nips/blob/master/46.md
+ * @see NIP-04 (used for NIP-46 message encryption between client and signer)
  */
 
 import { SimplePool, generateSecretKey, getPublicKey, finalizeEvent, nip04, Event } from 'nostr-tools';
@@ -16,9 +34,13 @@ const DEFAULT_AMBER_RELAY = 'wss://relay.damus.io';
 // Connection timeout (10 seconds)
 const CONNECTION_TIMEOUT_MS = 10000;
 
+/** Result of an Amber connection attempt */
 export interface AmberConnectionResult {
+    /** The user's actual Nostr public key (hex, from Amber) */
     userPubkey: string;
+    /** Ephemeral client secret key used for this NIP-46 session */
     ephemeralSk: Uint8Array;
+    /** Relay URL used for NIP-46 communication with Amber */
     relay: string;
 }
 
@@ -168,8 +190,16 @@ export const initializeAmberConnection = async (relay: string = DEFAULT_AMBER_RE
 };
 
 /**
- * Complete Amber connection flow for mobile/web
- * Handles the full connection lifecycle including return handling
+ * Complete Amber connection flow for mobile/web.
+ *
+ * Handles the full connection lifecycle including deep-link navigation
+ * and return handling. On mobile, redirects to Amber and stores connection
+ * state in sessionStorage for when the user returns. On desktop, opens a
+ * popup window and polls for completion.
+ *
+ * @param relay - Relay to use for NIP-46 communication (default: relay.damus.io)
+ * @returns Connection result with user pubkey, or throws on failure
+ * @throws {Error} If Amber connection fails, is cancelled, or times out (5 min)
  */
 export const connectWithAmber = async (
     relay: string = DEFAULT_AMBER_RELAY
@@ -251,7 +281,12 @@ export const connectWithAmber = async (
 };
 
 /**
- * Complete the Amber connection handshake (called when user returns from Amber)
+ * Complete the Amber connection handshake when the user returns to the app.
+ *
+ * Reads the pending connection attempt from sessionStorage, requests the
+ * user's public key from Amber via NIP-46, and stores the successful result.
+ *
+ * @returns Connection result if handshake succeeded, null if no pending connection or failure
  */
 export const completeAmberConnection = async (): Promise<AmberConnectionResult | null> => {
     try {
@@ -371,7 +406,9 @@ export const nip04DecryptWithAmber = async (
 };
 
 /**
- * Disconnect from Amber (cleanup localStorage)
+ * Disconnect from Amber by clearing all session-related localStorage keys.
+ *
+ * Should be called on logout to prevent stale Amber sessions.
  */
 export const disconnectAmber = (): void => {
     localStorage.removeItem('amber_ephemeral_sk');

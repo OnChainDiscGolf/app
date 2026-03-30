@@ -1,10 +1,37 @@
+/**
+ * @file Button.tsx
+ * @description Reusable button component with variant styling (primary,
+ * secondary, danger, ghost) and optional full-width mode. Extends native
+ * HTML button attributes.
+ */
+
 import React from 'react';
 
+/**
+ * Props for the {@link Button} component.
+ *
+ * @extends React.ButtonHTMLAttributes<HTMLButtonElement>
+ * @property variant - Visual style variant. Defaults to `'primary'`.
+ * @property fullWidth - Whether the button stretches to fill its container. Defaults to `false`.
+ */
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   fullWidth?: boolean;
 }
 
+/**
+ * Styled button component with four visual variants.
+ *
+ * - **primary** - Emerald green with shadow (default, used for CTAs)
+ * - **secondary** - Dark surface with border (used for secondary actions)
+ * - **danger** - Red (used for destructive actions)
+ * - **ghost** - Transparent with hover effect (used for subtle actions)
+ *
+ * Includes `active:scale-95` press feedback and disabled state handling.
+ *
+ * @param props - Standard button HTML attributes plus variant and fullWidth.
+ * @returns A styled `<button>` element.
+ */
 export const Button: React.FC<ButtonProps> = ({ 
   children, 
   variant = 'primary', 

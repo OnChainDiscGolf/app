@@ -1,3 +1,13 @@
+/**
+ * @file Icons.tsx
+ * @description Centralized icon registry for the app. Re-exports Lucide React
+ * icons under semantic aliases (e.g., `Trophy`, `Send`, `Back`) and defines
+ * custom SVG icons that match Lucide's style: Basket (disc golf basket),
+ * Android, IOSShare, SmirkFace, Bitcoin, and Cashew (Cashu wallet).
+ *
+ * Usage: `import { Icons } from './Icons';` then `<Icons.Wallet size={24} />`
+ */
+
 import React from 'react';
 import {
   Wallet,
@@ -45,10 +55,19 @@ import {
   Gem,
   Trophy as LucideTrophy,
   UsersRound,
-  Download
+  Download,
+  WifiOff,
+  Calendar
 } from 'lucide-react';
 
-// Custom Disc Golf Basket Icon matching Lucide style
+/**
+ * Custom disc golf basket SVG icon matching Lucide's stroke style.
+ * Used as the primary "Play" / trophy icon throughout the app.
+ *
+ * @param props.size - Icon width and height in pixels. Defaults to 24.
+ * @param props.className - Additional CSS classes.
+ * @param props.strokeWidth - SVG stroke width. Defaults to 1.5.
+ */
 const Basket = ({ size = 24, className = "", strokeWidth = 1.5 }: { size?: number, className?: string, strokeWidth?: number }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -80,7 +99,13 @@ const Basket = ({ size = 24, className = "", strokeWidth = 1.5 }: { size?: numbe
   </svg>
 );
 
-// Custom Android Icon for Amber app
+/**
+ * Custom Android robot SVG icon for Amber signer integration prompts.
+ *
+ * @param props.size - Icon width and height in pixels. Defaults to 24.
+ * @param props.className - Additional CSS classes.
+ * @param props.strokeWidth - SVG stroke width. Defaults to 2.
+ */
 const Android = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -115,7 +140,14 @@ const Android = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number
   </svg>
 );
 
-// Custom iOS Share Icon - Arrow pointing up from box
+/**
+ * Custom iOS-style share icon (arrow pointing up from a box).
+ * Used in PWA install prompts for iOS devices.
+ *
+ * @param props.size - Icon width and height in pixels. Defaults to 24.
+ * @param props.className - Additional CSS classes.
+ * @param props.strokeWidth - SVG stroke width. Defaults to 2.
+ */
 const IOSShare = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -140,7 +172,12 @@ const IOSShare = ({ size = 24, className = "", strokeWidth = 2 }: { size?: numbe
   </svg>
 );
 
-// Cheeky Smirk Face - for when the host keeps the pot!
+/**
+ * Custom smirking face SVG icon. Used humorously when the host keeps the pot.
+ *
+ * @param props.size - Icon width and height in pixels. Defaults to 24.
+ * @param props.className - Additional CSS classes.
+ */
 const SmirkFace = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -168,7 +205,13 @@ const SmirkFace = ({ size = 24, className = "" }: { size?: number, className?: s
   </svg>
 );
 
-// Custom Bitcoin Icon - Official ₿ symbol (original SVG from user, viewBox adjusted to center)
+/**
+ * Custom Bitcoin (₿) symbol SVG icon. Filled glyph based on the official Bitcoin logo.
+ *
+ * @param props.size - Icon width and height in pixels. Defaults to 24.
+ * @param props.className - Additional CSS classes.
+ * @param props.strokeWidth - Unused but accepted for API consistency with other icons.
+ */
 const Bitcoin = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -182,7 +225,14 @@ const Bitcoin = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number
   </svg>
 );
 
-// Custom Cashew Nut Icon - for Cashu wallet (scaled to match Lucide icon sizes)
+/**
+ * Custom cashew nut SVG icon representing the Cashu eCash wallet.
+ * Scaled and transformed to match Lucide icon sizing conventions.
+ *
+ * @param props.size - Icon width and height in pixels. Defaults to 24.
+ * @param props.className - Additional CSS classes.
+ * @param props.strokeWidth - SVG stroke width (scaled down internally). Defaults to 2.
+ */
 const Cashew = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number, className?: string, strokeWidth?: number }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -206,6 +256,10 @@ const Cashew = ({ size = 24, className = "", strokeWidth = 2 }: { size?: number,
   </svg>
 );
 
+/**
+ * Centralized icon registry mapping semantic names to Lucide and custom SVG icons.
+ * Import this object and use `Icons.Name` to render icons consistently across the app.
+ */
 export const Icons = {
   Trophy: Basket, // Basket icon for disc golf context
   TrophyMedal: LucideTrophy, // Actual trophy icon for wins
@@ -260,4 +314,6 @@ export const Icons = {
   Diamond: Gem,
   League: UsersRound,
   Download,
+  WifiOff,
+  Calendar,
 };

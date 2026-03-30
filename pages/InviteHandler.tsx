@@ -1,9 +1,33 @@
+/**
+ * @file InviteHandler.tsx
+ *
+ * Invite link handler -- processes URLs with an `nsec` query parameter to
+ * automatically log in a user with a pre-generated throwaway Nostr identity.
+ *
+ * Used by the "instant invite" feature: when a host generates a throwaway
+ * identity for a friend who doesn't have the app, they share an invite URL
+ * like `https://app.onchaindiscgolf.com/invite?nsec=nsec1...`.
+ *
+ * Flow:
+ * 1. Extracts `nsec` from query params.
+ * 2. Calls `loginNsec()` to authenticate with the throwaway key.
+ * 3. On success: shows a welcome screen with educational modals ("What is Nostr?",
+ *    "Why do I have a key?") and the nsec for the user to copy/save.
+ * 4. On error: shows an error message with a retry/home button.
+ * 5. Includes a 10-second timeout to prevent stuck processing states.
+ *
+ * Route: /invite?nsec=...
+ */
+
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import { Icons } from '../components/Icons';
 
+/**
+ * Invite handler page -- auto-login via nsec query parameter for throwaway identities.
+ */
 export const InviteHandler: React.FC = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -206,7 +230,7 @@ export const InviteHandler: React.FC = () => {
                             <button
                                 onClick={() => {
                                     console.log('[InviteHandler] Navigate to profile setup');
-                                    navigate('/profile-setup');
+                                    navigate('/profile-setup', { replace: true });
                                 }}
                                 className="w-full py-3 bg-brand-primary text-black font-bold rounded-xl hover:bg-brand-accent transition-all transform hover:scale-[1.02] shadow-lg shadow-brand-primary/20 flex items-center justify-center space-x-2"
                             >
@@ -228,7 +252,7 @@ export const InviteHandler: React.FC = () => {
                             <h2 className="text-xl font-bold text-white">Invite Failed</h2>
                             <p className="text-red-300 text-center px-4">{errorMessage}</p>
                             <button
-                                onClick={() => navigate('/')}
+                                onClick={() => navigate('/', { replace: true })}
                                 className="mt-4 px-6 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-bold transition-colors"
                             >
                                 Go Home

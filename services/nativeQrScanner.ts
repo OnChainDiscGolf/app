@@ -1,7 +1,18 @@
 /**
- * Native QR Scanner Service
- * Uses @capacitor-mlkit/barcode-scanning for native camera-based QR scanning
- * Falls back to web-based scanning when native is not available
+ * @fileoverview Native QR Scanner Service -- ML Kit barcode scanning with web fallback.
+ *
+ * Wraps @capacitor-mlkit/barcode-scanning to provide native camera-based QR
+ * scanning on Android/iOS. On web, scanning is handled elsewhere (html5-qrcode).
+ *
+ * Used for:
+ * - Scanning round/tournament join QR codes
+ * - Scanning Cashu tokens and Lightning invoices
+ * - Scanning npub/nsec for player lookup
+ *
+ * The scanner module is dynamically imported to avoid bundling ML Kit on web.
+ * Google Barcode Scanner module may need to be installed on newer Android devices.
+ *
+ * @see https://github.com/nicklucas/capacitor-mlkit
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -27,22 +38,31 @@ const initScanner = async () => {
     }
 };
 
+/** Result of a QR scan attempt */
 export interface ScanResult {
+    /** Whether a QR code was successfully read */
     success: boolean;
+    /** The decoded QR code data (URL, token, invoice, etc.) */
     data?: string;
+    /** Error message if the scan failed */
     error?: string;
+    /** True if the user cancelled the scan */
     cancelled?: boolean;
 }
 
 /**
- * Check if native scanning is supported
+ * Check if native scanning is supported on the current platform.
+ *
+ * @returns True if running in a native Capacitor shell (iOS/Android)
  */
 export const isNativeScanningSupported = (): boolean => {
     return Capacitor.isNativePlatform();
 };
 
 /**
- * Check if the scanner module is available
+ * Check if the ML Kit scanner module is loaded and hardware-supported.
+ *
+ * @returns True if native scanning can be used on this device
  */
 export const isScannerAvailable = async (): Promise<boolean> => {
     if (!isNativeScanningSupported()) return false;
@@ -60,7 +80,9 @@ export const isScannerAvailable = async (): Promise<boolean> => {
 };
 
 /**
- * Check and request camera permissions
+ * Check the current camera permission status without prompting the user.
+ *
+ * @returns Permission state: 'granted', 'denied', or 'prompt'
  */
 export const checkPermissions = async (): Promise<'granted' | 'denied' | 'prompt'> => {
     if (!isNativeScanningSupported()) return 'denied';
@@ -78,7 +100,9 @@ export const checkPermissions = async (): Promise<'granted' | 'denied' | 'prompt
 };
 
 /**
- * Request camera permissions
+ * Request camera permissions from the user via the OS permission dialog.
+ *
+ * @returns Resulting permission state after the prompt
  */
 export const requestPermissions = async (): Promise<'granted' | 'denied' | 'prompt'> => {
     if (!isNativeScanningSupported()) return 'denied';
@@ -96,8 +120,12 @@ export const requestPermissions = async (): Promise<'granted' | 'denied' | 'prom
 };
 
 /**
- * Start native QR code scanning
- * Returns a promise that resolves when a code is scanned or cancelled
+ * Start native QR code scanning using the rear camera.
+ *
+ * Opens the ML Kit scanner UI. Automatically requests camera permissions
+ * if not yet granted. Resolves when a QR code is scanned or the user cancels.
+ *
+ * @returns Scan result with decoded data, or error/cancellation info
  */
 export const startNativeScan = async (): Promise<ScanResult> => {
     if (!isNativeScanningSupported()) {
@@ -146,8 +174,12 @@ export const startNativeScan = async (): Promise<ScanResult> => {
 };
 
 /**
- * Check if Google Barcode Scanner module is available (Android only)
- * This is required for newer Android devices
+ * Check if the Google Barcode Scanner module is available (Android only).
+ *
+ * Required for newer Android devices that use Google Play Services for
+ * ML Kit barcode scanning. Returns true on iOS and web (not needed).
+ *
+ * @returns True if the module is available or not needed on this platform
  */
 export const isGoogleBarcodeScannerModuleAvailable = async (): Promise<boolean> => {
     if (!isNativeScanningSupported() || Capacitor.getPlatform() !== 'android') {
@@ -167,7 +199,11 @@ export const isGoogleBarcodeScannerModuleAvailable = async (): Promise<boolean> 
 };
 
 /**
- * Install Google Barcode Scanner module (Android only)
+ * Install the Google Barcode Scanner module via Google Play Services (Android only).
+ *
+ * This downloads the ML Kit model to the device. No-op on iOS and web.
+ *
+ * @returns True if installation succeeded or was not needed
  */
 export const installGoogleBarcodeScannerModule = async (): Promise<boolean> => {
     if (!isNativeScanningSupported() || Capacitor.getPlatform() !== 'android') {
@@ -187,7 +223,9 @@ export const installGoogleBarcodeScannerModule = async (): Promise<boolean> => {
 };
 
 /**
- * Open app settings (useful when permissions are permanently denied)
+ * Open the OS app settings page so the user can manually grant camera permission.
+ *
+ * Useful when camera permissions have been permanently denied.
  */
 export const openSettings = async (): Promise<void> => {
     try {

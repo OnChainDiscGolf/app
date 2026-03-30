@@ -1,5 +1,21 @@
+/**
+ * @file LightningStrike.tsx
+ * @description Full-screen animated lightning bolt effect that plays when
+ * the user receives sats. Intensity (bolt count, screen flash, shake, glow)
+ * scales with the payment amount across six tiers from "Spark" (<=100 sats)
+ * to "APOCALYPSE" (>50k sats). Bolts are procedurally generated SVG paths
+ * with randomized jaggedness, branching, and multi-wave timing.
+ */
+
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 
+/**
+ * Props for the {@link LightningStrikeNotification} component.
+ *
+ * @property amount - The sats amount received, used to determine visual intensity.
+ * @property onComplete - Callback invoked when the animation finishes.
+ * @property extendedDuration - Reserved for future use; not currently implemented.
+ */
 interface LightningStrikeProps {
     amount: number;
     onComplete: () => void;
@@ -26,6 +42,20 @@ interface IntensityConfig {
     label: string;
 }
 
+/**
+ * Determine the visual intensity configuration based on the sats amount.
+ *
+ * Tiers:
+ * - `minimal` (<=100 sats): Single bolt, no branches/shake
+ * - `low` (<=1000): 1-2 bolts, subtle flash
+ * - `medium` (<=5000): 2-4 bolts, moderate flash
+ * - `high` (<=10000): 4-7 bolts, branches, screen shake
+ * - `very-high` (<=50000): 6-10 bolts, multi-wave, shake
+ * - `massive` (>50000): 10-16 bolts, afterglow, max intensity
+ *
+ * @param amount - Sats amount received.
+ * @returns The intensity configuration for the animation.
+ */
 const getIntensityConfig = (amount: number): IntensityConfig => {
     if (amount <= 100) {
         return {
@@ -126,6 +156,19 @@ interface Bolt {
     wave: number; // 0, 1, or 2 for multi-wave
 }
 
+/**
+ * Generate a jagged SVG path string representing a lightning bolt between two points.
+ *
+ * Divides the line into random segments and offsets each point perpendicular
+ * to the main axis by a random amount controlled by `jaggedness`.
+ *
+ * @param startX - Starting X coordinate.
+ * @param startY - Starting Y coordinate.
+ * @param endX - Ending X coordinate.
+ * @param endY - Ending Y coordinate.
+ * @param jaggedness - Maximum perpendicular offset in pixels. Defaults to 80.
+ * @returns An SVG path `d` attribute string.
+ */
 const generateLightningPath = (
     startX: number,
     startY: number,
@@ -155,6 +198,13 @@ const generateLightningPath = (
     return path;
 };
 
+/**
+ * Generate a branch bolt path that forks off from a point along a parent bolt.
+ *
+ * @param parentPath - The parent bolt's SVG path string.
+ * @param branchPoint - Normalized position (0-1) along the parent path to branch from.
+ * @returns An SVG path `d` attribute string for the branch.
+ */
 const generateBranch = (
     parentPath: string,
     branchPoint: number // 0-1 along the path
@@ -185,6 +235,16 @@ const getRandomEdgePoint = (): { x: number; y: number } => {
     }
 };
 
+/**
+ * Generate an array of bolt objects based on the intensity configuration.
+ *
+ * Bolts originate from random viewport edges and converge toward the center.
+ * For multi-wave configurations, bolts are distributed across waves with
+ * staggered delays.
+ *
+ * @param config - The intensity configuration determining bolt count, width, and features.
+ * @returns An array of generated bolt objects with paths, delays, widths, and branches.
+ */
 const generateBolts = (config: IntensityConfig): Bolt[] => {
     const centerX = typeof window !== 'undefined' ? window.innerWidth / 2 : 200;
     const centerY = typeof window !== 'undefined' ? window.innerHeight / 2 : 400;
@@ -232,6 +292,17 @@ const generateBolts = (config: IntensityConfig): Bolt[] => {
 // COMPONENT
 // ============================================================================
 
+/**
+ * Full-screen lightning bolt animation overlay for incoming sats.
+ *
+ * Runs through four phases: flash -> show -> afterglow (optional) -> fade -> complete.
+ * Procedurally generates SVG bolt paths that animate in via CSS `stroke-dashoffset`.
+ * Intensity scales with the `amount` prop across six tiers. Uses a ref for the
+ * `onComplete` callback to prevent animation restarts on parent re-renders.
+ *
+ * @param props - {@link LightningStrikeProps}
+ * @returns The animation overlay, or `null` after the animation completes.
+ */
 export const LightningStrikeNotification: React.FC<LightningStrikeProps> = ({
     amount,
     onComplete,

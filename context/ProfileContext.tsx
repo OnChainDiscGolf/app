@@ -1,3 +1,22 @@
+/**
+ * @file ProfileContext.tsx
+ * @description Manages the authenticated user's Nostr profile (Kind 0), gameplay statistics,
+ * contact list (Kind 3), and recent players list (Kind 30078).
+ *
+ * On login, fetches the user's profile from Nostr relays (with localStorage fallback),
+ * loads the contact list, restores recent players from a Nostr backup, and computes
+ * aggregate stats from round history.
+ *
+ * @architecture Depends on AuthContext for `currentUserPubkey` and `isGuest`.
+ * Exposes raw state setters so AppContext can perform cross-cutting profile updates
+ * during account creation, onboarding finalization, and logout.
+ *
+ * **Effects:**
+ * - Effect 1: Persist recent players to localStorage
+ * - Effect 2: Auto-sync recent players to Nostr (debounced 2s)
+ * - Effect 3: Fetch profile, contacts, and recent players on login
+ */
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserProfile, UserStats, DisplayProfile } from '../types';
 import { publishProfile, fetchProfile, fetchUserHistory, fetchRecentPlayers, fetchContactList, fetchProfilesBatch, publishRecentPlayers, getMagicLightningAddress } from '../services/nostrService';
@@ -29,6 +48,23 @@ export interface ProfileContextType {
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
+/**
+ * ProfileProvider - Manages user profile, stats, contacts, and recent players.
+ *
+ * **State managed:**
+ * - `userProfile` - Nostr Kind 0 metadata (name, about, picture, lud16, nip05)
+ * - `userStats` - Aggregated gameplay statistics (rounds, wins, aces, sats won/paid)
+ * - `recentPlayers` - List of recently played-with users (up to 50)
+ * - `contacts` - User's Nostr Kind 3 contact list with resolved profiles
+ * - `isProfileLoading` - Loading state during initial profile fetch
+ *
+ * **Exposed actions:**
+ * - `updateUserProfile(profile)` - Save profile locally and publish to Nostr
+ * - `refreshStats()` - Recalculate stats from round history and transaction log
+ * - `addRecentPlayer(player)` - Add/promote a player in the recent players list
+ * - `initializeSubscriptions(pubkey)` - Log Lightning address on finalization
+ * - State setters for cross-cutting operations in AppContext
+ */
 export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isGuest, currentUserPubkey } = useAuth();
 
@@ -54,12 +90,16 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [contacts, setContacts] = useState<DisplayProfile[]>([]);
 
-  // Persist recent players to localStorage
+  // === Effect 1: Persist Recent Players to localStorage ===
+  // Keeps the local recent players cache in sync with state changes.
   useEffect(() => {
     localStorage.setItem('cdg_recent_players', JSON.stringify(recentPlayers));
   }, [recentPlayers]);
 
-  // Auto-sync recent players to Nostr (debounced 2s)
+  // === Effect 2: Auto-Sync Recent Players to Nostr (Debounced 2s) ===
+  // Publishes the recent players list to Nostr as a Kind 30078 event after a 2-second
+  // debounce. Skipped during initial profile loading to avoid overwriting remote data
+  // before it's been fetched and merged.
   useEffect(() => {
     if (isAuthenticated && !isGuest && !isProfileLoading && recentPlayers.length > 0) {
       const timer = setTimeout(() => {
@@ -69,7 +109,11 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [recentPlayers, isAuthenticated, isGuest, isProfileLoading]);
 
-  // refreshStats - reads transactions from localStorage
+  /**
+   * Recalculates user stats by fetching round history from Nostr and reading
+   * transactions from localStorage. Computes totals for rounds, wins, aces,
+   * birdies, bogey-free rounds, sats won/paid, and best score.
+   */
   const refreshStats = useCallback(async () => {
     if (!currentUserPubkey) return;
     try {
@@ -127,7 +171,11 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [currentUserPubkey]);
 
-  // Fetch profile, contacts, recent players on login
+  // === Effect 3: Fetch Profile, Contacts, and Recent Players on Login ===
+  // Triggered when `currentUserPubkey` changes (login/logout). Fetches the user's
+  // Kind 0 profile from Nostr (falls back to localStorage), loads the Kind 3 contact
+  // list with batch profile resolution, and restores remote recent players with
+  // deduplication against local cache.
   useEffect(() => {
     if (currentUserPubkey && !isGuest) {
       setIsProfileLoading(true);
@@ -178,6 +226,10 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [currentUserPubkey, isGuest]);
 
+  /**
+   * Update the user's profile locally and publish to Nostr relays.
+   * @param {UserProfile} profile - Updated profile data (name, about, picture, lud16, nip05)
+   */
   const updateUserProfile = async (profile: UserProfile) => {
     setUserProfile(profile);
     localStorage.setItem('cdg_user_profile', JSON.stringify(profile));
@@ -188,6 +240,11 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  /**
+   * Add or promote a player to the top of the recent players list.
+   * Deduplicates by pubkey and caps the list at 20 entries.
+   * @param {DisplayProfile} player - Player to add/promote
+   */
   const addRecentPlayer = (player: DisplayProfile) => {
     setRecentPlayers(prev => {
       const filtered = prev.filter(p => p.pubkey !== player.pubkey);
@@ -195,15 +252,29 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  /**
+   * Set user profile state and persist to localStorage.
+   * Used by AppContext during onboarding finalization.
+   * @param {UserProfile} profile - Profile data to set
+   */
   const setUserProfileState = useCallback((profile: UserProfile) => {
     setUserProfile(profile);
     localStorage.setItem('cdg_user_profile', JSON.stringify(profile));
   }, []);
 
+  /**
+   * Set contacts state with alphabetical sorting. Used by AppContext.
+   * @param {DisplayProfile[]} newContacts - Contacts to set
+   */
   const setContactsState = useCallback((newContacts: DisplayProfile[]) => {
     setContacts(newContacts.sort((a, b) => a.name.localeCompare(b.name)));
   }, []);
 
+  /**
+   * Merge new players into the recent players list with deduplication.
+   * Caps at 50 entries. Used by AppContext during finalization.
+   * @param {DisplayProfile[]} newPlayers - Players to merge in
+   */
   const setRecentPlayersState = useCallback((newPlayers: DisplayProfile[]) => {
     setRecentPlayers(prev => {
       const existingPubkeys = new Set(prev.map(p => p.pubkey));
@@ -212,6 +283,11 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
+  /**
+   * Log Lightning address and pubkey on subscription initialization.
+   * Actual subscriptions are handled by existing effects keyed on currentUserPubkey.
+   * @param {string} pubkey - User's public key to initialize for
+   */
   const initializeSubscriptions = useCallback((pubkey: string) => {
     const lightningAddress = getMagicLightningAddress(pubkey);
     console.log(`⚡ Your Lightning Address: ${lightningAddress}`);
@@ -248,6 +324,11 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 };
 
+/**
+ * Hook to access user profile, stats, contacts, and recent players.
+ * @returns {ProfileContextType} Profile state and actions.
+ * @throws {Error} If called outside of ProfileProvider.
+ */
 export const useProfile = (): ProfileContextType => {
   const context = useContext(ProfileContext);
   if (context === undefined) {

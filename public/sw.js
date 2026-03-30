@@ -1,4 +1,4 @@
-const CACHE_NAME = 'on-chain-v7';
+const CACHE_NAME = 'on-chain-v8';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -85,6 +85,50 @@ self.addEventListener('fetch', (event) => {
         }
         return fetch(event.request);
       })
+  );
+});
+
+// ==========================================
+// Push Notifications (Web Push API)
+// ==========================================
+
+self.addEventListener('push', (event) => {
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || 'On-Chain Disc Golf';
+  const options = {
+    body: data.body || '',
+    icon: '/icon.jpg',
+    badge: '/icon.jpg',
+    tag: data.type || 'general',
+    data: data,
+    vibrate: [200, 100, 200],
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const route = event.notification.data?.route || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Focus existing window if available
+      for (const client of clientList) {
+        if ('focus' in client) {
+          client.focus();
+          if (client.url !== route) {
+            client.navigate(route);
+          }
+          return;
+        }
+      }
+      // Otherwise open a new window
+      return clients.openWindow(route);
+    })
   );
 });
 

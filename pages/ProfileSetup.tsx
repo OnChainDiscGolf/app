@@ -1,3 +1,22 @@
+/**
+ * @file ProfileSetup.tsx
+ *
+ * Post-authentication profile setup page.
+ *
+ * Shown after a user creates an account or logs in for the first time.
+ * Allows setting a display name, uploading a profile picture (NIP-98 authenticated),
+ * and entering an optional PDGA number.
+ *
+ * Also displays the user's npub (public key) and nsec (private key) with
+ * copy-to-clipboard functionality and an educational "What are these?" modal
+ * explaining Nostr key concepts.
+ *
+ * If the user is still in guest mode, this page converts them to a full account
+ * before saving the profile and navigating to the scorecard or home.
+ *
+ * Route: /profile-setup
+ */
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -5,6 +24,9 @@ import { Icons } from '../components/Icons';
 import { nip19 } from 'nostr-tools';
 import { getSession, uploadProfileImage } from '../services/nostrService';
 
+/**
+ * Profile setup page -- set display name, avatar, and PDGA# after account creation.
+ */
 export const ProfileSetup: React.FC = () => {
     const { userProfile, updateUserProfile, currentUserPubkey, activeRound, createAccount, isGuest } = useApp();
     const [name, setName] = useState(userProfile.name || 'Disc Golfer');
@@ -70,7 +92,7 @@ export const ProfileSetup: React.FC = () => {
         });
 
         // Navigate to root - HomeOrOnboarding will show Home (Play tab) for authenticated users
-        navigate('/');
+        navigate('/', { replace: true });
     };
 
     return (

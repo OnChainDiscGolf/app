@@ -1,18 +1,58 @@
+/**
+ * @fileoverview NWC Service -- NIP-47 Nostr Wallet Connect bridge to external wallets.
+ *
+ * Implements the NIP-47 protocol for communicating with external Lightning wallets
+ * (e.g., Alby, Mutiny, LNbits) via Nostr relay messages. The user provides a
+ * `nostr+walletconnect://` URI from their wallet, and this service handles:
+ *
+ * - Parsing the connection string (pubkey, relay, client secret)
+ * - Sending encrypted commands (Kind 23194) to the wallet
+ * - Receiving encrypted responses (Kind 23195) from the wallet
+ * - Command timeout handling (60 seconds) with payment verification fallback
+ *
+ * Supported NIP-47 commands:
+ * - `get_balance` -- Query wallet balance (returned in msats, converted to sats)
+ * - `pay_invoice` -- Pay a Bolt11 Lightning invoice
+ * - `make_invoice` -- Create a new Lightning invoice for receiving
+ * - `lookup_invoice` -- Check if an invoice has been paid
+ *
+ * NOTE: NIP-04 encryption is used per the NIP-47 spec (legacy exception).
+ *
+ * @see NIP-47 https://github.com/nostr-protocol/nips/blob/master/47.md
+ * @see NIP-04 (used for NIP-47 request/response encryption)
+ */
+
 import { finalizeEvent, nip04, generateSecretKey, getPublicKey, Event } from 'nostr-tools';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { SimplePool } from 'nostr-tools';
 
-// Re-using the pool from nostrService might be better, but for now creating a local one or we can export the one from nostrService.
-// To avoid circular deps, let's create a lightweight pool here or accept it in constructor.
+// Separate pool to avoid circular dependency with nostrService
 const pool = new SimplePool();
 
+/** Parsed NWC connection parameters from a nostr+walletconnect:// URI */
 export interface NWCConnection {
+    /** Wallet's Nostr public key (hex) */
     pubkey: string;
+    /** Relay URL for NWC communication */
     relay: string;
-    secret: string; // The 'secret' from the connection string (optional in older specs, but usually present)
+    /** Client secret key (hex) -- whitelisted by the wallet for this connection */
+    secret: string;
+    /** Optional Lightning address associated with this wallet */
     lud16?: string;
 }
 
+/**
+ * NIP-47 Nostr Wallet Connect client.
+ *
+ * Manages a connection to an external Lightning wallet via Nostr relays.
+ * All communication is NIP-04 encrypted between the client secret key
+ * and the wallet's public key.
+ *
+ * @example
+ * const nwc = new NWCService("nostr+walletconnect://pubkey?relay=wss://...&secret=hex");
+ * const balance = await nwc.getBalance(); // Returns sats
+ * await nwc.payInvoice("lnbc...");
+ */
 export class NWCService {
     private connection: NWCConnection | null = null;
     private walletPubkey: string = '';
@@ -27,6 +67,14 @@ export class NWCService {
         }
     }
 
+    /**
+     * Parse a nostr+walletconnect:// URI into connection parameters.
+     *
+     * URI format: `nostr+walletconnect://<wallet-pubkey>?relay=<relay>&secret=<client-sk>&lud16=<address>`
+     *
+     * @param uri - Full NWC connection string
+     * @throws {Error} If the URI is invalid or missing required parameters
+     */
     parseConnectionString(uri: string) {
         if (!uri.startsWith('nostr+walletconnect://')) throw new Error("Invalid NWC URI");
 
@@ -50,6 +98,12 @@ export class NWCService {
         this.connection = { pubkey, relay, secret: this.secret, lud16: lud16 || undefined };
     }
 
+    /**
+     * Query the connected wallet's balance.
+     *
+     * @returns Balance in satoshis (NWC returns msats, this converts)
+     * @throws {Error} If not connected or the wallet returns an error
+     */
     async getBalance(): Promise<number> {
         if (!this.connection) throw new Error("NWC not connected");
 
@@ -57,6 +111,16 @@ export class NWCService {
         return result.balance ? Math.floor(result.balance / 1000) : 0; // NWC usually returns msats
     }
 
+    /**
+     * Pay a Bolt11 Lightning invoice via the connected wallet.
+     *
+     * On timeout, attempts a lookup_invoice to check if the payment actually
+     * succeeded (wallets sometimes process payments after the response timeout).
+     *
+     * @param invoice - Bolt11 Lightning invoice string
+     * @returns Object containing the payment preimage
+     * @throws {Error} If payment fails or times out without confirmation
+     */
     async payInvoice(invoice: string): Promise<{ preimage: string }> {
         if (!this.connection) throw new Error("NWC not connected");
 
@@ -84,6 +148,14 @@ export class NWCService {
         }
     }
 
+    /**
+     * Create a new Lightning invoice for receiving a payment.
+     *
+     * @param amountSats - Amount to receive in satoshis (converted to msats for NWC)
+     * @param description - Optional invoice description
+     * @returns Object with the Bolt11 invoice string and payment hash
+     * @throws {Error} If not connected or invoice creation fails
+     */
     async makeInvoice(amountSats: number, description?: string): Promise<{ invoice: string, paymentHash: string }> {
         if (!this.connection) throw new Error("NWC not connected");
         const result = await this.executeCommand('make_invoice', {
@@ -93,6 +165,13 @@ export class NWCService {
         return { invoice: result.invoice, paymentHash: result.payment_hash };
     }
 
+    /**
+     * Check whether an invoice has been paid.
+     *
+     * @param paymentHash - The payment hash of the invoice to look up
+     * @returns Object indicating whether the invoice has been paid
+     * @throws {Error} If not connected or lookup fails
+     */
     async lookupInvoice(paymentHash: string): Promise<{ paid: boolean }> {
         if (!this.connection) throw new Error("NWC not connected");
         // Some implementations use invoice, some payment_hash. Spec says either.

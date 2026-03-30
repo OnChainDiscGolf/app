@@ -1,15 +1,44 @@
+/**
+ * @file FundingGuide.tsx
+ * @description Step-by-step modal guide for funding a wallet via Cash App,
+ * Strike, or on-chain Bitcoin from an exchange (Coinbase, Robinhood, etc.).
+ * Shows the user's Lightning address for the first two methods and generates
+ * an on-chain Bitcoin deposit address via Breez SDK for the exchange tab.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Icons } from './Icons';
 import { isBreezInitialized, createOnchainAddress } from '../services/breezService';
 
+/**
+ * Props for the {@link FundingGuide} component.
+ *
+ * @property lightningAddress - The user's Lightning address to display for copying.
+ * @property amountNeeded - Optional sats amount needed (e.g., entry fee shortfall) shown for context.
+ * @property onClose - Callback invoked when the guide is dismissed.
+ */
 interface FundingGuideProps {
   lightningAddress: string;
-  amountNeeded?: number; // sats needed for context (e.g. entry fee shortfall)
+  amountNeeded?: number;
   onClose: () => void;
 }
 
+/** Available funding method tabs. */
 type FundingTab = 'cashapp' | 'strike' | 'exchange';
 
+/**
+ * Full-screen modal with tabbed step-by-step instructions for funding the wallet.
+ *
+ * - **Cash App** - Instructions for sending Bitcoin via Lightning with Cash App.
+ * - **Strike** - Instructions for sending via Strike's Lightning address feature.
+ * - **Coinbase & More** - Generates an on-chain BTC deposit address via Breez SDK
+ *   (only shown when Breez is initialized) for exchanges that don't support Lightning.
+ *
+ * Each tab displays numbered steps and a copyable address (Lightning or on-chain).
+ *
+ * @param props - {@link FundingGuideProps}
+ * @returns The funding guide modal overlay.
+ */
 export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, amountNeeded, onClose }) => {
   const [activeTab, setActiveTab] = useState<FundingTab>('cashapp');
   const [copied, setCopied] = useState(false);
@@ -319,14 +348,22 @@ export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, am
   );
 };
 
-// --- Sub-components ---
+// --- Sub-components (internal) ---
 
+/** Color mapping from Tailwind color tokens to bg/text class pairs for Step badges. */
 const stepColors: Record<string, { bg: string; text: string }> = {
   '[#00D64F]': { bg: 'bg-[#00D64F]/20', text: 'text-[#00D64F]' },
   'blue-400': { bg: 'bg-blue-400/20', text: 'text-blue-400' },
   'orange-400': { bg: 'bg-orange-400/20', text: 'text-orange-400' },
 };
 
+/**
+ * Numbered step indicator with a colored badge and descriptive text.
+ *
+ * @param props.number - Step number displayed in the badge.
+ * @param props.color - Tailwind color key for the badge (e.g., `'blue-400'`).
+ * @param props.children - Step description content.
+ */
 const Step: React.FC<{ number: number; color: string; children: React.ReactNode }> = ({ number, color, children }) => {
   const colors = stepColors[color] || { bg: 'bg-slate-700', text: 'text-slate-300' };
   return (
@@ -339,6 +376,14 @@ const Step: React.FC<{ number: number; color: string; children: React.ReactNode 
   );
 };
 
+/**
+ * Download CTA link for a payment app (Cash App or Strike).
+ *
+ * @param props.name - Display name of the app.
+ * @param props.color - Hex color for the app brand accent.
+ * @param props.url - External URL to the app's website.
+ * @param props.note - Short note about fees and availability.
+ */
 const DownloadLink: React.FC<{ name: string; color: string; url: string; note: string }> = ({ name, color, url, note }) => (
   <a
     href={url}

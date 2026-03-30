@@ -1,12 +1,35 @@
+/**
+ * @file InfoModal.tsx
+ * @description Informational modal explaining the Play tab features:
+ * creating rounds, joining rounds, the wallet, and how sats/entry fees work.
+ * Includes external resource links to PDGA, Bitcoin, Cashu, and Nostr.
+ */
+
 import React from 'react';
 import { Icons } from './Icons';
 import { Button } from './Button';
 
+/**
+ * Props for the {@link InfoModal} component.
+ *
+ * @property isOpen - Whether the modal is visible.
+ * @property onClose - Callback invoked when the modal is dismissed.
+ */
 interface InfoModalProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
+/**
+ * "Play Tab Guide" informational modal.
+ *
+ * Explains the core app features to new users: creating rounds, joining rounds
+ * via QR code, how the wallet works, and how sats entry fees and ace pools
+ * function. Includes a "Learn More" section with external links.
+ *
+ * @param props - {@link InfoModalProps}
+ * @returns The modal overlay, or `null` when `isOpen` is false.
+ */
 export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
 

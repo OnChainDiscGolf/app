@@ -1,16 +1,38 @@
+/**
+ * @file useQrScanner.ts
+ * @description Hook for QR code scanning with automatic platform detection.
+ * Uses the Capacitor native barcode scanner (Google Barcode Scanner module)
+ * on Android/iOS, and falls back to a web-based scanner using the camera
+ * MediaStream API + jsQR library on desktop/PWA.
+ *
+ * The web scanner continuously reads frames from a video element, draws them
+ * to an off-screen canvas, and runs jsQR on the pixel data every animation frame.
+ *
+ * The native scanner delegates to the OS barcode scanning UI and returns results
+ * via a one-shot promise.
+ */
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsQR from 'jsqr';
-import { 
-    isNativeScanningSupported, 
-    isScannerAvailable, 
-    startNativeScan, 
-    checkPermissions, 
+import {
+    isNativeScanningSupported,
+    isScannerAvailable,
+    startNativeScan,
+    checkPermissions,
     requestPermissions,
     isGoogleBarcodeScannerModuleAvailable,
     installGoogleBarcodeScannerModule,
     openSettings
 } from '../services/nativeQrScanner';
 
+/**
+ * Props for the {@link useQrScanner} hook.
+ *
+ * @property videoRef - Ref to the `<video>` element used by the web scanner.
+ * @property canvasRef - Ref to the `<canvas>` element for frame analysis.
+ * @property onScan - Callback invoked with the decoded QR data string.
+ * @property active - Whether scanning should be active. Starts/stops the scanner.
+ */
 interface UseQrScannerProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
     canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -18,6 +40,19 @@ interface UseQrScannerProps {
     active: boolean;
 }
 
+/**
+ * Return type for the {@link useQrScanner} hook.
+ *
+ * @property isCameraLoading - Whether the camera is initializing.
+ * @property cameraError - Error message if camera access failed, or null.
+ * @property scannedData - The last decoded QR data string, or null.
+ * @property restart - Function to restart the scanner (web or native).
+ * @property logs - Timestamped debug log messages.
+ * @property isNativeScanner - Whether the native scanner is being used.
+ * @property startNativeScan - Triggers a native scan (user-initiated).
+ * @property permissionStatus - Current camera permission state.
+ * @property openAppSettings - Opens the OS app settings for permission management.
+ */
 interface UseQrScannerReturn {
     isCameraLoading: boolean;
     cameraError: string | null;
@@ -30,6 +65,21 @@ interface UseQrScannerReturn {
     openAppSettings: () => Promise<void>;
 }
 
+/**
+ * QR code scanner hook with native/web platform detection.
+ *
+ * On mount, checks for Capacitor native scanning support. If available (and
+ * the Google Barcode Scanner module is installed), sets `isNativeScanner=true`
+ * and waits for user-initiated `startNativeScan()` calls. Otherwise, falls
+ * back to a web scanner that requests the device camera, streams to a video
+ * element, and runs jsQR per animation frame.
+ *
+ * The `onScan` callback is stored in a ref to prevent scanner restarts when
+ * the callback identity changes.
+ *
+ * @param props - {@link UseQrScannerProps}
+ * @returns {@link UseQrScannerReturn}
+ */
 export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScannerProps): UseQrScannerReturn => {
     const [isCameraLoading, setIsCameraLoading] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);

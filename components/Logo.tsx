@@ -1,12 +1,36 @@
+/**
+ * @file Logo.tsx
+ * @description Application logo components in three variants:
+ * - {@link Logo} - Realistic disc golf basket with Bitcoin accent (primary)
+ * - {@link LogoChainDisc} - Abstract disc with chain ring and Bitcoin center
+ * - {@link LogoMinimal} - Simplified basket outline with gradient stroke
+ *
+ * All variants are pure SVG, resolution-independent, and accept a `size` prop.
+ */
+
 import React from 'react';
 
+/**
+ * Props shared by all logo variants.
+ *
+ * @property size - Width and height in pixels. Defaults to 80.
+ * @property variant - Logo variant hint (not currently used for switching; each variant is a separate export).
+ * @property className - Additional CSS classes.
+ */
 interface LogoProps {
     size?: number;
     variant?: 'full' | 'icon' | 'minimal';
     className?: string;
 }
 
-// Main Logo: Realistic Disc Golf Basket
+/**
+ * Primary application logo: a realistic disc golf basket SVG with metal
+ * gradients, hanging chains, an orange top band, and a Bitcoin (₿) symbol
+ * on the pole cap.
+ *
+ * @param props - {@link LogoProps}
+ * @returns The basket logo SVG.
+ */
 export const Logo: React.FC<LogoProps> = ({ size = 80, className = '' }) => {
     return (
         <div className={`relative ${className}`} style={{ width: size, height: size }}>
@@ -84,7 +108,13 @@ export const Logo: React.FC<LogoProps> = ({ size = 80, className = '' }) => {
     );
 };
 
-// Alternative: Abstract Chain Disc Logo
+/**
+ * Alternative logo: an abstract disc with a dashed chain outer ring,
+ * emerald disc body, and a Bitcoin (₿) symbol in the center.
+ *
+ * @param props - {@link LogoProps}
+ * @returns The chain-disc logo SVG.
+ */
 export const LogoChainDisc: React.FC<LogoProps> = ({ size = 80, className = '' }) => {
     return (
         <div className={`relative ${className}`} style={{ width: size, height: size }}>
@@ -131,7 +161,13 @@ export const LogoChainDisc: React.FC<LogoProps> = ({ size = 80, className = '' }
     );
 };
 
-// Minimal: Just the basket silhouette with chain accent
+/**
+ * Minimal logo: a stylized basket outline with a multi-color gradient stroke
+ * (orange -> green -> blue -> purple). Suitable for small sizes and loading states.
+ *
+ * @param props - {@link LogoProps}
+ * @returns The minimal basket outline SVG.
+ */
 export const LogoMinimal: React.FC<LogoProps> = ({ size = 80, className = '' }) => {
     return (
         <div className={`relative ${className}`} style={{ width: size, height: size }}>

@@ -1,6 +1,22 @@
+/**
+ * @file GuidedTour.tsx
+ * @description Interactive guided tour overlay that highlights UI elements
+ * with a spotlight cutout and shows tooltips with step-by-step instructions.
+ * Completion state is persisted to localStorage so each tour is shown only once.
+ * Also exports {@link useTourStatus} and {@link resetTour} helpers.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
+/**
+ * Configuration for a single step in a guided tour.
+ *
+ * @property targetId - DOM element ID to spotlight.
+ * @property title - Step heading displayed in the tooltip.
+ * @property content - Descriptive text for the step.
+ * @property position - Preferred tooltip placement relative to the target. Auto-detected if omitted.
+ */
 export interface TourStep {
     targetId: string;
     title: string;
@@ -8,6 +24,14 @@ export interface TourStep {
     position?: 'top' | 'bottom' | 'left' | 'right';
 }
 
+/**
+ * Props for the {@link GuidedTour} component.
+ *
+ * @property tourId - Unique identifier for this tour (used as localStorage key).
+ * @property steps - Ordered array of tour steps.
+ * @property onComplete - Callback invoked when the tour finishes (all steps or skipped).
+ * @property onSkip - Optional callback invoked specifically when the user skips.
+ */
 interface GuidedTourProps {
     tourId: string;
     steps: TourStep[];
@@ -15,12 +39,25 @@ interface GuidedTourProps {
     onSkip?: () => void;
 }
 
+/** Computed tooltip position and arrow direction. */
 interface TooltipPosition {
     top: number;
     left: number;
     arrowPosition: 'top' | 'bottom' | 'left' | 'right';
 }
 
+/**
+ * Full-screen guided tour overlay rendered via React portal.
+ *
+ * Creates a dark overlay with a spotlight cutout around the current step's
+ * target element, a pulsing highlight ring, and a positioned tooltip with
+ * navigation controls. Automatically determines the best tooltip placement
+ * based on available viewport space. Persists completion to localStorage
+ * under `tour_{tourId}_completed`.
+ *
+ * @param props - {@link GuidedTourProps}
+ * @returns A portal-rendered overlay, or `null` if position cannot be calculated.
+ */
 export const GuidedTour: React.FC<GuidedTourProps> = ({
     tourId,
     steps,
@@ -308,7 +345,15 @@ export const GuidedTour: React.FC<GuidedTourProps> = ({
     );
 };
 
-// Hook to check if tour should be shown
+/**
+ * Hook to check whether a specific guided tour should be shown.
+ *
+ * Reads `tour_{tourId}_completed` from localStorage. Returns `true` if the
+ * tour has NOT been completed yet.
+ *
+ * @param tourId - Unique tour identifier.
+ * @returns `true` if the tour should be displayed to the user.
+ */
 export const useTourStatus = (tourId: string): boolean => {
     const [shouldShow, setShouldShow] = useState(false);
 
@@ -320,7 +365,12 @@ export const useTourStatus = (tourId: string): boolean => {
     return shouldShow;
 };
 
-// Helper to reset tour (for testing)
+/**
+ * Reset a guided tour's completion state so it will be shown again.
+ * Useful for development and testing.
+ *
+ * @param tourId - Unique tour identifier to reset.
+ */
 export const resetTour = (tourId: string): void => {
     localStorage.removeItem(`tour_${tourId}_completed`);
 };

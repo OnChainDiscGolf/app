@@ -1,16 +1,44 @@
+/**
+ * @file Wallet.tsx
+ *
+ * Orchestrator component for the Wallet tab (~5178 lines).
+ *
+ * Manages three self-custodial wallet backends:
+ * - **Breez (Lightning)** -- full Lightning node via Breez SDK Spark + WASM.
+ *   Supports invoices, Spark addresses, on-chain receive, and Lightning address.
+ * - **Cashu (eCash)** -- instant, private token-based wallet via Cashu mints.
+ *   Supports mint management, token send/receive, and Lightning deposit/withdraw.
+ * - **NWC (Nostr Wallet Connect)** -- proxy to an external wallet (Alby, Zeus, etc.)
+ *   via NIP-47 connection strings.
+ *
+ * UI structure:
+ * - Balance header with animated gradient based on active wallet type.
+ * - WalletModeSwitcher pill bar to toggle between wallets or "All" view.
+ * - Per-wallet send/receive flows (QR scanner, invoice generation, address paste).
+ * - Transaction history list filtered by active wallet.
+ * - Mint management (add/remove/set-active) for Cashu.
+ * - Breez wallet creation flow (mnemonic generation or unified seed).
+ * - NWC connection setup (paste connection string).
+ * - Help modals, funding guide, and feedback button.
+ *
+ * Unlike other orchestrators, Wallet keeps all view JSX inline because it uses
+ * 100+ state variables that would require massive prop interfaces to extract.
+ * Only overlay/modal components (WalletOverlays, WalletHelpModals) and the
+ * mode switcher (WalletModeSwitcher) have been extracted.
+ */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useQrScanner } from '../hooks/useQrScanner';
-import { useApp } from '../context/AppContext';
-import { sendGiftWrap, getMagicLightningAddress } from '../services/nostrService';
-import { Button } from '../components/Button';
-import { Icons } from '../components/Icons';
-import { FeedbackModal, FeedbackButton } from '../components/FeedbackModal';
-import { FundingGuide } from '../components/FundingGuide';
+import { useQrScanner } from '../../hooks/useQrScanner';
+import { useApp } from '../../context/AppContext';
+import { sendGiftWrap, getMagicLightningAddress } from '../../services/nostrService';
+import { Button } from '../../components/Button';
+import { Icons } from '../../components/Icons';
+import { FeedbackModal, FeedbackButton } from '../../components/FeedbackModal';
+import { FundingGuide } from '../../components/FundingGuide';
 import { useNavigate } from 'react-router-dom';
-import { getBtcPrice, satsToUsd } from '../services/priceService';
-import { generateMnemonic, storeMnemonicEncrypted, retrieveMnemonicEncrypted, hasStoredMnemonic, hasUnifiedSeed } from '../services/mnemonicService';
-import { downloadWalletCardPDF } from '../services/backupService';
+import { getBtcPrice, satsToUsd } from '../../services/priceService';
+import { generateMnemonic, storeMnemonicEncrypted, retrieveMnemonicEncrypted, hasStoredMnemonic, hasUnifiedSeed } from '../../services/mnemonicService';
+import { downloadWalletCardPDF } from '../../services/backupService';
 import {
     isBreezInitialized,
     getSparkAddress,
@@ -24,691 +52,16 @@ import {
     payLightningAddress as payBreezLightningAddress,
     getLightningAddress as getBreezLightningAddress,
     formatSats
-} from '../services/breezService';
+} from '../../services/breezService';
+import { SuccessOverlay, ProcessingOverlay } from './WalletOverlays';
+import { HelpModal, WalletHelpModal } from './WalletHelpModals';
+import { WalletModeSwitcher } from './WalletModeSwitcher';
+import { WALLET_COLORS, WALLET_ORDER, getLeftGlowColor } from './walletConstants';
 
-// Helper Component for Success Animation
-// Stylish Success Overlay with themed animations
-const SuccessOverlay: React.FC<{
-    message: string,
-    subMessage?: string,
-    onClose: () => void,
-    type?: 'sent' | 'received' | 'deposit'
-}> = ({ message, subMessage, onClose, type }) => {
-    const [showContent, setShowContent] = useState(false);
-
-    useEffect(() => {
-        // Stagger content appearance
-        const showTimer = setTimeout(() => setShowContent(true), 100);
-
-        // Auto-close timing
-        const duration = type === 'received' ? 4000 : 2500;
-        const closeTimer = setTimeout(() => {
-            if (type !== 'received') {
-                onClose();
-            }
-        }, duration);
-
-        return () => {
-            clearTimeout(showTimer);
-            clearTimeout(closeTimer);
-        };
-    }, [onClose, type]);
-
-    // Theme colors based on transaction type
-    const theme = {
-        sent: { color: '#f97316', bg: 'from-orange-500/20', glow: 'shadow-orange-500/40' },
-        received: { color: '#10b981', bg: 'from-emerald-500/20', glow: 'shadow-emerald-500/40' },
-        deposit: { color: '#8b5cf6', bg: 'from-purple-500/20', glow: 'shadow-purple-500/40' },
-    }[type || 'sent'];
-
-    return (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center animate-in fade-in duration-200">
-            {/* Gradient background */}
-            <div
-                className={`absolute inset-0 bg-gradient-to-br ${theme.bg} via-slate-900/95 to-black/98 backdrop-blur-md`}
-            />
-
-            {/* Radial glow behind icon */}
-            <div
-                className="absolute w-64 h-64 rounded-full opacity-30 blur-3xl animate-pulse"
-                style={{ background: `radial-gradient(circle, ${theme.color} 0%, transparent 70%)` }}
-            />
-
-            {/* Content */}
-            <div className={`relative z-10 flex flex-col items-center transition-all duration-500 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                {/* Success icon with ring animation */}
-                <div className="relative mb-6">
-                    {/* Outer ring pulse */}
-                    <div
-                        className="absolute inset-0 rounded-full animate-ping opacity-20"
-                        style={{
-                            background: theme.color,
-                            animationDuration: '1.5s',
-                            animationIterationCount: '2'
-                        }}
-                    />
-                    {/* Icon container */}
-                    <div
-                        className={`relative w-20 h-20 rounded-full flex items-center justify-center shadow-2xl ${theme.glow}`}
-                        style={{ background: `linear-gradient(135deg, ${theme.color}, ${theme.color}dd)` }}
-                    >
-                        <Icons.CheckMark size={40} className="text-white" strokeWidth={3} />
-                    </div>
-                </div>
-
-                {/* Message */}
-                <h3
-                    className="text-2xl font-bold text-white mb-2 text-center"
-                    style={{ textShadow: `0 0 30px ${theme.color}60` }}
-                >
-                    {message}
-                </h3>
-
-                {/* Sub message */}
-                {subMessage && (
-                    <p className="text-slate-400 text-base text-center max-w-xs">
-                        {subMessage}
-                    </p>
-                )}
-
-                {/* Continue button for received */}
-                {type === 'received' && (
-                    <button
-                        onClick={onClose}
-                        className="mt-8 px-8 py-3 rounded-xl font-bold text-white transition-all hover:scale-105 active:scale-95"
-                        style={{
-                            background: `linear-gradient(135deg, ${theme.color}, ${theme.color}cc)`,
-                            boxShadow: `0 4px 20px ${theme.color}40`
-                        }}
-                    >
-                        Continue
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-};
-
-// Stylish Processing Overlay with animated lightning loader
-const ProcessingOverlay: React.FC<{ message: string }> = ({ message }) => {
-    return (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center animate-in fade-in duration-200">
-            {/* Dark gradient backdrop */}
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-black/95 to-slate-900/95 backdrop-blur-md" />
-
-            {/* Pulsing glow */}
-            <div
-                className="absolute w-48 h-48 rounded-full opacity-20 blur-3xl animate-pulse"
-                style={{ background: 'radial-gradient(circle, #f97316 0%, transparent 70%)' }}
-            />
-
-            {/* Content */}
-            <div className="relative z-10 flex flex-col items-center">
-                {/* Animated lightning bolt loader */}
-                <div className="relative w-16 h-16 mb-6">
-                    {/* Rotating ring */}
-                    <div
-                        className="absolute inset-0 rounded-full border-2 border-orange-500/30"
-                        style={{
-                            borderTopColor: '#f97316',
-                            animation: 'spin 1s linear infinite'
-                        }}
-                    />
-                    {/* Inner glow ring */}
-                    <div
-                        className="absolute inset-2 rounded-full border border-orange-500/20"
-                        style={{
-                            borderTopColor: '#fb923c',
-                            animation: 'spin 0.8s linear infinite reverse'
-                        }}
-                    />
-                    {/* Center lightning icon */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <svg
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            className="text-orange-400 animate-pulse"
-                            style={{ filter: 'drop-shadow(0 0 8px #f97316)' }}
-                        >
-                            <path
-                                d="M13 2L4.09344 12.6879C3.74463 13.1064 3.57023 13.3157 3.56756 13.4925C3.56524 13.6461 3.63372 13.7923 3.75324 13.8889C3.89073 14 4.16316 14 4.70802 14H12L11 22L19.9065 11.3121C20.2553 10.8936 20.4297 10.6843 20.4324 10.5075C20.4347 10.3539 20.3663 10.2077 20.2467 10.1111C20.1092 10 19.8368 10 19.292 10H12L13 2Z"
-                                fill="currentColor"
-                            />
-                        </svg>
-                    </div>
-                </div>
-
-                {/* Message with subtle animation */}
-                <h3
-                    className="text-lg font-bold text-white"
-                    style={{ textShadow: '0 0 20px rgba(249,115,22,0.4)' }}
-                >
-                    {message}
-                </h3>
-
-                {/* Animated dots */}
-                <div className="flex space-x-1 mt-3">
-                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const HelpModal: React.FC<{
-    isOpen: boolean;
-    title: string;
-    text: string;
-    onClose: () => void;
-    onAction?: (action: string) => void;
-}> = ({ isOpen, title, text, onClose, onAction }) => {
-    if (!isOpen) return null;
-
-    const handleContentClick = (e: React.MouseEvent) => {
-        const target = e.target as HTMLElement;
-        const action = target.getAttribute('data-action');
-        if (action && onAction) {
-            onAction(action);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
-                {/* Header */}
-                <div className="p-5 border-b border-slate-800">
-                    <div className="flex justify-between items-start">
-                        <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 rounded-full bg-brand-primary/20 flex items-center justify-center">
-                                <Icons.Help size={20} className="text-brand-primary" />
-                            </div>
-                            <h3 className="text-lg font-bold text-white">{title}</h3>
-                        </div>
-                        <button onClick={onClose} className="text-slate-400 hover:text-white p-1">
-                            <Icons.Close size={20} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-5 max-h-[60vh] overflow-y-auto">
-                    <div
-                        className="text-slate-300 text-sm leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: text }}
-                        onClick={handleContentClick}
-                    />
-                </div>
-
-                {/* Footer */}
-                <div className="p-4 border-t border-slate-800">
-                    <Button fullWidth onClick={onClose}>Got it</Button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// Expandable Wallet Tile Component for Help Modal
-const ExpandableWalletTile: React.FC<{
-    type: 'breez' | 'cashu' | 'nwc';
-    isExpanded: boolean;
-    onToggle: () => void;
-}> = ({ type, isExpanded, onToggle }) => {
-    const config = {
-        breez: {
-            color: 'blue',
-            icon: <Icons.Zap size={16} className="text-blue-400" />,
-            title: 'Lightning (Breez)',
-            subtitle: 'Self-custodial Lightning wallet.',
-            badge: '(Coming soon)',
-            details: `The Breez SDK creates a Lightning node on your phone. It's like having your own mini Bitcoin bank that only you control. Best for larger amounts and users who value maximum security.`
-        },
-        cashu: {
-            color: 'emerald',
-            icon: <Icons.Cashew size={16} className="text-emerald-400" />,
-            title: 'Cashu',
-            subtitle: 'Private eCash tokens.',
-            badge: null,
-            details: `Think of it like digital arcade tokens — simple, private, and instant. Cashu uses "mints" that create tokens backed by Bitcoin. You can send these tokens instantly and privately. Great for everyday use and getting started.`
-        },
-        nwc: {
-            color: 'purple',
-            icon: <Icons.Link size={16} className="text-purple-400" />,
-            title: 'NWC',
-            subtitle: 'Connect your existing wallet.',
-            badge: null,
-            details: `Already using Alby, Zeus, or another Lightning wallet? Plug it right in! NWC (Nostr Wallet Connect) lets apps talk to your wallet securely. You keep full control — this app just sends payment requests.`
-        }
-    };
-
-    const c = config[type];
-    const colorClasses = {
-        blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', hover: 'hover:bg-blue-500/20', text: 'text-blue-400' },
-        emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', hover: 'hover:bg-emerald-500/20', text: 'text-emerald-400' },
-        purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', hover: 'hover:bg-purple-500/20', text: 'text-purple-400' }
-    }[c.color];
-
-    return (
-        <div className={`${colorClasses.bg} border ${colorClasses.border} rounded-lg overflow-hidden transition-all duration-300`}>
-            <button
-                onClick={onToggle}
-                className={`w-full p-3 ${colorClasses.hover} transition-colors text-left`}
-            >
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                        {c.icon}
-                        <span className={`font-bold ${colorClasses.text}`}>{c.title}</span>
-                        {c.badge && <span className="text-slate-500 text-xs italic">{c.badge}</span>}
-                    </div>
-                    <Icons.ChevronDown
-                        size={16}
-                        className={`${colorClasses.text} transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
-                    />
-                </div>
-                <p className="text-xs text-slate-400 mt-1">{c.subtitle}</p>
-            </button>
-
-            {/* Expandable Content */}
-            <div
-                className={`overflow-hidden transition-all duration-300 ease-out ${isExpanded ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
-                    }`}
-            >
-                <div className="px-3 pb-3 pt-1 border-t border-slate-700/50">
-                    <p className="text-xs text-slate-400 leading-relaxed">{c.details}</p>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// Wallet Help Modal with expandable tiles
-const WalletHelpModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    onLightningClick: () => void;
-    onWhyThreeClick: () => void;
-    onNewToBitcoinClick: () => void;
-    onSatoshiClick: () => void;
-    showNewToBitcoin?: boolean;
-}> = ({ isOpen, onClose, onLightningClick, onWhyThreeClick, onNewToBitcoinClick, onSatoshiClick, showNewToBitcoin = false }) => {
-    const [expandedWallet, setExpandedWallet] = useState<string | null>(null);
-
-    if (!isOpen) return null;
-
-    const toggleWallet = (type: string) => {
-        setExpandedWallet(expandedWallet === type ? null : type);
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-24 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
-                {/* Header */}
-                <div className="p-5 border-b border-slate-800">
-                    <div className="flex justify-between items-start">
-                        <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 rounded-full bg-brand-primary/20 flex items-center justify-center">
-                                <Icons.Help size={20} className="text-brand-primary" />
-                            </div>
-                            <h3 className="text-lg font-bold text-white">Your Wallet</h3>
-                        </div>
-                        <button onClick={onClose} className="text-slate-400 hover:text-white p-1">
-                            <Icons.Close size={20} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
-                    <p className="text-slate-300 text-sm">
-                        Your wallet lets you <strong className="text-white">send and receive Bitcoin</strong> instantly using the{' '}
-                        <button onClick={onLightningClick} className="text-brand-primary hover:underline">
-                            Lightning Network
-                        </button>
-                        . Of course, you're not going to send a whole Bitcoin — you're way too poor for that. You're going to send{' '}
-                        <button onClick={onSatoshiClick} className="text-orange-400 hover:underline font-bold">
-                            Satoshis
-                        </button>
-                        {' '}(or sats).
-                    </p>
-
-                    <div>
-                        <p className="font-bold text-white mb-2">💡 Quick Tips:</p>
-                        <ul className="list-disc ml-5 space-y-1 text-sm text-slate-300">
-                            <li><strong>Tap your balance</strong> to see USD value</li>
-                            <li><strong>Pull down</strong> to refresh your balance</li>
-                        </ul>
-                    </div>
-
-                    <div>
-                        <div className="flex items-center space-x-2 mb-2">
-                            <p className="font-bold text-white">🔄 Three Wallet Options</p>
-                            <button onClick={onWhyThreeClick} className="text-brand-primary text-xs hover:underline">
-                                (Why three?)
-                            </button>
-                        </div>
-
-                        <div className="space-y-2">
-                            <ExpandableWalletTile
-                                type="breez"
-                                isExpanded={expandedWallet === 'breez'}
-                                onToggle={() => toggleWallet('breez')}
-                            />
-                            <ExpandableWalletTile
-                                type="cashu"
-                                isExpanded={expandedWallet === 'cashu'}
-                                onToggle={() => toggleWallet('cashu')}
-                            />
-                            <ExpandableWalletTile
-                                type="nwc"
-                                isExpanded={expandedWallet === 'nwc'}
-                                onToggle={() => toggleWallet('nwc')}
-                            />
-                        </div>
-                    </div>
-
-                    <p className="text-xs text-slate-500">
-                        Tap a wallet above for more details. Switch anytime using the selector at the top.
-                    </p>
-
-                    {/* New to Bitcoin - shows when user has balance */}
-                    {showNewToBitcoin && (
-                        <button
-                            onClick={onNewToBitcoinClick}
-                            className="w-full mt-4 p-3 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 rounded-xl transition-colors group"
-                        >
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-3">
-                                    <Icons.Bitcoin size={20} className="text-orange-500" />
-                                    <div className="text-left">
-                                        <p className="text-sm font-medium text-white">Need more sats?</p>
-                                        <p className="text-xs text-slate-400">Learn how to buy Bitcoin</p>
-                                    </div>
-                                </div>
-                                <Icons.Next size={16} className="text-slate-500 group-hover:text-orange-500 transition-colors" />
-                            </div>
-                        </button>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="p-4 border-t border-slate-800">
-                    <Button fullWidth onClick={onClose}>Got it</Button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// Wallet Mode Pill Switcher Component with collapsible "All" option
-const WalletModeSwitcher: React.FC<{
-    activeMode: 'breez' | 'cashu' | 'nwc';
-    viewMode: 'all' | 'breez' | 'cashu' | 'nwc';
-    isExpanded: boolean;
-    onModeChange: (mode: 'breez' | 'cashu' | 'nwc') => void;
-    onViewModeChange: (mode: 'all' | 'breez' | 'cashu' | 'nwc') => void;
-    onExpandToggle: () => void;
-    onWalletSelect: (mode: 'breez' | 'cashu' | 'nwc') => void;
-}> = ({ activeMode, viewMode, isExpanded, onModeChange, onViewModeChange, onExpandToggle, onWalletSelect }) => {
-    // Track animation state for smooth open/close
-    const [animationState, setAnimationState] = useState<'collapsed' | 'expanding' | 'expanded' | 'collapsing'>('collapsed');
-    const [shouldRender, setShouldRender] = useState(false);
-
-    // Handle expand/collapse transitions
-    useEffect(() => {
-        if (isExpanded && animationState === 'collapsed') {
-            setShouldRender(true);
-            // Small delay to ensure DOM is ready before animation starts
-            requestAnimationFrame(() => {
-                setAnimationState('expanding');
-            });
-        } else if (!isExpanded && (animationState === 'expanded' || animationState === 'expanding')) {
-            setAnimationState('collapsing');
-        }
-    }, [isExpanded]);
-
-    // Handle animation end
-    const handleAnimationEnd = () => {
-        if (animationState === 'expanding') {
-            setAnimationState('expanded');
-        } else if (animationState === 'collapsing') {
-            setAnimationState('collapsed');
-            setShouldRender(false);
-        }
-    };
-
-    const modes = [
-        { id: 'breez' as const, label: 'Lightning', icon: Icons.Zap, color: 'blue' },
-        { id: 'cashu' as const, label: 'Cashu', icon: Icons.Cashew, color: 'emerald' },
-        { id: 'nwc' as const, label: 'NWC', icon: Icons.Link, color: 'purple' },
-    ];
-
-    const getColorClasses = (color: string) => {
-        const colors: Record<string, { active: string; inactive: string; border: string; text: string }> = {
-            blue: {
-                active: 'bg-blue-500/30',
-                inactive: 'bg-blue-500/10 hover:bg-blue-500/20',
-                border: 'border-blue-500/50',
-                text: 'text-blue-400'
-            },
-            emerald: {
-                active: 'bg-emerald-500/30',
-                inactive: 'bg-emerald-500/10 hover:bg-emerald-500/20',
-                border: 'border-emerald-500/50',
-                text: 'text-emerald-400'
-            },
-            purple: {
-                active: 'bg-purple-500/30',
-                inactive: 'bg-purple-500/10 hover:bg-purple-500/20',
-                border: 'border-purple-500/50',
-                text: 'text-purple-400'
-            },
-            orange: {
-                active: 'bg-orange-500/30',
-                inactive: 'bg-orange-500/10 hover:bg-orange-500/20',
-                border: 'border-orange-500/50',
-                text: 'text-orange-400'
-            }
-        };
-        return colors[color];
-    };
-
-    const isAllActive = viewMode === 'all';
-    const allColors = getColorClasses('orange');
-    const ICON_SIZE = 16; // Consistent icon size across all buttons
-    const isClosing = animationState === 'collapsing';
-
-    return (
-        <div className="flex flex-col gap-1.5 bg-black/30 rounded-xl p-1.5 border border-white/10 backdrop-blur-sm">
-            {/* Bitcoin "All" button - always visible, consistent height */}
-            <button
-                onClick={onExpandToggle}
-                className={`
-                    relative flex items-center justify-center rounded-lg transition-all duration-300 ease-out
-                    px-2.5 py-1.5 min-h-[36px]
-                    ${isAllActive && !isExpanded
-                        ? `${allColors.active} ${allColors.border} border`
-                        : `${allColors.inactive} border border-transparent`
-                    }
-                `}
-            >
-                <Icons.Bitcoin
-                    size={24}
-                    className={`${allColors.text} transition-all duration-300`}
-                />
-            </button>
-
-            {/* Individual wallet buttons - shown when expanded or animating */}
-            {shouldRender && (
-                <div
-                    className="flex items-center justify-center origin-center overflow-hidden"
-                    style={{
-                        animation: isClosing
-                            ? 'wallet-collapse 350ms ease-in forwards'
-                            : 'wallet-expand 300ms ease-out forwards',
-                        // Fixed width: big enough to fit 3 icons + 1 label ("Lightning" is longest)
-                        width: '175px',
-                        minWidth: '175px',
-                        maxWidth: '175px'
-                    }}
-                    onAnimationEnd={handleAnimationEnd}
-                >
-                    {modes.map((mode, index) => {
-                        const isActive = viewMode === mode.id;
-                        const colors = getColorClasses(mode.color);
-                        const IconComponent = mode.icon;
-                        // Reverse the index for closing animation
-                        const animationDelay = isClosing
-                            ? (modes.length - 1 - index) * 50
-                            : index * 50;
-
-                        // When no wallet is selected (viewMode === 'all'), all buttons share space equally
-                        // When a wallet IS selected, selected one expands for label, others stay compact
-                        const hasSelection = viewMode !== 'all';
-
-                        return (
-                            <button
-                                key={mode.id}
-                                onClick={() => onWalletSelect(mode.id)}
-                                className={`
-                                    relative flex items-center justify-center rounded-lg transition-colors duration-200
-                                    min-h-[36px] py-1.5 px-2
-                                    ${isActive
-                                        ? `${colors.active} ${colors.border} border`
-                                        : `${colors.inactive} border border-transparent`
-                                    }
-                                `}
-                                style={{
-                                    // No selection: all equal. Has selection: active expands, others compact
-                                    flex: hasSelection ? (isActive ? '1 1 auto' : '0 0 auto') : '1 1 0',
-                                    // Use 'both' fill mode so items stay visible during delay before disappear animation starts
-                                    animation: isClosing
-                                        ? `wallet-item-disappear 200ms ease-in ${animationDelay}ms both`
-                                        : `wallet-item-appear 300ms ease-out ${animationDelay}ms forwards`,
-                                    opacity: 0,
-                                    transform: 'scale(0.8) translateY(-8px)'
-                                }}
-                            >
-                                <IconComponent
-                                    size={ICON_SIZE}
-                                    className={`${colors.text} flex-shrink-0 ${isActive ? 'mr-1' : ''}`}
-                                />
-                                {/* Only show label when this wallet is selected */}
-                                {isActive && (
-                                    <span
-                                        className={`
-                                            text-xs font-bold uppercase tracking-wide whitespace-nowrap
-                                            ${colors.text}
-                                        `}
-                                    >
-                                        {mode.label}
-                                    </span>
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
-
-            {/* CSS Keyframes for smooth animations */}
-            <style>{`
-                @keyframes wallet-expand {
-                    0% {
-                        opacity: 0;
-                        transform: scaleX(0.5) scaleY(0.8);
-                    }
-                    100% {
-                        opacity: 1;
-                        transform: scaleX(1) scaleY(1);
-                    }
-                }
-                @keyframes wallet-collapse {
-                    0% {
-                        opacity: 1;
-                        transform: scaleX(1) scaleY(1);
-                    }
-                    70% {
-                        opacity: 0.8;
-                        transform: scaleX(0.9) scaleY(0.95);
-                    }
-                    100% {
-                        opacity: 0;
-                        transform: scaleX(0.5) scaleY(0.8);
-                    }
-                }
-                @keyframes wallet-item-appear {
-                    0% {
-                        opacity: 0;
-                        transform: scale(0.8) translateY(-8px);
-                    }
-                    100% {
-                        opacity: 1;
-                        transform: scale(1) translateY(0);
-                    }
-                }
-                @keyframes wallet-item-disappear {
-                    0% {
-                        opacity: 1;
-                        transform: scale(1) translateY(0);
-                    }
-                    100% {
-                        opacity: 0;
-                        transform: scale(0.85) translateY(-6px);
-                    }
-                }
-            `}</style>
-        </div>
-    );
-};
-
-// Color mapping for wallet modes
-const WALLET_COLORS = {
-    breez: {
-        primary: 'rgb(59, 130, 246)',    // blue-500
-        glow: 'rgba(59, 130, 246, 0.2)',
-        glowStrong: 'rgba(59, 130, 246, 0.25)',
-        border: 'rgba(59, 130, 246, 0.3)'
-    },
-    cashu: {
-        primary: 'rgb(16, 185, 129)',    // emerald-500
-        glow: 'rgba(16, 185, 129, 0.2)',
-        glowStrong: 'rgba(16, 185, 129, 0.25)',
-        border: 'rgba(16, 185, 129, 0.3)'
-    },
-    nwc: {
-        primary: 'rgb(168, 85, 247)',    // purple-500
-        glow: 'rgba(168, 85, 247, 0.2)',
-        glowStrong: 'rgba(168, 85, 247, 0.25)',
-        border: 'rgba(168, 85, 247, 0.3)'
-    },
-    all: {
-        primary: 'rgb(249, 115, 22)',    // orange-500
-        glow: 'rgba(249, 115, 22, 0.2)',
-        glowStrong: 'rgba(249, 115, 22, 0.25)',
-        border: 'rgba(249, 115, 22, 0.3)'
-    },
-    none: {
-        primary: 'transparent',
-        glow: 'transparent',
-        glowStrong: 'transparent',
-        border: 'rgba(100, 116, 139, 0.3)'
-    }
-};
-
-// Wallet order for determining left/right colors
-const WALLET_ORDER: Array<'breez' | 'cashu' | 'nwc'> = ['breez', 'cashu', 'nwc'];
-
-// Get the color that should appear on the LEFT side based on current selection
-const getLeftGlowColor = (currentMode: 'breez' | 'cashu' | 'nwc'): 'breez' | 'cashu' | 'none' => {
-    const currentIndex = WALLET_ORDER.indexOf(currentMode);
-    if (currentIndex === 0) return 'none'; // Breez is leftmost, nothing to the left
-    if (currentIndex === 1) return 'breez'; // Cashu: Breez is to the left
-    return 'cashu'; // NWC: Cashu is to the left (Breez "disappears")
-};
-
+/**
+ * Wallet page orchestrator -- manages multi-wallet (Breez/Cashu/NWC) state,
+ * send/receive flows, transaction history, and wallet configuration.
+ */
 export const Wallet: React.FC = () => {
     const { walletBalance, isBalanceLoading, transactions, userProfile, currentUserPubkey, mints, setActiveMint, addMint, removeMint, sendFunds, receiveEcash, depositFunds, checkDepositStatus, confirmDeposit, getLightningQuote, isAuthenticated, refreshWalletBalance, walletMode, nwcString, setWalletMode, setNwcConnection, checkForPayments, walletBalances, refreshAllBalances, authSource } = useApp();
     const navigate = useNavigate();
@@ -2044,7 +1397,7 @@ export const Wallet: React.FC = () => {
                                         setIsProcessing(true);
                                         try {
                                             // Dynamic import to avoid circular deps or large bundles if not needed elsewhere
-                                            const { NWCService } = await import('../services/nwcService');
+                                            const { NWCService } = await import('../../services/nwcService');
                                             const tempService = new NWCService(localNwcString);
 
                                             // Test connection by fetching balance
@@ -3119,7 +2472,7 @@ export const Wallet: React.FC = () => {
                             setIsLoadingContacts(true);
                             setContactsError(null);
                             try {
-                                const { fetchContactList, lookupUser } = await import('../services/nostrService');
+                                const { fetchContactList, lookupUser } = await import('../../services/nostrService');
                                 const pubkeys = await fetchContactList(currentUserPubkey);
 
                                 // Fetch profile data for each contact
@@ -3253,7 +2606,7 @@ export const Wallet: React.FC = () => {
                                             setSendInput(contact.lud16);
                                         } else {
                                             // Use magic lightning address
-                                            const { getMagicLightningAddress } = require('../services/nostrService');
+                                            const { getMagicLightningAddress } = require('../../services/nostrService');
                                             setSendInput(getMagicLightningAddress(contact.pubkey));
                                         }
                                         setView('send-details');

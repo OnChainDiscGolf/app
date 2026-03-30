@@ -1,19 +1,28 @@
 /**
- * Onboarding Page
- * 
- * NEW FLOW (mnemonic-based identity):
- * 
- * 1. NEW USER → Welcome → Profile Setup → Mnemonic Backup → Finalization → Home
- *    - Identity generated at Welcome (stored in memory via OnboardingContext)
- *    - Profile Setup uses real keys for NIP-98 uploads
- *    - Nothing persisted until Finalization
- * 
- * 2. RECOVERY → Enter 12-word mnemonic → Profile Setup → Home
- *    - Skips backup and finalization (identity already exists)
- * 
- * 3. NSEC LOGIN → Enter nsec → Profile Setup → Home
- * 
- * 4. AMBER LOGIN → Connect via NIP-46 → Profile Setup → Home
+ * @file Onboarding.tsx
+ *
+ * New user onboarding flow -- the first screen for unauthenticated users.
+ *
+ * Step machine (`OnboardingStep`):
+ * ```
+ * NEW USER:     welcome -> profile-setup -> backup -> Finalization -> Home
+ * RECOVERY:     welcome -> recovery (12-word mnemonic) -> profile-setup -> Home
+ * NSEC LOGIN:   welcome -> nsec (paste nsec) -> profile-setup -> Home
+ * AMBER LOGIN:  welcome -> amber (Android NIP-46) -> profile-setup -> Home
+ * ```
+ *
+ * Key design decisions:
+ * - Identity is generated at the welcome step and held in OnboardingContext
+ *   (in-memory only). Nothing is persisted to localStorage until Finalization.
+ * - Profile setup uses the real keys for NIP-98 authenticated image uploads
+ *   even before the account is persisted.
+ * - The mnemonic backup step (for new users) shows the 12-word seed phrase
+ *   and requires confirmation before proceeding to Finalization.
+ * - Recovery flow derives keys from mnemonic via BIP-39 + NIP-06, then
+ *   fetches the existing profile from Nostr relays.
+ * - Amber option only shown on Android native builds.
+ *
+ * Route: /onboarding
  */
 
 import React, { useState, useEffect } from 'react';
@@ -27,14 +36,27 @@ import { uploadProfileImageWithKey } from '../services/nostrService';
 import { isNative, getPlatform } from '../services/capacitorService';
 import { nip19 } from 'nostr-tools';
 
+/**
+ * Steps in the onboarding flow.
+ * - welcome: initial screen with "Create" and "I have an account" options.
+ * - profile-setup: name, picture, PDGA# entry (uses real keys for NIP-98 uploads).
+ * - backup: mnemonic display and confirmation (new users only).
+ * - recovery: 12-word mnemonic entry for existing accounts.
+ * - nsec: raw nsec key entry for existing accounts.
+ * - amber: Android Amber signer connection flow.
+ */
 type OnboardingStep =
-    | 'welcome'           // Initial screen with options
-    | 'profile-setup'     // Enter name, picture, pdga (NEW: comes before backup)
-    | 'backup'            // Show mnemonic backup (NEW: comes after profile setup)
-    | 'recovery'          // Enter existing mnemonic
-    | 'nsec'              // Enter existing nsec
-    | 'amber';            // Amber connection flow
+    | 'welcome'
+    | 'profile-setup'
+    | 'backup'
+    | 'recovery'
+    | 'nsec'
+    | 'amber';
 
+/**
+ * Onboarding page -- multi-step new user flow for identity creation,
+ * recovery, and initial profile setup.
+ */
 export const Onboarding: React.FC = () => {
     const navigate = useNavigate();
     const { loginNsec: appLoginNsec, loginMnemonic: appLoginMnemonic, loginAmber } = useApp();
@@ -87,7 +109,7 @@ export const Onboarding: React.FC = () => {
             setProfileData({ name: 'Disc Golfer' });
 
             // Skip profile setup and backup — go straight to finalization
-            navigate('/finalization');
+            navigate('/finalization', { replace: true });
         } catch (e) {
             console.error('Quick start failed:', e);
             setError('Failed to create account. Please try again.');
@@ -101,7 +123,7 @@ export const Onboarding: React.FC = () => {
 
     const handleBackupComplete = () => {
         // After backup, go to finalization where everything gets persisted
-        navigate('/finalization');
+        navigate('/finalization', { replace: true });
     };
 
     const handleRecoverySubmit = async (mnemonic: string) => {
@@ -111,7 +133,7 @@ export const Onboarding: React.FC = () => {
         try {
             await appLoginMnemonic(mnemonic);
             // Recovery flow: go to profile setup with recovery flag
-            navigate('/profile-setup', { state: { isRecovery: true } });
+            navigate('/profile-setup', { state: { isRecovery: true }, replace: true });
         } catch (e) {
             console.error('Recovery failed:', e);
             setError('Invalid recovery phrase. Please check and try again.');
@@ -127,7 +149,7 @@ export const Onboarding: React.FC = () => {
         try {
             await appLoginNsec(nsec);
             // NSEC flow: go to profile setup with recovery flag
-            navigate('/profile-setup', { state: { isRecovery: true } });
+            navigate('/profile-setup', { state: { isRecovery: true }, replace: true });
         } catch (e) {
             console.error('Nsec login failed:', e);
             setError('Invalid nsec. Please check and try again.');

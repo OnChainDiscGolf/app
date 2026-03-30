@@ -1,17 +1,30 @@
 /**
- * Breez SDK Service
- * 
- * Wrapper for Breez SDK (Spark/Nodeless implementation)
- * Provides self-custodial Lightning wallet functionality.
- * 
- * SDK Package: @breeztech/breez-sdk-spark
- * Documentation: https://sdk-doc-spark.breez.technology/
- * 
- * Features:
- * - Send payments via Bolt11, LNURL-Pay, Lightning address
- * - Receive payments via Bolt11, static Lightning address
- * - On-chain interoperability
- * - WebAssembly support for web/Capacitor apps
+ * @fileoverview Breez SDK Service -- Self-custodial Lightning wallet via Breez Spark.
+ *
+ * Wraps the Breez SDK Spark (nodeless) implementation to provide full Lightning
+ * wallet functionality within the app. The SDK runs as WebAssembly in the browser.
+ *
+ * **Capabilities:**
+ * - Send payments: Bolt11 invoices, LNURL-Pay, Lightning addresses
+ * - Receive payments: Bolt11 invoices, static Lightning address (breez.fun)
+ * - On-chain receive: Bitcoin address via submarine swap
+ * - Real-time event subscriptions: payment received/sent/failed, sync, deposits
+ * - Payment history with BigInt handling for SDK values
+ *
+ * **Deterministic Lightning Address:**
+ * Each user gets a memorable address like `crushcreek81@breez.fun` derived
+ * deterministically from their BIP-39 mnemonic. The generation algorithm uses
+ * two frozen word lists (disc golf + nature themed) and MUST NOT be modified
+ * or existing users lose their ability to receive payments.
+ *
+ * **SDK Integration Notes:**
+ * - Package: @breeztech/breez-sdk-spark
+ * - WASM-based (custom Vite plugin handles .wasm file serving)
+ * - Seed format: `{ type: 'mnemonic', mnemonic: string }` (not bytes)
+ * - Two-step payment flow: prepareSendPayment() -> sendPayment()
+ * - Sync via getInfo({ ensureSynced: true }) (no standalone .sync())
+ *
+ * @see https://sdk-doc-spark.breez.technology/
  */
 
 import { getSeedFromMnemonic, retrieveMnemonicEncrypted, hasStoredMnemonic } from './mnemonicService';
@@ -147,46 +160,73 @@ export const generateCustomLightningAddress = (mnemonic: string): string => {
 // TYPES
 // ============================================================================
 
+/** Wallet balance snapshot from Breez SDK */
 export interface BreezBalance {
-    /** Balance in satoshis */
+    /** Confirmed balance in satoshis */
     balanceSats: number;
-    /** Pending incoming payments */
+    /** Pending incoming payments in satoshis (not available in Spark SDK) */
     pendingReceiveSats: number;
-    /** Pending outgoing payments */
+    /** Pending outgoing payments in satoshis (not available in Spark SDK) */
     pendingSendSats: number;
 }
 
+/** Normalized payment record from Breez SDK (handles BigInt conversion from SDK) */
 export interface BreezPayment {
+    /** Payment ID or hash */
     id: string;
+    /** Direction: 'send' (outgoing) or 'receive' (incoming) */
     paymentType: 'send' | 'receive';
+    /** Payment amount in satoshis */
     amountSats: number;
+    /** Routing fee in satoshis */
     feeSats: number;
+    /** Unix timestamp (seconds) */
     timestamp: number;
+    /** Payment description or memo */
     description?: string;
+    /** Bolt11 invoice string (if available) */
     bolt11?: string;
+    /** Payment preimage (proof of payment) */
     preimage?: string;
+    /** Payment status */
     status: 'pending' | 'complete' | 'failed';
 }
 
+/** A Lightning invoice created for receiving a payment */
 export interface BreezInvoice {
+    /** Bolt11 invoice string */
     bolt11: string;
+    /** Payment hash for tracking */
     paymentHash: string;
+    /** Invoice amount in satoshis */
     amountSats: number;
+    /** Human-readable description */
     description: string;
+    /** Invoice expiry time (seconds) */
     expiry: number;
 }
 
+/** Result of a payment send operation */
 export interface BreezPaymentResult {
+    /** Whether the payment succeeded */
     success: boolean;
+    /** Payment hash (if available) */
     paymentHash?: string;
+    /** Payment preimage / proof of payment (if available) */
     preimage?: string;
+    /** Routing fee paid in satoshis */
     feeSats?: number;
+    /** Error message on failure */
     error?: string;
 }
 
+/** Configuration for Breez SDK initialization */
 export interface BreezConfig {
+    /** Breez API key (PEM certificate from VITE_BREEZ_API_KEY env var) */
     apiKey: string;
+    /** Network environment: 'production' (mainnet) or 'staging' (regtest) */
     environment: 'production' | 'staging';
+    /** Working directory for IndexedDB storage (default: ./breez_data) */
     workingDir?: string;
 }
 
@@ -360,8 +400,15 @@ export const initializeBreez = async (
 };
 
 /**
- * Initialize Breez from stored mnemonic
- * Called on app startup if mnemonic exists
+ * Initialize Breez SDK from an encrypted mnemonic stored in localStorage.
+ *
+ * Called on app startup if a mnemonic exists. Decrypts the mnemonic using
+ * the user's pubkey and passes it to initializeBreez().
+ *
+ * @param pubkey - User's public key (for mnemonic decryption)
+ * @param config - Breez SDK configuration
+ * @param useBreezMnemonic - If true, uses the separate Breez mnemonic (for nsec users)
+ * @returns True if initialization succeeded
  */
 export const initializeBreezFromStorage = async (
     pubkey: string,
@@ -379,14 +426,19 @@ export const initializeBreezFromStorage = async (
 };
 
 /**
- * Check if Breez SDK is initialized
+ * Check if the Breez SDK is initialized and ready for operations.
+ *
+ * @returns True if the SDK has been successfully initialized
  */
 export const isBreezInitialized = (): boolean => {
     return isInitialized;
 };
 
 /**
- * Disconnect and cleanup Breez SDK
+ * Disconnect and cleanup the Breez SDK instance.
+ *
+ * Clears the SDK instance, resets initialization state, and removes
+ * the cached Lightning address and mnemonic from memory.
  */
 export const disconnectBreez = async (): Promise<void> => {
     if (sdkInstance) {
@@ -408,7 +460,11 @@ export const disconnectBreez = async (): Promise<void> => {
 // ============================================================================
 
 /**
- * Get wallet balance
+ * Get the current wallet balance from the Breez SDK.
+ *
+ * Returns zero balances if the SDK is not initialized (does not throw).
+ *
+ * @returns Balance snapshot with confirmed and pending amounts
  */
 export const getBreezBalance = async (): Promise<BreezBalance> => {
     if (!isInitialized || !sdkInstance) {
@@ -480,7 +536,12 @@ export const getStaticLightningAddress = async (): Promise<string | null> => {
 };
 
 /**
- * Get cached static Lightning address (sync, no API call)
+ * Get the cached static Lightning address synchronously (no API call).
+ *
+ * Returns the address that was generated or registered during initialization.
+ * Returns null if Breez has not been initialized.
+ *
+ * @returns Cached Lightning address string or null
  */
 export const getCachedLightningAddress = (): string | null => {
     return staticLightningAddress;
@@ -1353,8 +1414,11 @@ export const subscribeToPayments = (
 // ============================================================================
 
 /**
- * Check if we can use Breez for payments
- * Returns true if SDK is initialized and has balance
+ * Check if Breez can be used for payments (initialized and has balance).
+ *
+ * Used by the payment router to decide whether to try Breez first.
+ *
+ * @returns True if SDK is initialized and balance > 0
  */
 export const canUseBreez = async (): Promise<boolean> => {
     if (!isInitialized) {
@@ -1366,7 +1430,10 @@ export const canUseBreez = async (): Promise<boolean> => {
 };
 
 /**
- * Format satoshis for display
+ * Format a satoshi amount for human-readable display.
+ *
+ * @param sats - Amount in satoshis
+ * @returns Formatted string (e.g., "1.50M sats", "2.5k sats", "500 sats")
  */
 export const formatSats = (sats: number): string => {
     if (sats >= 1000000) {
@@ -1378,7 +1445,9 @@ export const formatSats = (sats: number): string => {
 };
 
 /**
- * Get Breez status for debugging
+ * Get Breez SDK status for debugging/diagnostics.
+ *
+ * @returns Object with initialization state and cached Lightning address
  */
 export const getBreezStatus = (): {
     initialized: boolean;

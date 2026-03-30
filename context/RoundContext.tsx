@@ -1,7 +1,32 @@
+/**
+ * @file RoundContext.tsx
+ * @description Manages the active disc golf round state, including players, scores,
+ * hole progression, and real-time Nostr subscriptions for multiplayer scoring.
+ *
+ * When an active round exists, subscribes to the round's Nostr event (Kind 30001)
+ * for real-time score updates from other players. Also listens for rounds where
+ * the current user is tagged (`#p` tag) for auto-join functionality.
+ *
+ * Persists active round, players, and current hole to localStorage for crash recovery.
+ *
+ * @architecture Depends on AuthContext for `currentUserPubkey`. Round creation,
+ * joining, and finalization are cross-cutting actions that live in AppContext.
+ * RoundContext only manages the runtime round state and Nostr subscriptions.
+ *
+ * **Effects:**
+ * - Effect 1: Persist active round to localStorage
+ * - Effect 2: Persist players to localStorage
+ * - Effect 3: Persist current hole to localStorage
+ * - Effect 4: Active round score subscription (real-time Nostr sync)
+ * - Effect 5: Auto-join rounds where user is tagged (remote round detection)
+ * - Effect 6: Listen for eCash payment events from WalletContext (mark player as paid)
+ */
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Player, RoundSettings } from '../types';
 import { DEFAULT_HOLE_COUNT } from '../constants';
 import { publishRound, publishScore, subscribeToRound, subscribeToPlayerRounds, fetchProfile } from '../services/nostrService';
+import { notifyScoreUpdate } from '../services/notificationService';
 import { useAuth } from './AuthContext';
 
 export interface RoundContextType {
@@ -22,6 +47,21 @@ export interface RoundContextType {
 
 const RoundContext = createContext<RoundContextType | undefined>(undefined);
 
+/**
+ * RoundProvider - Manages active round state, player scores, and real-time Nostr sync.
+ *
+ * **State managed:**
+ * - `activeRound` - Current round settings (null when no round is active)
+ * - `players` - Array of players with scores, payment status, and metadata
+ * - `currentHole` - The hole number currently being played
+ *
+ * **Exposed actions:**
+ * - `updateScore(hole, score, playerId?)` - Update a player's score for a hole
+ * - `publishCurrentScores()` - Publish the current user's scores to Nostr
+ * - `setPlayerPaid(playerId)` - Mark a player as having paid their entry fee
+ * - `resetRound()` - Clear all round state and localStorage
+ * - Raw setters for cross-cutting actions in AppContext (createRound, joinRound, finalizeRound)
+ */
 export const RoundProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUserPubkey, isAuthenticated } = useAuth();
 
@@ -42,7 +82,8 @@ export const RoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const subRef = useRef<any>(null);
 
-  // Persist active round
+  // === Effect 1: Persist Active Round to localStorage ===
+  // Saves or removes the active round from localStorage for crash recovery.
   useEffect(() => {
     if (activeRound) {
       localStorage.setItem('cdg_active_round', JSON.stringify(activeRound));
@@ -51,17 +92,20 @@ export const RoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [activeRound]);
 
-  // Persist players
+  // === Effect 2: Persist Players to localStorage ===
   useEffect(() => {
     localStorage.setItem('cdg_players', JSON.stringify(players));
   }, [players]);
 
-  // Persist current hole
+  // === Effect 3: Persist Current Hole to localStorage ===
   useEffect(() => {
     localStorage.setItem('cdg_current_hole', currentHole.toString());
   }, [currentHole]);
 
-  // Active Round Syncing (subscribe to scores for active round)
+  // === Effect 4: Active Round Score Subscription (Real-Time Nostr Sync) ===
+  // When an active, non-finalized round exists, subscribes to its Kind 30001 event
+  // on Nostr relays. Incoming score events update existing players or auto-add new
+  // players (with lazy profile fetch). Sends push notifications for remote score updates.
   useEffect(() => {
     if (activeRound && !activeRound.isFinalized) {
       if (activeRound.startingHole) {
@@ -74,6 +118,17 @@ export const RoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         subRef.current = subscribeToRound(activeRound.id, async (event) => {
           const playerPubkey = event.pubkey;
           const content = JSON.parse(event.content);
+
+          // Notify about remote score updates (not our own scores)
+          if (playerPubkey !== currentUserPubkey) {
+            setPlayers(prev => {
+              const player = prev.find(p => p.id === playerPubkey);
+              if (player) {
+                notifyScoreUpdate(player.name || 'A player');
+              }
+              return prev;
+            });
+          }
 
           setPlayers(prev => {
             const exists = prev.find(p => p.id === playerPubkey);
@@ -113,7 +168,10 @@ export const RoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [activeRound?.id, currentUserPubkey]);
 
-  // Listen for Rounds where user is tagged (Remote Round Notification)
+  // === Effect 5: Auto-Join Rounds Where User is Tagged ===
+  // Subscribes to Kind 30001 events where the current user's pubkey appears in a `#p` tag.
+  // When a new round is detected (not the current round, not created by self), automatically
+  // sets it as the active round. This enables "invite to round" functionality.
   useEffect(() => {
     if (isAuthenticated && currentUserPubkey) {
       const sub = subscribeToPlayerRounds(currentUserPubkey, async (event) => {
@@ -156,7 +214,9 @@ export const RoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [isAuthenticated, currentUserPubkey, activeRound]);
 
-  // Listen for eCash payments from players (custom event from WalletContext)
+  // === Effect 6: eCash Payment Detection (Cross-Context Event) ===
+  // Listens for 'ecash-received-from-player' custom DOM events dispatched by WalletContext
+  // when a Cashu token is received via DM. Marks the sending player as paid in the active round.
   useEffect(() => {
     const handleEcashFromPlayer = (e: CustomEvent) => {
       const playerPubkey = e.detail?.pubkey;
@@ -171,7 +231,13 @@ export const RoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => window.removeEventListener('ecash-received-from-player', handleEcashFromPlayer as EventListener);
   }, [activeRound]);
 
-  // Actions
+  /**
+   * Update a player's score for a specific hole.
+   * Recalculates the player's total score after update.
+   * @param {number} hole - Hole number (1-indexed)
+   * @param {number} score - Number of strokes for the hole
+   * @param {string} [playerId] - Player pubkey to update (defaults to current user)
+   */
   const updateScore = useCallback((hole: number, score: number, playerId?: string) => {
     const targetId = playerId || currentUserPubkey;
     setPlayers(prev => prev.map(p => {
@@ -182,6 +248,10 @@ export const RoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
   }, [currentUserPubkey]);
 
+  /**
+   * Publish the current user's scores to Nostr relays for the active round.
+   * Only publishes if there is an active round and the current user is a player.
+   */
   const publishCurrentScores = useCallback(async () => {
     if (!activeRound) return;
     const currentPlayer = players.find(p => p.isCurrentUser);
@@ -193,12 +263,19 @@ export const RoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [activeRound, players]);
 
+  /**
+   * Mark a player as having paid their entry fee.
+   * @param {string} playerId - Pubkey of the player to mark as paid
+   */
   const setPlayerPaid = useCallback((playerId: string) => {
     setPlayers(prev => prev.map(p =>
       p.id === playerId ? { ...p, paid: true } : p
     ));
   }, []);
 
+  /**
+   * Reset all round state and clear localStorage. Called after finalization or manual reset.
+   */
   const resetRound = () => {
     setActiveRound(null);
     setPlayers([]);
@@ -228,6 +305,11 @@ export const RoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 };
 
+/**
+ * Hook to access active round state, players, scores, and round actions.
+ * @returns {RoundContextType} Round state and actions.
+ * @throws {Error} If called outside of RoundProvider.
+ */
 export const useRound = (): RoundContextType => {
   const context = useContext(RoundContext);
   if (!context) {

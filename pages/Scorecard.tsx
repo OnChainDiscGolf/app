@@ -1,21 +1,52 @@
+/**
+ * @file Scorecard.tsx
+ *
+ * Active round scoring page -- the core gameplay screen.
+ *
+ * Displays a hole-by-hole scorecard where the host (or any player with
+ * honor-system enabled) can enter scores for each player on the current hole.
+ *
+ * Key features:
+ * - **Hole navigation** -- swipe or tap to move between holes.
+ * - **Score entry** -- tap +/- buttons to adjust each player's score per hole.
+ * - **Ace detection** -- triggers a celebration animation when a hole-in-one is recorded.
+ * - **Live score publishing** -- publishes scores to Nostr periodically so other
+ *   apps and tournament leaderboards can track progress in real time.
+ * - **Halfway review** -- optional score summary at the midpoint.
+ * - **Final review** -- full scorecard summary with standings and payout preview
+ *   before the host finalizes the round.
+ * - **Finalization** -- calculates payouts, distributes funds, and publishes
+ *   the final round result to Nostr.
+ * - **QR invite** -- hosts can show a round join QR at any point for late joiners.
+ * - **Tournament awareness** -- detects if this round is a tournament card and
+ *   adjusts UI (e.g., hides certain actions, syncs with tournament leaderboard).
+ *
+ * Route: /scorecard
+ */
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useRound } from '../context/RoundContext';
 import { Button } from '../components/Button';
 import { Icons } from '../components/Icons';
+import { JoinQrCode } from '../components/JoinQrCode';
+import { buildRoundJoinUrl } from '../utils/qrUrls';
 import { DEFAULT_PAR, DEFAULT_HOLE_COUNT } from '../constants';
 import { useNavigate } from 'react-router-dom';
 import { calculatePayouts } from '../utils/payoutCalculations';
 import { useDenomination } from '../hooks/useDenomination';
 
+/**
+ * Scorecard page -- hole-by-hole score entry, live publishing, and round finalization.
+ */
 export const Scorecard: React.FC = () => {
-    const { activeRound, players, updateScore, publishCurrentScores, finalizeRound, isAuthenticated, userProfile, currentUserPubkey } = useApp();
+    const { activeRound, players, updateScore, publishCurrentScores, finalizeRound, isAuthenticated, userProfile, currentUserPubkey, activeTournament } = useApp();
     const { setActiveRound } = useRound();
     const navigate = useNavigate();
     const { formatAmount } = useDenomination();
 
     const isHost = activeRound?.pubkey === currentUserPubkey;
+    const isTournamentCard = activeTournament?.cards?.some(c => c.id === activeRound?.id) ?? false;
 
     // Initialize view hole to startingHole if available, else 1
     const [viewHole, setViewHole] = useState(activeRound?.startingHole || 1);
@@ -27,6 +58,8 @@ export const Scorecard: React.FC = () => {
     const [aceAnimation, setAceAnimation] = useState<string | null>(null);
     const [showHelpModal, setShowHelpModal] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [showInviteQr, setShowInviteQr] = useState(false);
+    const [inviteBannerDismissed, setInviteBannerDismissed] = useState(false);
 
     // Calculate pots based on granular payment selections
     const entryPayers = players.filter(p => p.paysEntry);
@@ -289,8 +322,8 @@ export const Scorecard: React.FC = () => {
         
         // On the first hole, navigate back to the round setup/payments page
         if (viewHole === startingHole) {
-            // Navigate back to Home with the customize view to see payments
-            navigate('/');
+            // Navigate back to Home (replace so back doesn't return to scorecard)
+            navigate('/', { replace: true });
             return;
         }
         
@@ -1028,6 +1061,47 @@ export const Scorecard: React.FC = () => {
                 </div>
             )}
 
+            {/* Host Invite Banner */}
+            {isHost && !activeRound.isFinalized && !inviteBannerDismissed && (
+                <div className="relative z-10 bg-slate-800/60 border-b border-slate-700/50 px-4 py-2">
+                    <div className="max-w-md mx-auto">
+                        {!showInviteQr ? (
+                            <div className="flex items-center justify-between">
+                                <button
+                                    onClick={() => setShowInviteQr(true)}
+                                    className="flex items-center space-x-2 text-sm text-cyan-400 font-medium"
+                                >
+                                    <Icons.QrCode size={16} />
+                                    <span>Invite players to this round</span>
+                                </button>
+                                <button
+                                    onClick={() => setInviteBannerDismissed(true)}
+                                    className="p-1 text-slate-500 hover:text-slate-300"
+                                >
+                                    <Icons.Close size={14} />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="py-3">
+                                <div className="flex justify-end mb-2">
+                                    <button
+                                        onClick={() => setShowInviteQr(false)}
+                                        className="p-1 text-slate-500 hover:text-slate-300"
+                                    >
+                                        <Icons.Close size={14} />
+                                    </button>
+                                </div>
+                                <JoinQrCode
+                                    joinUrl={buildRoundJoinUrl(activeRound.id, currentUserPubkey)}
+                                    title="Scan to Join Round"
+                                    subtitle={`${activeRound.name} • ${activeRound.courseName}`}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Compact Header */}
             <div className="relative z-10 bg-slate-900/80 backdrop-blur-xl border-b border-slate-700/50 px-4 py-2.5">
                 <div className="max-w-md mx-auto flex items-center justify-between">
@@ -1074,8 +1148,13 @@ export const Scorecard: React.FC = () => {
                         </div>
                     )}
                     
-                    {/* Right: Help & Settings */}
+                    {/* Right: Tournament Leaderboard + Help & Settings */}
                     <div className="flex items-center space-x-1">
+                        {isTournamentCard && (
+                            <button onClick={() => navigate('/tournament')} className="p-2 bg-cyan-500/20 rounded-full text-cyan-400 hover:text-white hover:bg-cyan-500/30 transition-colors">
+                                <Icons.BarChart size={18} />
+                            </button>
+                        )}
                         <button onClick={() => setShowHelpModal(true)} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
                             <Icons.Help size={18} />
                         </button>

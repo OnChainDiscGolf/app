@@ -1,3 +1,42 @@
+/**
+ * @file WalletContext.tsx
+ * @description Multi-wallet state management supporting three wallet backends:
+ * Cashu eCash, NWC (Nostr Wallet Connect), and Breez SDK (Lightning).
+ *
+ * This is the largest context in the application with 17 effects handling:
+ * - Wallet initialization and balance management across all three backends
+ * - Real-time payment detection via Nostr DMs, NIP-17 Gift Wraps, Nutzaps,
+ *   Lightning Gift Wraps, and multi-gateway WebSocket subscriptions
+ * - Cashu proof management (storage, verification, deduplication, spent-proof cleanup)
+ * - Encrypted wallet backup to Nostr (NIP-44) with merge-based restoration
+ * - Breez SDK lifecycle (init from mnemonic, payment event subscriptions, reconciliation)
+ * - NWC service lifecycle (init from connection string)
+ * - Payment notification animations (lightning strike effect)
+ *
+ * @architecture Depends on AuthContext for `currentUserPubkey`, `isAuthenticated`, `isGuest`.
+ * Exposes raw state setters so AppContext can perform cross-cutting wallet operations
+ * during logout. Cross-context communication with RoundContext uses custom DOM events
+ * ('ecash-received-from-player') rather than direct context coupling.
+ *
+ * **Effects (17 total):**
+ * - Effect 1: Auto-reset lightning strike animation (3s timer)
+ * - Effect 3: Proofs/balance persistence (recalculates on proof changes)
+ * - Effect 4: Transactions persistence to localStorage
+ * - Effect 5: Mints persistence to localStorage
+ * - Effect 6: Auto-sync wallet backup to Nostr (debounced 2s)
+ * - Effect 7: Initialize Cashu WalletService on mint changes
+ * - Effect 8: Initialize NWC Service on connection string changes
+ * - Effect 9: Auto-refresh balance when wallet mode changes
+ * - Effect 10: Persist wallet mode and NWC string
+ * - Effect 11: Wallet restoration on login (merge backup, init Breez, claim missed payments)
+ * - Effect 12: Listen for DMs (auto-redeem eCash tokens)
+ * - Effect 13: Listen for NIP-17 Gift Wraps (eCash, payment requests, confirmations, invites)
+ * - Effect 14: Listen for Lightning Nutzaps
+ * - Effect 15: Listen for Lightning Gift Wraps
+ * - Effect 16: Real-time multi-gateway payment detection via WebSocket + fallback polling
+ * - Effect 17: Breez reconciliation (catch missed payments on balance changes)
+ */
+
 import { CashuMint, CashuWallet, getDecodedToken } from '@cashu/cashu-ts';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { WalletTransaction, Mint, Proof } from '../types';
@@ -7,11 +46,14 @@ import { hasStoredMnemonic, retrieveMnemonicEncrypted } from '../services/mnemon
 import {
   initializeBreez, isBreezInitialized, getBreezBalance,
   subscribeToPayments as subscribeToBreezEvents, disconnectBreez,
-  getPaymentHistory, syncBreez
+  getPaymentHistory, syncBreez,
+  createInvoice as breezCreateInvoice,
+  payInvoice as breezPayInvoice
 } from '../services/breezService';
 import { checkPendingPayments, subscribeToQuoteUpdates, unsubscribeFromQuoteUpdates, getQuoteById, registerWithAllGateways, checkGatewayRegistration, subscribeToAllGatewayUpdates } from '../services/npubCashService';
 import { checkGatewayRegistration as getGatewayRegistrations } from '../services/npubCashService';
 import { WalletService } from '../services/walletService';
+import { notifyPaymentReceived, notifyRoundInvite, notifyPaymentRequest } from '../services/notificationService';
 import { NWCService } from '../services/nwcService';
 import { useAuth } from './AuthContext';
 
@@ -77,6 +119,38 @@ const WalletContext = createContext<WalletContextType | undefined>(undefined);
 // PROVIDER
 // ============================================================================
 
+/**
+ * WalletProvider - Multi-wallet state management with 17 effects for payment detection,
+ * proof management, backup sync, and wallet lifecycle.
+ *
+ * **State managed:**
+ * - `walletBalance` - Balance of the currently active wallet mode
+ * - `walletBalances` - Individual balances for each wallet type { cashu, nwc, breez }
+ * - `isBalanceLoading` - Loading indicator during balance refresh
+ * - `transactions` - Unified transaction history across all wallet types
+ * - `walletMode` - Currently active wallet ('cashu' | 'nwc' | 'breez')
+ * - `nwcString` - NWC connection URI
+ * - `mints` - List of Cashu mints with active selection
+ * - `proofs` - Cashu token proofs (the actual eCash)
+ * - `paymentNotification` - Pending payment notification for UI display
+ * - `lightningStrike` - Lightning strike animation state
+ *
+ * **Exposed actions:**
+ * - `depositFunds(amount)` - Generate a Lightning invoice for receiving (all wallet types)
+ * - `checkDepositStatus(quote)` - Poll whether an invoice has been paid
+ * - `confirmDeposit(quote, amount)` - Finalize deposit and mint proofs
+ * - `sendFunds(amount, invoice)` - Pay a Lightning invoice (all wallet types)
+ * - `receiveEcash(token)` - Redeem a Cashu token
+ * - `createToken(amount)` - Create a Cashu token for sending
+ * - `getLightningQuote(invoice)` - Get fee estimate for a Lightning payment
+ * - `refreshWalletBalance()` - Refresh balance with proof verification
+ * - `refreshAllBalances()` - Refresh balances across all three wallet types
+ * - `checkForPayments()` - Manually check npub.cash for pending payments
+ * - `addMint/removeMint/setActiveMint` - Cashu mint management
+ * - `setWalletMode/setNwcConnection` - Switch wallet mode
+ * - `reconcileOnResume()` - Full wallet reconciliation (called on app foreground)
+ * - `addTransaction/syncWallet/restoreWalletFromBackup/handleIncomingPayment` - For cross-cutting use
+ */
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isGuest, currentUserPubkey } = useAuth();
 
@@ -176,6 +250,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // HELPERS
   // ---------------------------------------------------------------------------
 
+  /**
+   * Record a new wallet transaction. Deduplicates by transaction ID.
+   * @param {WalletTransaction['type']} type - Transaction type (deposit, send, receive, payout, etc.)
+   * @param {number} amount - Amount in satoshis (must be > 0)
+   * @param {string} description - Human-readable transaction description
+   * @param {'cashu' | 'nwc' | 'breez'} [walletType] - Wallet backend (defaults to current mode)
+   * @param {{ id?: string; timestamp?: number; status?: string }} [options] - Optional overrides
+   */
   const addTransaction = (
     type: WalletTransaction['type'],
     amount: number,
@@ -204,9 +286,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   };
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 1: Auto-reset lightning strike after animation (3s timer)
-  // ---------------------------------------------------------------------------
+  // === Effect 1: Auto-Reset Lightning Strike Animation ===
+  // Clears the lightning strike visual effect after 3 seconds.
+  // The lightning strike fires when any incoming payment is detected.
 
   useEffect(() => {
     if (lightningStrike?.show) {
@@ -221,6 +303,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // syncWallet helper (useCallback) - publishes wallet backup to Nostr
   // ---------------------------------------------------------------------------
 
+  /**
+   * Publish an encrypted wallet backup (proofs, mints, transactions, gateway registrations)
+   * to Nostr relays using NIP-44 encryption. Called after any wallet state change.
+   * @param {Proof[]} currentProofs - Current Cashu proofs
+   * @param {Mint[]} currentMints - Current mint list
+   * @param {WalletTransaction[]} currentTransactions - Current transaction history
+   */
   const syncWallet = useCallback(async (currentProofs: Proof[], currentMints: Mint[], currentTransactions: WalletTransaction[]) => {
     if (isAuthenticated && !isGuest) {
       console.log("Syncing wallet to Nostr...");
@@ -233,9 +322,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [isAuthenticated, isGuest]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 3: Proofs/balance persistence (recalculates balance on proof changes)
-  // ---------------------------------------------------------------------------
+  // === Effect 3: Proofs/Balance Persistence ===
+  // Recalculates Cashu balance from proofs and persists to localStorage.
+  // Updates the active wallet balance if Cashu is the current mode.
 
   useEffect(() => {
     const cashuBal = WalletService.calculateBalance(proofs);
@@ -246,21 +335,20 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.setItem('cdg_proofs', JSON.stringify(proofs));
   }, [proofs, mints, walletMode]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 4: Transactions persistence
-  // ---------------------------------------------------------------------------
+  // === Effect 4: Transactions Persistence ===
+  // Persists the full transaction history to localStorage on every change.
 
   useEffect(() => localStorage.setItem('cdg_txs', JSON.stringify(transactions)), [transactions]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 5: Mints persistence
-  // ---------------------------------------------------------------------------
+  // === Effect 5: Mints Persistence ===
+  // Persists the mint list to localStorage on every change.
 
   useEffect(() => localStorage.setItem('cdg_mints', JSON.stringify(mints)), [mints]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 6: Auto-sync wallet to Nostr (debounced 2s)
-  // ---------------------------------------------------------------------------
+  // === Effect 6: Auto-Sync Wallet Backup to Nostr (Debounced 2s) ===
+  // Publishes an encrypted wallet backup whenever proofs, mints, or transactions change.
+  // Debounced by 2 seconds to avoid excessive relay writes during rapid changes.
+  // Only runs for authenticated, non-guest users with at least one proof.
 
   useEffect(() => {
     if (isAuthenticated && !isGuest && proofs.length > 0) {
@@ -272,9 +360,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [proofs, mints, transactions, isAuthenticated, isGuest, syncWallet]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 7: Init Wallet Service (on mints change)
-  // ---------------------------------------------------------------------------
+  // === Effect 7: Initialize Cashu WalletService ===
+  // Creates a new WalletService instance connected to the active Cashu mint
+  // whenever the mint list changes. Falls back to the first mint if none is active.
 
   useEffect(() => {
     const activeMint = mints.find(m => m.isActive) || mints[0];
@@ -284,9 +372,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [mints]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 8: Init NWC Service (on nwcString change)
-  // ---------------------------------------------------------------------------
+  // === Effect 8: Initialize NWC (Nostr Wallet Connect) Service ===
+  // Creates a new NWCService instance from the connection URI.
+  // Clears the connection and falls back to Cashu mode if the URI is invalid.
 
   useEffect(() => {
     if (nwcString) {
@@ -302,9 +390,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [nwcString]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 9: Auto-refresh balance when wallet mode changes
-  // ---------------------------------------------------------------------------
+  // === Effect 9: Auto-Refresh Balance on Wallet Mode Change ===
+  // When the user switches wallet mode (cashu/nwc/breez), immediately sets the
+  // display balance to the cached value for that mode and triggers a full refresh.
 
   useEffect(() => {
     if (walletMode === 'cashu') {
@@ -317,9 +405,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     refreshWalletBalance();
   }, [walletMode, nwcString]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 10: Persist wallet mode
-  // ---------------------------------------------------------------------------
+  // === Effect 10: Persist Wallet Mode and NWC Connection ===
+  // Saves the current wallet mode and NWC connection string to localStorage.
 
   useEffect(() => {
     localStorage.setItem('cdg_wallet_mode', walletMode);
@@ -330,6 +417,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // refreshWalletBalance (full implementation)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Refresh the wallet balance for the currently active wallet mode.
+   * - **Breez**: Queries Breez SDK for Lightning balance
+   * - **NWC**: Queries remote wallet via NWC protocol
+   * - **Cashu**: Verifies all proofs against their mints (removes spent proofs),
+   *   then checks for missed payments via historical Gift Wraps (48h lookback)
+   */
   const refreshWalletBalance = async () => {
     setIsBalanceLoading(true);
 
@@ -515,6 +609,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // refreshAllBalances (useCallback)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Refresh balances across all three wallet types (Cashu, NWC, Breez) in parallel.
+   * Updates both individual balances and the active wallet's display balance.
+   * @returns {Promise<void>}
+   */
   const refreshAllBalances = useCallback(async () => {
     setIsBalanceLoading(true);
     console.log("Refreshing all wallet balances...");
@@ -573,6 +672,15 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // handleIncomingPayment (useCallback, with dedup via animatedPaymentIdsRef)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Handle an incoming payment by recording a transaction, triggering the
+   * lightning strike animation, refreshing balances, and sending a push notification.
+   * Deduplicates animations using animatedPaymentIdsRef (30s cooldown per payment ID).
+   * @param {'cashu' | 'nwc' | 'breez'} walletType - Which wallet received the payment
+   * @param {number} amount - Amount in satoshis
+   * @param {string} description - Human-readable description
+   * @param {string} [paymentId] - Unique payment identifier for deduplication
+   */
   const handleIncomingPayment = useCallback((
     walletType: 'cashu' | 'nwc' | 'breez',
     amount: number,
@@ -600,12 +708,21 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     addTransaction('receive', amount, description, walletType, { id: txId });
     setLightningStrike({ amount, show: true });
     refreshAllBalances();
+
+    // Push notification for payment received (fires when app is backgrounded)
+    notifyPaymentReceived(amount);
   }, [refreshAllBalances]);
 
   // ---------------------------------------------------------------------------
   // reconcileBreezPayments (useCallback)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Reconcile Breez payment history with local transaction list.
+   * Syncs the Breez node, fetches full payment history, and adds any transactions
+   * not yet recorded locally. Shows a lightning strike animation for the most recent
+   * missed receive payment.
+   */
   const reconcileBreezPayments = useCallback(async () => {
     if (!isBreezInitialized()) return;
 
@@ -674,6 +791,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // reconcileOnResume (useCallback)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Full wallet reconciliation triggered when the app returns to foreground.
+   * Refreshes all balances and reconciles Breez payment history to catch
+   * any payments received while the app was backgrounded.
+   */
   const reconcileOnResume = useCallback(async () => {
     console.log('[Resume] Running full wallet reconciliation...');
     try {
@@ -685,9 +807,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [refreshAllBalances, reconcileBreezPayments]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 11: Wallet restoration on login
-  // ---------------------------------------------------------------------------
+  // === Effect 11: Wallet Restoration on Login ===
+  // Triggered when `currentUserPubkey` changes. Performs three major tasks:
+  // 1. Fetches encrypted wallet backup from Nostr and merges proofs/transactions/mints
+  //    with local state. Restores gateway registrations (re-registers if needed).
+  // 2. Scans historical NIP-17 Gift Wraps (7-day lookback) for unclaimed Cashu tokens.
+  // 3. Initializes Breez SDK for mnemonic-based users (derives from stored seed),
+  //    sets up payment event subscriptions, and refreshes all balances.
 
   useEffect(() => {
     if (currentUserPubkey && !isGuest) {
@@ -865,9 +991,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentUserPubkey, isGuest]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 12: Listen for DMs (auto-redeem eCash)
-  // ---------------------------------------------------------------------------
+  // === Effect 12: Listen for DMs (Auto-Redeem eCash) ===
+  // Subscribes to incoming NIP-04 DMs. Scans decrypted content for Cashu tokens
+  // (cashuA... prefix) and auto-redeems them. Dispatches 'ecash-received-from-player'
+  // custom event so RoundContext can mark the sender as paid.
 
   useEffect(() => {
     if (isAuthenticated && !isGuest) {
@@ -899,9 +1026,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [isAuthenticated, isGuest]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 13: Listen for NIP-17 Gift Wraps
-  // ---------------------------------------------------------------------------
+  // === Effect 13: Listen for NIP-17 Gift Wraps ===
+  // Subscribes to incoming NIP-17 Gift Wrap events. Handles multiple message types:
+  // - **Cashu tokens**: Auto-redeems and triggers incoming payment animation
+  // - **Payment requests**: Dispatches 'payment-request-received' for PaymentRequestModal
+  // - **Payment confirmations**: Dispatches 'payment-confirmation-received' for hosts
+  // - **Round invites**: Triggers push notification for round invitation
 
   useEffect(() => {
     if (isAuthenticated && !isGuest) {
@@ -934,15 +1064,69 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
           }
         }
+
+        // Detect payment requests from round hosts
+        if (content && content.includes('"payment_request"')) {
+          try {
+            const parsed = JSON.parse(content);
+            if (parsed.type === 'payment_request' && parsed.invoice) {
+              window.dispatchEvent(new CustomEvent('payment-request-received', {
+                detail: {
+                  invoice: parsed.invoice,
+                  amount: parsed.amount,
+                  breakdown: parsed.breakdown,
+                  round: parsed.round,
+                  message: parsed.message,
+                  senderPubkey: event.pubkey,
+                }
+              }));
+              notifyPaymentRequest(
+                parsed.round?.course || 'a round',
+                parsed.round?.host || 'A player',
+                parsed.amount || 0
+              );
+              return; // Already handled — skip generic invite notification below
+            }
+          } catch { /* not a valid payment request JSON */ }
+        }
+
+        // Detect payment confirmations from players (for hosts)
+        if (content && content.includes('"payment_confirmation"')) {
+          try {
+            const parsed = JSON.parse(content);
+            if (parsed.type === 'payment_confirmation') {
+              window.dispatchEvent(new CustomEvent('payment-confirmation-received', {
+                detail: { senderPubkey: event.pubkey, amount: parsed.amount, round: parsed.round }
+              }));
+            }
+          } catch { /* ignore */ }
+        }
+
+        // Detect round invite messages (contain "invited you to play")
+        if (content && content.includes('invited you to play')) {
+          try {
+            const parsed = JSON.parse(content);
+            const message = parsed.message || content;
+            const inviterMatch = message.match(/^(.+?) invited you/);
+            const courseMatch = message.match(/play at (.+?)\./);
+            const hostName = inviterMatch?.[1] || 'Someone';
+            const roundName = courseMatch?.[1] || 'a round';
+            notifyRoundInvite(roundName, hostName);
+          } catch {
+            // Content may not be JSON, try plain text
+            notifyRoundInvite('a round', 'A player');
+          }
+        }
       });
 
       return () => sub.close();
     }
   }, [isAuthenticated, isGuest]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 14: Listen for Lightning Nutzaps
-  // ---------------------------------------------------------------------------
+  // === Effect 14: Listen for Lightning Nutzaps ===
+  // Subscribes to Nutzap events (Lightning zaps that produce Cashu tokens).
+  // Extracts the zap amount from the description tag, verifies the recipient
+  // matches the current user, and triggers incoming payment handling with sound.
 
   useEffect(() => {
     if (isAuthenticated && !isGuest) {
@@ -982,9 +1166,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [isAuthenticated, isGuest, currentUserPubkey]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 15: Listen for Lightning Gift Wraps
-  // ---------------------------------------------------------------------------
+  // === Effect 15: Listen for Lightning Gift Wraps ===
+  // Subscribes to Lightning-specific Gift Wrap events. These are typically
+  // generated by Lightning-to-Cashu gateway services. Extracts and redeems
+  // embedded Cashu tokens, triggers payment notification and animation.
 
   useEffect(() => {
     if (isAuthenticated && !isGuest) {
@@ -1030,9 +1215,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [isAuthenticated, isGuest]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 16: Real-time multi-gateway payment detection via WebSocket
-  // ---------------------------------------------------------------------------
+  // === Effect 16: Real-Time Multi-Gateway Payment Detection via WebSocket ===
+  // Subscribes to WebSocket updates from all registered payment gateways (npub.cash,
+  // Minibits, etc.) for real-time payment detection. When a quote transitions to PAID,
+  // mints new Cashu proofs and records the payment. Includes a 60-second fallback
+  // polling mechanism in case WebSocket events are missed.
 
   useEffect(() => {
     if (isAuthenticated && currentUserPubkey) {
@@ -1140,9 +1327,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [isAuthenticated, isGuest, currentUserPubkey]);
 
-  // ---------------------------------------------------------------------------
-  // EFFECT 17: Breez reconciliation effect
-  // ---------------------------------------------------------------------------
+  // === Effect 17: Breez Payment Reconciliation ===
+  // Triggered when the Breez balance changes. Syncs the Breez node and reconciles
+  // payment history to catch any payments that were received but not yet recorded
+  // in the local transaction list (e.g., payments received while app was backgrounded).
 
   useEffect(() => {
     reconcileBreezPayments();
@@ -1152,7 +1340,21 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // WALLET ACTIONS
   // ---------------------------------------------------------------------------
 
+  /**
+   * Generate a Lightning invoice to receive funds. Routes to the active wallet backend:
+   * - **Breez**: Creates invoice via Breez SDK
+   * - **NWC**: Creates invoice via NWC makeInvoice
+   * - **Cashu**: Creates a mint quote via the active Cashu mint
+   * @param {number} amount - Amount in satoshis to request
+   * @returns {Promise<{ request: string; quote: string }>} Lightning invoice (request) and quote ID
+   */
   const depositFunds = async (amount: number): Promise<{ request: string; quote: string }> => {
+    if (walletMode === 'breez') {
+      const result = await breezCreateInvoice(amount, 'Round Entry Fee');
+      if (!result) throw new Error('Breez invoice generation failed');
+      return { request: result.bolt11, quote: result.paymentHash };
+    }
+
     if (walletMode === 'nwc') {
       if (!nwcServiceRef.current) throw new Error("NWC not connected");
       const { invoice, paymentHash } = await nwcServiceRef.current.makeInvoice(amount, "Deposit to NWC Wallet");
@@ -1163,7 +1365,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return await walletServiceRef.current.requestDeposit(amount);
   };
 
+  /**
+   * Check whether a deposit invoice has been paid.
+   * @param {string} quote - Quote ID or payment hash returned by depositFunds
+   * @returns {Promise<boolean>} True if the invoice has been paid
+   */
   const checkDepositStatus = async (quote: string): Promise<boolean> => {
+    if (walletMode === 'breez') {
+      try {
+        const history = await getPaymentHistory();
+        return history.some((p: any) => p.paymentHash === quote && p.status === 'complete');
+      } catch { return false; }
+    }
+
     if (walletMode === 'nwc') {
       if (!nwcServiceRef.current) return false;
       try {
@@ -1179,7 +1393,21 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return await walletServiceRef.current.checkDepositQuoteStatus(quote);
   };
 
+  /**
+   * Finalize a deposit after the invoice has been paid.
+   * - **Breez/NWC**: Just refreshes balance and records the payment
+   * - **Cashu**: Mints new proofs from the quote and updates wallet state
+   * @param {string} quote - Quote ID from depositFunds
+   * @param {number} amount - Amount that was deposited
+   * @returns {Promise<boolean>} True if deposit was successfully confirmed
+   */
   const confirmDeposit = async (quote: string, amount: number): Promise<boolean> => {
+    if (walletMode === 'breez') {
+      await refreshAllBalances();
+      handleIncomingPayment('breez', amount, 'Round Entry Fee', quote);
+      return true;
+    }
+
     if (walletMode === 'nwc') {
       await refreshWalletBalance();
       handleIncomingPayment('nwc', amount, 'Received via NWC', quote);
@@ -1212,16 +1440,32 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  /**
+   * Get a fee estimate for paying a Lightning invoice (Cashu only).
+   * @param {string} invoice - BOLT11 Lightning invoice
+   * @returns {Promise<{ amount: number; fee: number }>} Invoice amount and estimated fee in sats
+   */
   const getLightningQuote = async (invoice: string): Promise<{ amount: number; fee: number }> => {
     if (!walletServiceRef.current) throw new Error("Wallet not connected");
     return await walletServiceRef.current.getLightningQuote(invoice);
   };
 
+  /**
+   * Pay a Lightning invoice using the active wallet backend.
+   * - **Breez**: Pays via Breez SDK, refreshes balance
+   * - **NWC**: Pays via NWC payInvoice, handles timeout gracefully
+   * - **Cashu**: Melts proofs to pay invoice, includes spent-proof recovery on error
+   * @param {number} amount - Expected payment amount in sats
+   * @param {string} invoice - BOLT11 Lightning invoice to pay
+   * @returns {Promise<boolean>} True if payment succeeded
+   * @throws {Error} On payment failure (after recovery attempt for Cashu)
+   */
   const sendFunds = async (amount: number, invoice: string): Promise<boolean> => {
-    // Guard: Breez wallet should use its own send functions in Wallet.tsx
     if (walletMode === 'breez') {
-      console.error('sendFunds called while in Breez mode - this should use Breez-specific functions');
-      throw new Error('Use Breez wallet send functions when in Breez mode');
+      const result = await breezPayInvoice(invoice);
+      if (!result.success) throw new Error(result.error || 'Breez payment failed');
+      await refreshAllBalances();
+      return true;
     }
 
     if (walletMode === 'nwc') {
@@ -1316,6 +1560,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  /**
+   * Create a Cashu eCash token for a given amount. Used for P2P payments
+   * (entry fees sent via DM, tournament registration, etc.).
+   * Validates proof integrity before attempting to create the token.
+   * @param {number} amount - Amount in satoshis to encode in the token
+   * @returns {Promise<string>} Serialized Cashu token string (cashuA...)
+   * @throws {Error} If wallet not connected, insufficient funds, or no valid proofs
+   */
   const createToken = async (amount: number): Promise<string> => {
     if (!walletServiceRef.current) throw new Error("Wallet not connected");
     if (walletBalance < amount) throw new Error("Insufficient funds");
@@ -1368,6 +1620,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  /**
+   * Redeem a Cashu eCash token. Extracts the mint URL from the token,
+   * receives new proofs, records a transaction, triggers lightning strike
+   * animation, and plays a sound effect.
+   * @param {string} token - Serialized Cashu token (cashuA...)
+   * @returns {Promise<boolean>} True if the token was successfully redeemed
+   */
   const receiveEcash = async (token: string): Promise<boolean> => {
     if (!walletServiceRef.current) return false;
     try {
@@ -1417,6 +1676,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  /**
+   * Manually check all npub.cash gateways for pending payments.
+   * Mints Cashu proofs for any PAID quotes not yet processed.
+   * @returns {Promise<number>} Number of payments successfully claimed
+   */
   const checkForPayments = async (): Promise<number> => {
     if (!currentUserPubkey || isGuest) return 0;
 
@@ -1481,10 +1745,20 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  /**
+   * Add a new Cashu mint. The first mint added is automatically set as active.
+   * @param {string} url - Mint URL
+   * @param {string} nickname - Display name for the mint
+   */
   const addMint = (url: string, nickname: string) => {
     setMints(prev => [...prev, { url, nickname, isActive: prev.length === 0 }]);
   };
 
+  /**
+   * Remove a Cashu mint by URL. Falls back to Minibits default if all mints are removed.
+   * Promotes the first remaining mint to active if the removed mint was active.
+   * @param {string} url - Mint URL to remove
+   */
   const removeMint = (url: string) => {
     setMints(prev => {
       const filtered = prev.filter(m => m.url !== url);
@@ -1499,14 +1773,26 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   };
 
+  /**
+   * Set the active Cashu mint. Only one mint can be active at a time.
+   * @param {string} url - URL of the mint to activate
+   */
   const setActiveMint = (url: string) => {
     setMints(prev => prev.map(m => ({ ...m, isActive: m.url === url })));
   };
 
+  /**
+   * Switch the active wallet mode. Triggers balance refresh via Effect 9.
+   * @param {'cashu' | 'nwc' | 'breez'} mode - Wallet mode to switch to
+   */
   const setWalletModeAction = (mode: 'cashu' | 'nwc' | 'breez') => {
     setWalletModeState(mode);
   };
 
+  /**
+   * Set the NWC connection URI and automatically switch to NWC mode.
+   * @param {string} uri - NWC connection URI (nostr+walletconnect://...)
+   */
   const setNwcConnection = (uri: string) => {
     setNwcString(uri);
     if (uri) {
@@ -1514,6 +1800,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  /**
+   * Restore wallet state from an encrypted backup. Merges proofs (with deduplication),
+   * transactions (by ID), and mints into the current state.
+   * @param {{ proofs: Proof[]; mints: Mint[]; transactions: WalletTransaction[] }} backup - Backup data
+   */
   const restoreWalletFromBackup = useCallback((backup: { proofs: Proof[]; mints: Mint[]; transactions: WalletTransaction[] }) => {
     if (backup.proofs && backup.proofs.length > 0) {
       setProofs(current => WalletService.deduplicateProofs(current, backup.proofs));
@@ -1593,6 +1884,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 // HOOK
 // ============================================================================
 
+/**
+ * Hook to access multi-wallet state, balances, transactions, and payment actions.
+ * @returns {WalletContextType} Wallet state, payment actions, and raw setters.
+ * @throws {Error} If called outside of WalletProvider.
+ */
 export const useWallet = (): WalletContextType => {
   const context = useContext(WalletContext);
   if (context === undefined) {

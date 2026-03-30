@@ -1,16 +1,32 @@
+/**
+ * @fileoverview Gift Wrap Service -- NIP-17/NIP-59 three-layer encrypted messaging.
+ *
+ * Implements the NIP-59 Gift Wrap protocol for sending private messages
+ * between Nostr users. This is used for P2P eCash transfers (Cashu tokens
+ * via DM), payment requests, and payment confirmations.
+ *
+ * The three encryption layers provide metadata-resistant communication:
+ *
+ * 1. **Rumor (unsigned)** -- The actual message content. Not signed to prevent
+ *    the recipient from proving authorship to a third party.
+ *
+ * 2. **Seal (Kind 13)** -- The rumor encrypted with NIP-44 to the recipient,
+ *    signed by the sender. Has a randomized timestamp for metadata resistance.
+ *
+ * 3. **Gift Wrap (Kind 1059)** -- The seal encrypted with an ephemeral key.
+ *    Only reveals the recipient (via `p` tag), not the sender. Randomized timestamp.
+ *
+ * All encryption uses NIP-44 (ChaCha20-Poly1305) via nostr-tools v2.
+ *
+ * @see NIP-59 https://github.com/nostr-protocol/nips/blob/master/59.md
+ * @see NIP-17 https://github.com/nostr-protocol/nips/blob/master/17.md
+ * @see NIP-44 https://github.com/nostr-protocol/nips/blob/master/44.md
+ */
+
 import { Event, getPublicKey, generateSecretKey, finalizeEvent } from 'nostr-tools';
 import { nip44 } from 'nostr-tools';
 import { hexToBytes } from '@noble/hashes/utils';
 import { getPool } from './nostrService';
-
-/**
- * NIP-59: Gift Wrap Service for Private Messaging
- * 
- * Implements the 3-layer encryption approach:
- * 1. Rumor: unsigned event with actual content
- * 2. Seal (kind 13): rumor encrypted to recipient, signed by sender
- * 3. Gift Wrap (kind 1059): seal encrypted with ephemeral key for privacy
- */
 
 // Random timestamp within a day
 const randomNow = () => {
@@ -84,7 +100,18 @@ const createGiftWrap = async (
 };
 
 /**
- * Send a gift-wrapped message to a recipient
+ * Send a gift-wrapped (NIP-59) message to a recipient.
+ *
+ * Constructs all three layers (rumor -> seal -> gift wrap) and publishes
+ * the gift wrap to the provided relays. At least one relay must accept
+ * the event or an error is thrown.
+ *
+ * @param content - Message content (plaintext, will be encrypted)
+ * @param senderSecretKey - Sender's Nostr secret key (for signing the seal)
+ * @param recipientPubkey - Recipient's public key (hex)
+ * @param relays - Relay URLs to publish the gift wrap to
+ * @param kind - Inner event kind (default: 14 for NIP-17 chat message)
+ * @throws {Error} If publishing fails on all relays
  */
 export const sendGiftWrap = async (
     content: string,
@@ -146,7 +173,16 @@ export const sendGiftWrap = async (
 };
 
 /**
- * Unwrap a gift wrap event to get the original rumor
+ * Unwrap a received gift wrap event to extract the original rumor.
+ *
+ * Performs two decryption steps:
+ * 1. Decrypt gift wrap content with recipient's key + ephemeral pubkey -> seal
+ * 2. Decrypt seal content with recipient's key + sender's pubkey -> rumor
+ *
+ * @param giftWrapEvent - The Kind 1059 gift wrap event from a relay
+ * @param recipientSecretKey - Recipient's secret key for decryption
+ * @returns The original unsigned rumor event with sender's pubkey and content
+ * @throws {Error} If decryption fails (wrong recipient, corrupted data)
  */
 export const unwrapGiftWrap = async (
     giftWrapEvent: Event,
@@ -175,7 +211,17 @@ export const unwrapGiftWrap = async (
 };
 
 /**
- * Subscribe to incoming gift wraps for a user
+ * Subscribe to incoming gift wrap events for a user on specified relays.
+ *
+ * Automatically unwraps each received gift wrap and passes the rumor
+ * content and sender pubkey to the callback. Used by WalletContext to
+ * listen for incoming Cashu token payments and payment requests.
+ *
+ * @param userPubkey - The user's public key (used as relay filter)
+ * @param userSecretKey - The user's secret key (for decryption)
+ * @param relays - Relay URLs to subscribe on
+ * @param onMessage - Callback invoked with each unwrapped rumor and sender pubkey
+ * @returns Cleanup function to close the subscription
  */
 export const subscribeToGiftWraps = (
     userPubkey: string,

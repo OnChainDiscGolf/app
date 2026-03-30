@@ -1,3 +1,9 @@
+/**
+ * @file index.tsx — React entry point for On-Chain Disc Golf.
+ *
+ * Mounts the root <App /> component into the #root DOM element defined in index.html.
+ * Wrapped in React.StrictMode for development-time checks (double-renders, deprecation warnings).
+ */
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';

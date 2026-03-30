@@ -1,25 +1,35 @@
 /**
- * MnemonicBackup Component
+ * @file MnemonicBackup.tsx
+ * @description Components for displaying, backing up, and recovering BIP-39
+ * mnemonic seed phrases. Exports three components:
  *
- * Displays 12/24 word mnemonic phrase for user backup.
- * Includes multiple backup options:
- * - Copy to clipboard
- * - QR Code with branding
- * - PDF Wallet Card with memory story
- * - Nostr encrypted backup
- *
- * Users must complete at least one backup action before continuing.
+ * - {@link MnemonicBackup} - Full backup flow with multiple backup options
+ *   (copy, QR download, PDF card, Nostr encrypted backup). Users must
+ *   complete at least one backup action before proceeding.
+ * - {@link MnemonicDisplay} - Read-only mnemonic display for settings views
+ *   with reveal/hide toggle and copy button.
+ * - {@link MnemonicRecoveryInput} - 12-word input form for account recovery,
+ *   supporting both word-by-word entry and paste-all modes.
  */
 
 import React, { useState } from 'react';
 import { Icons } from './Icons';
 import { splitMnemonicToWords } from '../services/mnemonicService';
-import { 
-    downloadQRCode, 
+import {
+    downloadQRCode,
     downloadWalletCardPDF,
     backupToNostr
 } from '../services/backupService';
 
+/**
+ * Props for the {@link MnemonicBackup} component.
+ *
+ * @property mnemonic - The BIP-39 mnemonic phrase string (space-separated words).
+ * @property onComplete - Callback invoked when the user completes backup and taps Continue.
+ * @property onBack - Optional callback for a back button.
+ * @property title - Heading text. Defaults to "Save Your Recovery Phrase".
+ * @property subtitle - Subheading text. Defaults to a recovery warning message.
+ */
 interface MnemonicBackupProps {
     mnemonic: string;
     onComplete: () => void;
@@ -28,6 +38,17 @@ interface MnemonicBackupProps {
     subtitle?: string;
 }
 
+/**
+ * Full-screen mnemonic backup flow.
+ *
+ * Displays the seed phrase in a 3-column grid behind a reveal overlay.
+ * Provides four backup methods: copy to clipboard, download PDF wallet card,
+ * download QR code image, and encrypted Nostr relay backup. The Continue
+ * button is disabled until the user completes at least one backup action.
+ *
+ * @param props - {@link MnemonicBackupProps}
+ * @returns The backup flow UI.
+ */
 export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
     mnemonic,
     onComplete,
@@ -363,8 +384,15 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
 };
 
 /**
- * Simplified Mnemonic Display (no backup options)
- * For showing existing mnemonic in settings/profile
+ * Read-only mnemonic phrase display for settings and profile views.
+ *
+ * Shows the seed words in a 3-column grid behind a tap-to-reveal overlay.
+ * Includes copy-to-clipboard and hide buttons when revealed. No backup
+ * action gates or continue button.
+ *
+ * @param props.mnemonic - The BIP-39 mnemonic phrase string.
+ * @param props.onClose - Optional callback to dismiss the display.
+ * @returns The mnemonic display UI.
  */
 export const MnemonicDisplay: React.FC<{
     mnemonic: string;
@@ -468,8 +496,20 @@ export const MnemonicDisplay: React.FC<{
 };
 
 /**
- * Mnemonic Recovery Input
- * For users recovering with their seed phrase
+ * 12-word mnemonic recovery input form.
+ *
+ * Supports two entry modes toggled by the user:
+ * - **Word by Word** - Individual text inputs for each of the 12 words,
+ *   with paste detection that auto-fills all fields.
+ * - **Paste All** - A single textarea for pasting the full phrase.
+ *
+ * The Recover Account button is disabled until all 12 words are entered.
+ *
+ * @param props.onSubmit - Callback with the assembled mnemonic string on submission.
+ * @param props.onCancel - Callback to dismiss the recovery form.
+ * @param props.error - Optional error message to display (e.g., invalid phrase).
+ * @param props.isLoading - Whether a recovery operation is in progress.
+ * @returns The recovery input form UI.
  */
 export const MnemonicRecoveryInput: React.FC<{
     onSubmit: (mnemonic: string) => void;

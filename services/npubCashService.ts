@@ -1,3 +1,25 @@
+/**
+ * @fileoverview npub.cash Service -- Gateway integration for Lightning address payments via Cashu.
+ *
+ * Manages connections to npub.cash and other Cashu gateway services that allow
+ * receiving Lightning payments without running a Lightning node. When someone
+ * pays a user's `npub@npubx.cash` Lightning address, the gateway converts the
+ * payment into Cashu eCash tokens that the app can claim.
+ *
+ * Features:
+ * - Multi-gateway support (npub.cash, minibits.cash, eNuts)
+ * - WebSocket subscriptions for real-time quote updates (payment notifications)
+ * - Automatic reconnection with exponential backoff (up to 10 attempts)
+ * - JWT authentication via Nostr event signing (NIP-98 style)
+ * - Gateway registration (sets preferred mint URL)
+ * - HTTP polling fallback for manual refresh
+ *
+ * The primary gateway is npub.cash (via npubx.cash API endpoint), which provides
+ * Lightning address resolution and Cashu token minting via Minibits mint.
+ *
+ * @see https://npub.cash -- npub.cash gateway service
+ */
+
 import { NPCClient, JWTAuthProvider, ConsoleLogger } from "npubcash-sdk";
 import { signEventWrapper, getSession } from './nostrService';
 import { Event } from 'nostr-tools';
@@ -61,18 +83,29 @@ const getClient = () => {
     return client;
 };
 
+/** A Cashu mint quote from a gateway representing a pending or completed payment */
 export interface NpubCashQuote {
+    /** Unique quote identifier from the gateway */
     quoteId: string;
+    /** Mint URL where tokens can be claimed */
     mintUrl: string;
+    /** Amount in satoshis */
     amount: number;
+    /** Quote state: 'UNPAID', 'PAID', 'ISSUED' */
     state: string;
+    /** Lightning invoice (Bolt11) associated with this quote */
     request: string;
 }
 
+/** Result of registering with a Cashu gateway */
 export interface GatewayRegistration {
+    /** Gateway identifier (e.g., 'npub.cash', 'minibits.cash') */
     gateway: string;
+    /** User's pubkey used for registration */
     pubkey: string;
+    /** Whether registration succeeded */
     success: boolean;
+    /** Error message if registration failed */
     error?: string;
 }
 
@@ -170,9 +203,14 @@ const getGatewayClient = (gatewayName: string): NPCClient | null => {
 };
 
 /**
- * Subscribe to real-time quote updates for all registered gateways
- * @param onUpdate Callback when a quote is updated (receives quoteId and gateway name)
- * @param onError Optional error handler
+ * Subscribe to real-time quote updates for all registered gateways.
+ *
+ * Always subscribes to npub.cash as the primary gateway, plus any
+ * additional successfully registered gateways. Uses WebSocket connections
+ * with automatic reconnection on failure.
+ *
+ * @param onUpdate - Callback when a quote is updated (receives quoteId and gateway name)
+ * @param onError - Optional error handler for WebSocket failures
  * @returns Disposer function to unsubscribe from all gateways
  */
 export const subscribeToAllGatewayUpdates = (
@@ -327,7 +365,13 @@ const unsubscribeFromGateway = (gatewayName: string): void => {
 };
 
 /**
- * Legacy function for backward compatibility - subscribes to npub.cash only
+ * Legacy function for backward compatibility -- subscribes to all gateways
+ * but presents a single-gateway callback interface.
+ *
+ * @param onUpdate - Callback when a quote is updated (receives quoteId only)
+ * @param onError - Optional error handler
+ * @returns Disposer function to unsubscribe
+ * @deprecated Use subscribeToAllGatewayUpdates for multi-gateway support
  */
 export const subscribeToQuoteUpdates = (
     onUpdate: (quoteId: string) => void,
@@ -340,7 +384,8 @@ export const subscribeToQuoteUpdates = (
 };
 
 /**
- * Unsubscribe from all gateway updates and clean up reconnection state
+ * Unsubscribe from all gateway WebSocket connections and clean up reconnection state.
+ * Called on logout or when the wallet tab is unmounted.
  */
 export const unsubscribeFromAllGatewayUpdates = () => {
     const registrations = checkGatewayRegistration();
@@ -359,7 +404,13 @@ export const unsubscribeFromQuoteUpdates = () => {
 };
 
 /**
- * Fetch all pending payments (HTTP fallback, used for manual refresh)
+ * Fetch all PAID quotes from npub.cash (HTTP fallback for manual refresh).
+ *
+ * Retrieves all quotes and filters for the 'PAID' state, which indicates
+ * payments ready to be claimed as Cashu tokens. Auth errors are handled
+ * gracefully (common for new accounts with no payment history).
+ *
+ * @returns Array of paid quotes, or empty array on failure
  */
 export const checkPendingPayments = async (): Promise<NpubCashQuote[]> => {
     const session = getSession();
@@ -492,7 +543,12 @@ export const registerWithENuts = async (): Promise<GatewayRegistration> => {
 };
 
 /**
- * Register with all supported gateways automatically
+ * Register with all supported gateways in parallel.
+ *
+ * Attempts registration with npub.cash, minibits.cash, and eNuts concurrently.
+ * Results are stored in localStorage for use by the subscription system.
+ *
+ * @returns Array of registration results (one per gateway)
  */
 export const registerWithAllGateways = async (): Promise<GatewayRegistration[]> => {
     console.log('🚀 Starting automatic gateway registration...');
@@ -536,7 +592,9 @@ export const registerWithAllGateways = async (): Promise<GatewayRegistration[]> 
 };
 
 /**
- * Check if user is registered with gateways
+ * Check which gateways the user is registered with (reads from localStorage).
+ *
+ * @returns Array of gateway registration records, or empty array if none
  */
 export const checkGatewayRegistration = (): GatewayRegistration[] => {
     const stored = localStorage.getItem('gateway_registrations');

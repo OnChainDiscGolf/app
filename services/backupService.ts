@@ -1,10 +1,23 @@
 /**
- * Backup Service
- * 
- * Provides multiple backup options for recovery phrases:
- * - QR Code generation with branding
- * - PDF Wallet Card with Memory Story
- * - Nostr encrypted backup (NIP-78)
+ * @fileoverview Backup Service -- PDF, QR, and Nostr backup generation with AES-GCM encryption.
+ *
+ * Provides multiple backup options for BIP-39 recovery phrases:
+ *
+ * 1. **QR Code** -- Mnemonic encoded as QR with app branding, downloadable as PNG
+ * 2. **PDF Wallet Card** -- A5 card with memory story (mnemonic words woven into
+ *    a narrative), QR code, and security warning. Dark theme, disc golf branding.
+ * 3. **Nostr Backup** -- Mnemonic encrypted with AES-GCM (PBKDF2 key derivation,
+ *    100k iterations) and stored locally (future: NIP-78 relay publication)
+ *
+ * The memory story feature maps each mnemonic word into a narrative template
+ * (adventure, space, disc golf, or mountain themed). Words are displayed in
+ * UPPERCASE and BOLD to distinguish them from filler text, making the backup
+ * more memorable while being harder for malware to pattern-match.
+ *
+ * Security: The story template is deterministic (same mnemonic = same story)
+ * so users can verify their backup at any time.
+ *
+ * @see mnemonicService.ts -- BIP-39 mnemonic generation and validation
  */
 
 import QRCode from 'qrcode';
@@ -97,9 +110,16 @@ const getStoryTemplateForMnemonic = (mnemonic: string): string[] => {
 };
 
 /**
- * Generate a memorable story from the mnemonic words
- * Each word is woven into a narrative structure
- * Words are returned in UPPERCASE for security (harder for malware to detect)
+ * Generate a memorable story from the mnemonic words.
+ *
+ * Each word is woven into a narrative template. Words appear in UPPERCASE
+ * to distinguish them from filler text and make them harder for malware
+ * to pattern-match against BIP-39 wordlists.
+ *
+ * The template is deterministic: same mnemonic always produces the same story.
+ *
+ * @param mnemonic - BIP-39 mnemonic phrase (12 or 24 words)
+ * @returns Plain text story with UPPERCASE mnemonic words
  */
 export const generateMemoryStory = (mnemonic: string): string => {
     const words = splitMnemonicToWords(mnemonic);
@@ -116,8 +136,14 @@ export const generateMemoryStory = (mnemonic: string): string => {
 };
 
 /**
- * Generate story for PDF with words marked for bold formatting
- * Returns object with story parts for rich text rendering
+ * Generate story for PDF with words marked for bold formatting.
+ *
+ * Returns an array of text segments, each flagged as bold or normal.
+ * The PDF renderer uses this to apply teal color + bold font to mnemonic words
+ * and slate color + normal font to filler text.
+ *
+ * @param mnemonic - BIP-39 mnemonic phrase (12 or 24 words)
+ * @returns Array of { text, isBold } segments for rich text rendering
  */
 export const generateMemoryStoryForPDF = (mnemonic: string): { text: string; isBold: boolean }[] => {
     const words = splitMnemonicToWords(mnemonic);
@@ -146,8 +172,13 @@ export const generateMemoryStoryForPDF = (mnemonic: string): { text: string; isB
 // =============================================================================
 
 /**
- * Generate a QR code as a data URL with minimal branding
- * Returns a canvas element that includes the QR + "On-Chain Disc Golf" text
+ * Generate a branded QR code as a data URL (PNG).
+ *
+ * Creates a QR code encoding the mnemonic with a white background,
+ * padding, and "On-Chain Disc Golf" branding text below.
+ *
+ * @param mnemonic - BIP-39 mnemonic phrase to encode
+ * @returns PNG data URL of the branded QR code
  */
 export const generateBrandedQRCode = async (mnemonic: string): Promise<string> => {
     // Create a canvas for the QR code
@@ -190,7 +221,9 @@ export const generateBrandedQRCode = async (mnemonic: string): Promise<string> =
 };
 
 /**
- * Download the branded QR code as an image
+ * Download the branded QR code as a PNG file (ocdg-card.png).
+ *
+ * @param mnemonic - BIP-39 mnemonic phrase to encode
  */
 export const downloadQRCode = async (mnemonic: string): Promise<void> => {
     const dataUrl = await generateBrandedQRCode(mnemonic);
@@ -336,7 +369,9 @@ export const generateWalletCardPDF = async (mnemonic: string): Promise<jsPDF> =>
 };
 
 /**
- * Download the card PDF
+ * Download the wallet card as a PDF file (ocdg-card.pdf).
+ *
+ * @param mnemonic - BIP-39 mnemonic phrase
  */
 export const downloadWalletCardPDF = async (mnemonic: string): Promise<void> => {
     const pdf = await generateWalletCardPDF(mnemonic);
@@ -348,7 +383,7 @@ export const downloadWalletCardPDF = async (mnemonic: string): Promise<void> => 
 // =============================================================================
 
 const BACKUP_EVENT_KIND = 30078; // NIP-78 Application Specific Data (parameterized replaceable)
-const BACKUP_D_TAG = 'chainlinks_encrypted_backup';
+const BACKUP_D_TAG = 'ocdg_encrypted_backup';
 
 /**
  * Simple AES-GCM encryption using Web Crypto API
@@ -446,8 +481,16 @@ const decryptWithPassword = async (
 };
 
 /**
- * Backup mnemonic to Nostr relays (encrypted)
- * User provides a password that encrypts the mnemonic before publishing
+ * Backup mnemonic to Nostr relays (AES-GCM encrypted with user password).
+ *
+ * The mnemonic is encrypted using PBKDF2 (100k iterations, SHA-256) key
+ * derivation and AES-256-GCM encryption via the Web Crypto API. The
+ * encrypted payload is currently stored in localStorage (TODO: publish
+ * as a NIP-78 event to relays).
+ *
+ * @param mnemonic - BIP-39 mnemonic phrase to back up
+ * @param password - User-chosen encryption password
+ * @returns True if backup succeeded
  */
 export const backupToNostr = async (mnemonic: string, password: string): Promise<boolean> => {
     try {
@@ -484,7 +527,13 @@ export const backupToNostr = async (mnemonic: string, password: string): Promise
 };
 
 /**
- * Restore mnemonic from Nostr backup
+ * Restore mnemonic from an encrypted Nostr backup.
+ *
+ * Decrypts the stored backup using the same AES-GCM + PBKDF2 scheme.
+ * Returns null if no backup exists or decryption fails (wrong password).
+ *
+ * @param password - The password used during backup
+ * @returns Decrypted mnemonic phrase, or null on failure
  */
 export const restoreFromNostr = async (password: string): Promise<string | null> => {
     try {
@@ -519,14 +568,18 @@ export const restoreFromNostr = async (password: string): Promise<string | null>
 };
 
 /**
- * Check if a Nostr backup exists
+ * Check if an encrypted Nostr backup exists in localStorage.
+ *
+ * @returns True if a backup payload is stored
  */
 export const hasNostrBackup = (): boolean => {
     return localStorage.getItem('cdg_nostr_backup') !== null;
 };
 
 /**
- * Get Nostr backup timestamp
+ * Get the timestamp of the most recent Nostr backup.
+ *
+ * @returns Date object of the backup, or null if no backup exists
  */
 export const getNostrBackupTimestamp = (): Date | null => {
     const timestamp = localStorage.getItem('cdg_nostr_backup_timestamp');

@@ -1,10 +1,32 @@
+/**
+ * @file RoundHistory.tsx
+ *
+ * Round history page -- displays a list of all past finalized rounds.
+ *
+ * Reads historical round data from localStorage (`cdg_round_history`), sorted
+ * by finalization date (most recent first). Each round card shows:
+ * - Course name and date (relative: "Today", "Yesterday", "3 days ago", etc.).
+ * - Final standings with score-to-par and color coding.
+ * - Payout breakdown per player.
+ * - Ace pot winners (if any).
+ * - Total pot and entry fee info.
+ *
+ * Rounds are expandable -- tap a card to reveal full details. Empty state
+ * shown when no rounds have been played yet.
+ *
+ * Route: /round-history
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { Button } from '../components/Button';
 import { Player } from '../types';
 
-// Historical round data structure (stored in localStorage)
+/**
+ * Historical round data structure saved to localStorage after each round finalization.
+ * Contains all data needed to render the round history detail view.
+ */
 export interface HistoricalRound {
   id: string;
   roundName: string;
@@ -60,6 +82,9 @@ const formatDate = (dateStr: string) => {
   });
 };
 
+/**
+ * Round history list page -- expandable cards showing past finalized rounds.
+ */
 export const RoundHistory: React.FC = () => {
   const navigate = useNavigate();
   const [rounds, setRounds] = useState<HistoricalRound[]>([]);

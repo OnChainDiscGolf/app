@@ -1,19 +1,48 @@
+/**
+ * @file RoundSummaryModal.tsx
+ * @description Modal displayed when a round is finalized, showing final
+ * standings, scores relative to par, payout amounts, ace pot results,
+ * and a "Share Results to Nostr" button that publishes a formatted note.
+ */
+
 import React, { useState } from 'react';
 import { Icons } from './Icons';
 import { Button } from './Button';
 import { Player } from '../types';
 import { publishNote } from '../services/nostrService';
 
+/**
+ * Payout information for a single player.
+ *
+ * @property playerName - Display name of the player.
+ * @property amount - Payout amount in sats.
+ * @property isCurrentUser - Whether this player is the local user.
+ */
 interface PayoutInfo {
     playerName: string;
     amount: number;
     isCurrentUser: boolean;
 }
 
+/**
+ * Props for the {@link RoundSummaryModal} component.
+ *
+ * @property isOpen - Whether the modal is visible.
+ * @property onClose - Callback invoked when the modal is dismissed.
+ * @property onDone - Optional callback when Done is tapped (for navigation).
+ * @property roundName - Course or round name displayed in the header.
+ * @property standings - Players sorted by score (ascending, best first).
+ * @property payouts - Payout info per player.
+ * @property aceWinners - Players who scored an ace, with hole numbers.
+ * @property acePotAmount - Total ace pot in sats.
+ * @property totalPot - Total prize pool in sats.
+ * @property par - Course par used for score formatting.
+ * @property isProcessingPayments - Whether payments are still being distributed.
+ */
 interface RoundSummaryModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onDone?: () => void; // Called when Done is clicked, for navigation
+    onDone?: () => void;
     roundName: string;
     standings: Player[];
     payouts: PayoutInfo[];
@@ -24,7 +53,13 @@ interface RoundSummaryModalProps {
     isProcessingPayments?: boolean;
 }
 
-// Helper to format score relative to par
+/**
+ * Format a player's total strokes relative to par.
+ *
+ * @param totalStrokes - Player's total stroke count.
+ * @param par - Course par.
+ * @returns Object with `total` strokes, `diff` string (e.g., "-3", "E", "+2"), and numeric `diffNum`.
+ */
 const formatScore = (totalStrokes: number, par: number): { total: number; diff: string; diffNum: number } => {
     const diff = totalStrokes - par;
     let diffStr = 'E';
@@ -33,6 +68,18 @@ const formatScore = (totalStrokes: number, par: number): { total: number; diff: 
     return { total: totalStrokes, diff: diffStr, diffNum: diff };
 };
 
+/**
+ * Round summary modal shown after round finalization.
+ *
+ * Displays a celebration header with trophy icon, a full standings table
+ * with rank, player name, score relative to par, and payout amounts.
+ * Shows ace pot results (or rollover notice). Includes a "Share Results
+ * to Nostr" button that publishes a formatted note with standings and
+ * hashtags. A processing indicator is shown while payments are in flight.
+ *
+ * @param props - {@link RoundSummaryModalProps}
+ * @returns The modal overlay, or `null` when `isOpen` is false.
+ */
 export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
     isOpen,
     onClose,
@@ -99,7 +146,7 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
             }
 
             lines.push('');
-            lines.push('⛓️ Scored & settled on-chain with #ChainLinks');
+            lines.push('⛓️ Scored & settled on-chain with #OnChainDiscGolf');
 
             await publishNote(lines.join('\n'));
             setShared(true);

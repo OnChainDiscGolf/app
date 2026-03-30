@@ -1,14 +1,62 @@
+/**
+ * @fileoverview Nostr Service -- Core Nostr protocol operations for the entire app.
+ *
+ * This is the primary interface to the Nostr network. It handles:
+ *
+ * **Identity & Authentication:**
+ * - Keypair generation (random, BIP-39/NIP-06 mnemonic, nsec import)
+ * - NIP-46 remote signing (Bunker URL) and NIP-46 Amber signer
+ * - Session management (localStorage-backed)
+ * - Signing/encryption wrappers that delegate to local key, NIP-46, or Amber
+ *
+ * **Publishing:**
+ * - Kind 0 profiles (with NIP-65 relay list auto-publish)
+ * - Kind 1 text notes (round results sharing)
+ * - Kind 3 contact lists (merge-update, preserves petnames)
+ * - Kind 30001 rounds (parameterized replaceable, d-tag = round ID)
+ * - Kind 30002 scores (parameterized replaceable, d-tag = round ID)
+ * - Kind 30003 tournaments (with geohash `g` tags for location discovery)
+ * - Kind 30005 wallet backups (NIP-44 self-encrypted)
+ * - Kind 30078 app data (NIP-78, recent players list)
+ * - Kind 10002 relay lists (NIP-65)
+ *
+ * **Subscriptions & Fetching:**
+ * - Real-time round/tournament score subscriptions
+ * - Profile fetching with 3s timeout for fast UX
+ * - Batch profile fetching (up to 250 contacts)
+ * - Tournament discovery (nearby via geohash, friends via p-tags)
+ * - Gift Wrap (NIP-17/NIP-59) send/receive/unwrap
+ * - NIP-04 direct messages (for feedback service)
+ * - NIP-57 nutzap subscriptions
+ * - Historical Gift Wrap recovery
+ *
+ * **Encryption:**
+ * - NIP-04 (legacy, for NWC and NIP-46 only)
+ * - NIP-44 (for wallet backups, app data, Gift Wraps)
+ * - Wrappers handle local vs NIP-46 vs Amber delegation transparently
+ *
+ * **Media:**
+ * - NIP-98 authenticated uploads to nostr.build
+ *
+ * @see NIP-06 (mnemonic key derivation)
+ * @see NIP-17/NIP-59 (Gift Wrap encrypted messaging)
+ * @see NIP-44 (versioned encryption)
+ * @see NIP-46 (remote signing / Nostr Connect)
+ * @see NIP-65 (relay list metadata)
+ * @see NIP-78 (application-specific data)
+ * @see NIP-98 (HTTP Auth for media uploads)
+ */
 
 import { SimplePool, generateSecretKey, getPublicKey, finalizeEvent, nip19, Filter, Event, nip04, nip44 } from 'nostr-tools';
-import { NOSTR_KIND_PROFILE, NOSTR_KIND_CONTACTS, NOSTR_KIND_ROUND, NOSTR_KIND_SCORE, NOSTR_KIND_APP_DATA, NOSTR_KIND_GIFT_WRAP, Player, RoundSettings, UserProfile, DisplayProfile, Proof, Mint, WalletTransaction } from '../types';
+import { NOSTR_KIND_PROFILE, NOSTR_KIND_CONTACTS, NOSTR_KIND_ROUND, NOSTR_KIND_SCORE, NOSTR_KIND_TOURNAMENT, NOSTR_KIND_APP_DATA, NOSTR_KIND_GIFT_WRAP, Player, RoundSettings, UserProfile, DisplayProfile, Proof, Mint, WalletTransaction, TournamentSettings } from '../types';
 import { bytesToHex, hexToBytes, randomBytes } from '@noble/hashes/utils';
 import { generateNostrConnectURI, signEventWithAmber, nip04EncryptWithAmber, nip04DecryptWithAmber } from './amberSigner';
-import { 
-    generateNewIdentity, 
-    deriveNostrKeyFromMnemonic, 
-    validateMnemonic, 
-    storeMnemonicEncrypted, 
-    setAuthSource, 
+import {
+    generateNewIdentity,
+    deriveNostrKeyFromMnemonic,
+    validateMnemonic,
+    storeMnemonicEncrypted,
+    setAuthSource,
     setUnifiedSeed,
     AuthSource
 } from './mnemonicService';
@@ -20,11 +68,16 @@ const DEFAULT_RELAYS = [
     'wss://relay.primal.net',     // Primal's relay, excellent indexing and uptime
     'wss://nos.lol',              // Very popular, fast, and stable
     'wss://relay.nostr.band',     // Excellent search/indexing, great for profile discovery
-    'wss://purplepag.es',         // Optimized for profile/metadata discovery
+    'wss://purplepag.es',         // Optimized for profile/metadata discovery (Kind 0, 10002 only)
     'wss://relay.snort.social',   // Reliable, well-maintained by Snort team
     'wss://nostr.wine',           // Free tier, well-connected across the network
     'wss://relay.nostr.net',      // Stable general-purpose relay
 ];
+
+// Relays that only accept metadata events (Kind 0, 3, 10002) - don't publish notes here
+const METADATA_ONLY_RELAYS = new Set([
+    'wss://purplepag.es',
+]);
 
 // Load relays from storage or use defaults
 let activeRelays: string[] = [...DEFAULT_RELAYS];
@@ -40,7 +93,37 @@ try {
     console.warn("Failed to load relays from storage", e);
 }
 
+// Track whether relay list (NIP-65) has been published this session
+let relayListPublished = false;
+
 const pool = new SimplePool();
+
+// Publish event to multiple relays, waiting for all to respond (with timeout)
+// Returns count of successful relay publishes
+const publishToRelays = async (relays: string[], event: Event): Promise<number> => {
+    if (relays.length === 0) throw new Error('No relays to publish to');
+
+    const promises = pool.publish(relays, event).map(p =>
+        Promise.race([
+            p.then(() => true as const),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Relay timeout')), 5000))
+        ])
+    );
+
+    const results = await Promise.allSettled(promises);
+    const successes = results.filter(r => r.status === 'fulfilled').length;
+
+    if (successes === 0) {
+        const errors = results
+            .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+            .map((r, i) => `${relays[i]}: ${r.reason?.message || 'Unknown'}`);
+        console.error('Failed to publish to any relay:', errors);
+        throw new Error(`Failed to publish to any relay`);
+    }
+
+    console.log(`Nostr: published to ${successes}/${relays.length} relays`);
+    return successes;
+};
 
 // Polyfill/Helper for Promise.any
 const promiseAny = <T>(promises: Iterable<Promise<T>>): Promise<T> => {
@@ -69,6 +152,17 @@ const promiseAny = <T>(promises: Iterable<Promise<T>>): Promise<T> => {
 
 // --- Helper for list (Improved Robustness) ---
 
+/**
+ * Query events from multiple relays with deduplication and configurable timeout.
+ *
+ * Subscribes to all provided relays, collects events (deduplicated by ID),
+ * and resolves when all relays have sent EOSE or the timeout expires.
+ *
+ * @param relays - Relay URLs to query (falls back to DEFAULT_RELAYS if empty)
+ * @param filters - Nostr filter objects (kinds, authors, tags, etc.)
+ * @param timeoutMs - Maximum wait time in ms (default: 6000, use 3000 for profiles)
+ * @returns Deduplicated array of matching events
+ */
 export const listEvents = async (relays: string[], filters: Filter[], timeoutMs: number = 6000): Promise<Event[]> => {
     // Ensure we have valid relays
     const targetRelays = (relays && relays.length > 0) ? relays : DEFAULT_RELAYS;
@@ -115,13 +209,30 @@ export const listEvents = async (relays: string[], filters: Filter[], timeoutMs:
 
 // --- Relay Management ---
 
+/** Get the current list of active relay URLs */
 export const getRelays = () => activeRelays;
+
+/**
+ * Get relays that accept regular notes (excludes metadata-only relays like purplepag.es).
+ *
+ * @returns Filtered relay list suitable for Kind 1, Kind 30001, etc.
+ */
+export const getWriteRelays = (): string[] => {
+    return activeRelays.filter(r => !METADATA_ONLY_RELAYS.has(r));
+};
 
 const saveRelays = (relays: string[]) => {
     activeRelays = relays;
+    relayListPublished = false; // Re-publish NIP-65 on next note/profile publish
     localStorage.setItem('cdg_relays', JSON.stringify(activeRelays));
 };
 
+/**
+ * Add a relay URL to the active relay list and persist to localStorage.
+ * Automatically prepends wss:// if no protocol is specified.
+ *
+ * @param url - Relay URL to add
+ */
 export const addRelay = (url: string) => {
     let cleanUrl = url.trim();
     if (!cleanUrl.startsWith('wss://') && !cleanUrl.startsWith('ws://')) {
@@ -132,16 +243,23 @@ export const addRelay = (url: string) => {
     }
 };
 
+/** Remove a relay URL from the active list and persist to localStorage */
 export const removeRelay = (url: string) => {
     saveRelays(activeRelays.filter(r => r !== url));
 };
 
+/** Reset relays to the default hardcoded list */
 export const resetRelays = () => {
     saveRelays([...DEFAULT_RELAYS]);
 };
 
 // --- Key Management & Auth ---
 
+/**
+ * Get the current Nostr session from localStorage.
+ *
+ * @returns Session object with auth method, public key, and optional secret key, or null if not logged in
+ */
 export const getSession = () => {
     const method = localStorage.getItem('auth_method');
     const pk = localStorage.getItem('nostr_pk');
@@ -155,6 +273,12 @@ export const getSession = () => {
     };
 };
 
+/**
+ * Generate a new random Nostr keypair and store in localStorage.
+ *
+ * @deprecated Use generateNewProfileFromMnemonic() for new users (supports unified backup).
+ * @returns Object with public key and secret key
+ */
 export const generateNewProfile = () => {
     const secret = generateSecretKey();
     const pk = getPublicKey(secret);
@@ -242,6 +366,16 @@ export const loginWithMnemonic = (mnemonic: string): {
     };
 };
 
+/**
+ * Login with an existing nsec (bech32-encoded private key).
+ *
+ * Decodes the nsec, derives the public key, and stores both in localStorage.
+ * Sets auth source to 'nsec' and unified seed to false (Breez needs separate mnemonic).
+ *
+ * @param nsec - bech32-encoded Nostr secret key (nsec1...)
+ * @returns Object with public key and secret key
+ * @throws {Error} If the nsec is invalid
+ */
 export const loginWithNsec = (nsec: string) => {
     try {
         const { type, data } = nip19.decode(nsec);
@@ -283,6 +417,19 @@ const waitForNip46Response = async (id: string, relays: string[], timeoutMs = 10
     });
 };
 
+/**
+ * Login via NIP-46 remote signer (Bunker URL).
+ *
+ * Connects to a remote signer via an ephemeral keypair and Nostr relays.
+ * The remote signer holds the user's actual private key; this app only
+ * gets signing capabilities via the NIP-46 protocol.
+ *
+ * @param bunkerUrl - NIP-46 bunker URL (bunker://pubkey?relay=...&secret=...)
+ * @returns Object with the user's public key
+ * @throws {Error} If connection fails or remote signer rejects
+ *
+ * @see NIP-46 https://github.com/nostr-protocol/nips/blob/master/46.md
+ */
 export const loginWithNip46 = async (bunkerUrl: string) => {
     try {
         if (!bunkerUrl.startsWith('bunker://')) throw new Error('Invalid Bunker URL');
@@ -361,6 +508,17 @@ export const loginWithNip46 = async (bunkerUrl: string) => {
 
 // --- Amber (NIP-46) Implementation ---
 
+/**
+ * Initiate login via Amber Android signer app (NIP-46).
+ *
+ * Opens a nostrconnect:// deep link to launch Amber. The user approves
+ * the connection in Amber and returns to the app. Call completeAmberLogin()
+ * when the user returns with their pubkey.
+ *
+ * @param relay - Relay for NIP-46 communication (default: relay.damus.io)
+ * @returns Object with `pending: true` (connection completes asynchronously)
+ * @throws {Error} If deep link creation fails
+ */
 export const loginWithAmber = async (relay: string = 'wss://relay.damus.io') => {
     try {
         // Generate ephemeral keypair for Amber connection
@@ -388,7 +546,13 @@ export const loginWithAmber = async (relay: string = 'wss://relay.damus.io') => 
     }
 };
 
-// Complete Amber login after user returns from Amber app
+/**
+ * Complete the Amber login after the user returns from the Amber app.
+ *
+ * @param userPubkey - The user's public key (obtained from Amber)
+ * @returns Object with the user's public key
+ * @throws {Error} If no pending Amber session exists
+ */
 export const completeAmberLogin = async (userPubkey: string) => {
     const ephemeralSkHex = localStorage.getItem('amber_ephemeral_sk');
     const relay = localStorage.getItem('amber_relay');
@@ -407,6 +571,12 @@ export const completeAmberLogin = async (userPubkey: string) => {
     return { pk: userPubkey };
 };
 
+/**
+ * Log out by clearing all auth-related localStorage keys.
+ *
+ * Removes local keys, NIP-46 session data, and Amber session data.
+ * Does NOT clear mnemonic storage (that's handled by mnemonicService.clearMnemonicStorage).
+ */
 export const logout = () => {
     localStorage.removeItem('nostr_sk');
     localStorage.removeItem('nostr_pk');
@@ -459,6 +629,18 @@ const getAuthContext = () => {
     throw new Error("Unknown auth method");
 };
 
+/**
+ * Sign a Nostr event template using the current auth method.
+ *
+ * Transparently delegates to:
+ * - Local signing (finalizeEvent) for local key users
+ * - Amber remote signing for Amber users
+ * - NIP-46 remote signing for Bunker users
+ *
+ * @param template - Unsigned event template (kind, tags, content, created_at)
+ * @returns Fully signed Nostr event with id, pubkey, and sig
+ * @throws {Error} If not authenticated or signing fails
+ */
 export const signEventWrapper = async (template: any) => {
     const ctx = getAuthContext();
 
@@ -647,6 +829,18 @@ const decryptInternal = async (senderPubkey: string, ciphertext: string): Promis
 
 // --- Media Upload (NIP-98 / Blossom) ---
 
+/**
+ * Upload a profile image to nostr.build using NIP-98 HTTP Auth.
+ *
+ * Signs a Kind 27235 auth event and includes it as a Bearer token
+ * in the upload request. Uses the current session's signing method.
+ *
+ * @param file - Image file to upload
+ * @returns URL of the uploaded image
+ * @throws {Error} If upload fails or response is invalid
+ *
+ * @see NIP-98 https://github.com/nostr-protocol/nips/blob/master/98.md
+ */
 export const uploadProfileImage = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
@@ -731,6 +925,15 @@ export const uploadProfileImageWithKey = async (file: File, secretKey: Uint8Arra
 
 // --- Publishing ---
 
+/**
+ * Publish a Kind 0 profile metadata event to all relays.
+ *
+ * Also ensures the NIP-65 relay list is published for discoverability.
+ * Publishes to all relays including metadata-only (purplepag.es).
+ *
+ * @param profile - User profile data (name, about, picture, lud16, nip05, pdga)
+ * @returns The published event
+ */
 export const publishProfile = async (profile: UserProfile) => {
     const metadata: Record<string, string | undefined> = {
         name: profile.name,
@@ -754,7 +957,12 @@ export const publishProfile = async (profile: UserProfile) => {
         content: JSON.stringify(metadata),
     });
 
-    await promiseAny(pool.publish(getRelays(), event));
+    // Publish profile to all relays (including metadata-only like purplepag.es)
+    await publishToRelays(getRelays(), event);
+
+    // Ensure NIP-65 relay list is published for discoverability
+    await ensureRelayListPublished();
+
     return event;
 };
 
@@ -785,6 +993,14 @@ export const publishProfileWithKey = async (profile: UserProfile, secretKey: Uin
     return event;
 };
 
+/**
+ * Publish a Kind 30001 round event (parameterized replaceable, d-tag = round ID).
+ *
+ * Tags all players with `p` tags for notification discovery.
+ *
+ * @param round - Round settings to publish
+ * @returns The published event
+ */
 export const publishRound = async (round: RoundSettings) => {
     const content = JSON.stringify({
         name: round.name,
@@ -799,7 +1015,7 @@ export const publishRound = async (round: RoundSettings) => {
     const tags = [
         ['d', round.id],
         ['t', 'discgolf'],
-        ['client', 'ChainLinks']
+        ['client', 'On-Chain Disc Golf']
     ];
 
     // Tag all players so they can be notified
@@ -821,6 +1037,44 @@ export const publishRound = async (round: RoundSettings) => {
 };
 
 /**
+ * Publish NIP-65 relay list (Kind 10002) so other clients know where to find this user's notes.
+ * Without this, clients using the outbox model won't discover notes from this pubkey.
+ */
+export const publishRelayList = async (): Promise<Event> => {
+    const tags = activeRelays.map(relay => {
+        if (METADATA_ONLY_RELAYS.has(relay)) {
+            return ['r', relay, 'read'];
+        }
+        return ['r', relay];
+    });
+
+    const event = await signEventWrapper({
+        kind: 10002,
+        created_at: Math.floor(Date.now() / 1000),
+        tags,
+        content: '',
+    });
+
+    // Publish to ALL relays including metadata-only (purplepag.es accepts Kind 10002)
+    await publishToRelays(activeRelays, event);
+    relayListPublished = true;
+    return event;
+};
+
+/**
+ * Ensure relay list has been published this session (lazy, only publishes once)
+ */
+const ensureRelayListPublished = async () => {
+    if (!relayListPublished) {
+        try {
+            await publishRelayList();
+        } catch (e) {
+            console.warn('Failed to publish relay list:', e);
+        }
+    }
+};
+
+/**
  * Publish a Kind 1 text note to Nostr (for sharing round results, etc.)
  */
 export const publishNote = async (content: string, tags?: string[][]): Promise<Event> => {
@@ -829,16 +1083,33 @@ export const publishNote = async (content: string, tags?: string[][]): Promise<E
         created_at: Math.floor(Date.now() / 1000),
         tags: [
             ['t', 'discgolf'],
-            ['client', 'ChainLinks'],
+            ['client', 'On-Chain Disc Golf'],
             ...(tags || [])
         ],
         content,
     });
 
-    await promiseAny(pool.publish(getRelays(), event));
+    // Publish to write-capable relays (excludes metadata-only relays like purplepag.es)
+    await publishToRelays(getWriteRelays(), event);
+
+    // Ensure NIP-65 relay list is published for discoverability
+    await ensureRelayListPublished();
+
     return event;
 };
 
+/**
+ * Publish a Kind 30002 score event for a round (parameterized replaceable, d-tag = round ID).
+ *
+ * Validates the event signature before publishing. Each player publishes
+ * their own score event, which other clients can verify.
+ *
+ * @param roundId - The round's d-tag identifier
+ * @param scores - Hole-by-hole scores keyed by hole number
+ * @param totalScore - Aggregate score
+ * @returns The published event
+ * @throws {Error} If event validation fails
+ */
 export const publishScore = async (roundId: string, scores: Record<number, number>, totalScore: number) => {
     const content = JSON.stringify({
         scores,
@@ -881,8 +1152,8 @@ export const publishRecentPlayers = async (players: DisplayProfile[]) => {
         kind: NOSTR_KIND_APP_DATA,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
-            ['d', 'chainlinks_recent_players'],
-            ['client', 'ChainLinks']
+            ['d', 'ocdg_recent_players'],
+            ['client', 'On-Chain Disc Golf']
         ],
         content: encryptedContent,
     });
@@ -896,7 +1167,7 @@ export const fetchRecentPlayers = async (pubkey: string): Promise<DisplayProfile
         const events = await listEvents(getRelays(), [{
             kinds: [NOSTR_KIND_APP_DATA],
             authors: [pubkey],
-            '#d': ['chainlinks_recent_players']
+            '#d': ['ocdg_recent_players']
         }]);
 
         if (events.length === 0) return [];
@@ -912,6 +1183,12 @@ export const fetchRecentPlayers = async (pubkey: string): Promise<DisplayProfile
 
 // --- Contacts (Kind 3) ---
 
+/**
+ * Fetch a user's Kind 3 contact list (array of followed pubkeys).
+ *
+ * @param pubkey - User's public key
+ * @returns Array of followed pubkey hex strings
+ */
 export const fetchContactList = async (pubkey: string): Promise<string[]> => {
     try {
         const events = await listEvents(getRelays(), [{
@@ -930,6 +1207,15 @@ export const fetchContactList = async (pubkey: string): Promise<string[]> => {
     }
 };
 
+/**
+ * Merge new pubkeys into the user's Kind 3 contact list and publish.
+ *
+ * Fetches the current contact list, adds new pubkeys that aren't already
+ * present, and republishes. Preserves existing petnames, relay hints, and
+ * content (relay map JSON).
+ *
+ * @param newPubkeys - Array of pubkeys to add to the contact list
+ */
 export const updateContactList = async (newPubkeys: string[]) => {
     const session = getSession();
     if (!session) return;
@@ -982,6 +1268,15 @@ export const updateContactList = async (newPubkeys: string[]) => {
     }
 };
 
+/**
+ * Batch-fetch Kind 0 profiles for multiple pubkeys (up to 250).
+ *
+ * Used for populating contact list displays. Returns the most recent
+ * profile for each pubkey. Skips profiles with invalid JSON.
+ *
+ * @param pubkeys - Array of pubkeys to fetch profiles for
+ * @returns Array of display profiles with name, image, and NIP-05
+ */
 export const fetchProfilesBatch = async (pubkeys: string[]): Promise<DisplayProfile[]> => {
     if (pubkeys.length === 0) return [];
 
@@ -1026,6 +1321,19 @@ export const fetchProfilesBatch = async (pubkeys: string[]): Promise<DisplayProf
 
 const NOSTR_KIND_WALLET_BACKUP = 30005; // Replaceable event for wallet backup
 
+/**
+ * Publish an encrypted wallet backup to Nostr relays (Kind 30005, d-tag = cashu_wallet_backup).
+ *
+ * The backup contains Cashu proofs, mint configurations, transaction history,
+ * and gateway registrations. Content is self-encrypted with NIP-44.
+ *
+ * @param proofs - Cashu proofs to back up
+ * @param mints - Configured mint list
+ * @param transactions - Transaction history
+ * @param gatewayRegistrations - Optional gateway registration records
+ * @returns The published event
+ * @throws {Error} If not authenticated or publishing fails
+ */
 export const publishWalletBackup = async (proofs: Proof[], mints: Mint[], transactions: WalletTransaction[], gatewayRegistrations?: any[]) => {
     const session = getSession();
     if (!session) throw new Error("Not authenticated");
@@ -1051,7 +1359,7 @@ export const publishWalletBackup = async (proofs: Proof[], mints: Mint[], transa
         created_at: Math.floor(Date.now() / 1000),
         tags: [
             ['d', 'cashu_wallet_backup'],
-            ['client', 'ChainLinks']
+            ['client', 'On-Chain Disc Golf']
         ],
         content: encryptedContent,
     });
@@ -1069,6 +1377,15 @@ export const publishWalletBackup = async (proofs: Proof[], mints: Mint[], transa
     }
 };
 
+/**
+ * Fetch and decrypt the latest wallet backup from Nostr relays.
+ *
+ * Queries for Kind 30005 events with d-tag 'cashu_wallet_backup', decrypts
+ * the most recent one using NIP-44, and returns the wallet state.
+ *
+ * @param pubkey - User's public key to query backups for
+ * @returns Decrypted wallet backup data, or null if no backup found
+ */
 export const fetchWalletBackup = async (pubkey: string): Promise<{ proofs: Proof[], mints: Mint[], transactions: WalletTransaction[], gatewayRegistrations?: any[] } | null> => {
     console.log(`🔍 [Backup] Fetching wallet backup for pubkey: ${pubkey.substring(0, 8)}...`);
     console.log(`🔍 [Backup] Querying ${getRelays().length} relays for kind ${NOSTR_KIND_WALLET_BACKUP} events...`);
@@ -1113,6 +1430,13 @@ export const fetchWalletBackup = async (pubkey: string): Promise<{ proofs: Proof
 
 // --- Subscribing / Fetching ---
 
+/**
+ * Subscribe to real-time score updates for a specific round.
+ *
+ * @param roundId - The round's d-tag identifier
+ * @param callback - Called with each incoming score event
+ * @returns Subscription object with close() method
+ */
 export const subscribeToRound = (roundId: string, callback: (event: any) => void) => {
     const filters: Filter[] = [{
         kinds: [NOSTR_KIND_SCORE],
@@ -1130,6 +1454,15 @@ export const subscribeToRound = (roundId: string, callback: (event: any) => void
     );
 };
 
+/**
+ * Subscribe to rounds that tag a specific player (last 24 hours).
+ *
+ * Used to detect when the user is invited to a new round.
+ *
+ * @param userPubkey - Player's public key to watch for
+ * @param callback - Called with each incoming round event
+ * @returns Subscription object with close() method
+ */
 export const subscribeToPlayerRounds = (userPubkey: string, callback: (event: Event) => void) => {
     const filters: Filter[] = [{
         kinds: [NOSTR_KIND_ROUND],
@@ -1148,6 +1481,333 @@ export const subscribeToPlayerRounds = (userPubkey: string, callback: (event: Ev
     );
 };
 
+// --- Round Fetching ---
+
+const parseRoundEvent = (event: any): RoundSettings | null => {
+    try {
+        const content = JSON.parse(event.content);
+        const dTag = event.tags?.find((t: string[]) => t[0] === 'd')?.[1] || '';
+        const playerTags = event.tags?.filter((t: string[]) => t[0] === 'p').map((t: string[]) => t[1]) || [];
+        return {
+            id: dTag,
+            eventId: event.id,
+            pubkey: event.pubkey,
+            name: content.name || '',
+            courseName: content.courseName || '',
+            entryFeeSats: content.entryFeeSats || 0,
+            acePotFeeSats: content.acePotFeeSats || 0,
+            date: content.date || '',
+            isFinalized: content.isFinalized || false,
+            holeCount: content.holeCount || 18,
+            par: content.par || 54,
+            players: playerTags,
+            startingHole: content.startingHole || 1,
+            trackPenalties: content.trackPenalties || false,
+            hideOverallScore: content.hideOverallScore || false,
+            useHonorSystem: content.useHonorSystem,
+            payoutConfig: content.payoutConfig,
+            playerHandicaps: content.playerHandicaps,
+        };
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Fetch a specific round event by its d-tag ID.
+ *
+ * @param roundId - The round's d-tag identifier
+ * @param authorPubkey - Optional author filter (for disambiguating same-ID rounds)
+ * @returns Parsed RoundSettings or null if not found
+ */
+export const fetchRound = async (roundId: string, authorPubkey?: string): Promise<RoundSettings | null> => {
+    try {
+        const filter: any = { kinds: [NOSTR_KIND_ROUND], '#d': [roundId] };
+        if (authorPubkey) filter.authors = [authorPubkey];
+
+        const events = await pool.querySync(getRelays(), filter);
+        if (!events || events.length === 0) return null;
+
+        const latest = events.sort((a, b) => b.created_at - a.created_at)[0];
+        return parseRoundEvent(latest);
+    } catch (e) {
+        console.warn('Failed to fetch round:', e);
+        return null;
+    }
+};
+
+// --- Tournament Events ---
+
+/**
+ * Publish a Kind 30003 tournament event with geohash tags for location discovery.
+ *
+ * Tags all registered players with `p` tags and adds `g` tags at multiple
+ * geohash precision levels (3-6 chars) for relay-side geographic filtering.
+ *
+ * @param tournament - Complete tournament settings
+ * @returns The published event
+ */
+export const publishTournament = async (tournament: TournamentSettings) => {
+    const content = JSON.stringify({
+        name: tournament.name,
+        courseName: tournament.courseName,
+        date: tournament.date,
+        holeCount: tournament.holeCount,
+        par: tournament.par,
+        entryFeeSats: tournament.entryFeeSats,
+        acePotFeeSats: tournament.acePotFeeSats,
+        maxPlayers: tournament.maxPlayers,
+        cardSize: tournament.cardSize,
+        cardAssignmentMode: tournament.cardAssignmentMode,
+        phase: tournament.phase,
+        cards: tournament.cards,
+        registeredPlayers: tournament.registeredPlayers,
+        payoutConfig: tournament.payoutConfig,
+        playerHandicaps: tournament.playerHandicaps,
+        isFinalized: tournament.isFinalized,
+        latitude: tournament.latitude,
+        longitude: tournament.longitude,
+        geohash: tournament.geohash,
+        locationName: tournament.locationName,
+    });
+
+    const tags: string[][] = [
+        ['d', tournament.id],
+        ['t', 'discgolf-tournament'],
+        ['client', 'On-Chain Disc Golf'],
+    ];
+
+    // Tag all registered players so they can discover the tournament
+    if (tournament.registeredPlayers && tournament.registeredPlayers.length > 0) {
+        tournament.registeredPlayers.forEach(pubkey => {
+            tags.push(['p', pubkey]);
+        });
+    }
+
+    // Add geohash tags at multiple precision levels for location-based discovery
+    if (tournament.geohash) {
+        for (let i = 3; i <= tournament.geohash.length; i++) {
+            tags.push(['g', tournament.geohash.substring(0, i)]);
+        }
+    }
+
+    const event = await signEventWrapper({
+        kind: NOSTR_KIND_TOURNAMENT,
+        created_at: Math.floor(Date.now() / 1000),
+        tags,
+        content,
+    });
+
+    await promiseAny(pool.publish(getRelays(), event));
+    return event;
+};
+
+export const subscribeTournament = (tournamentId: string, callback: (event: any) => void) => {
+    const filters: Filter[] = [{
+        kinds: [NOSTR_KIND_TOURNAMENT],
+        '#d': [tournamentId],
+    }];
+
+    return pool.subscribeMany(
+        getRelays(),
+        filters as any,
+        {
+            onevent(event) {
+                callback(event);
+            },
+        }
+    );
+};
+
+export const subscribeToTournamentScores = (cardRoundIds: string[], callback: (event: any) => void) => {
+    if (cardRoundIds.length === 0) return { close: () => { } };
+
+    const filters: Filter[] = [{
+        kinds: [NOSTR_KIND_SCORE],
+        '#d': cardRoundIds,
+    }];
+
+    return pool.subscribeMany(
+        getRelays(),
+        filters as any,
+        {
+            onevent(event) {
+                callback(event);
+            },
+        }
+    );
+};
+
+// Parse a raw Kind 30003 Nostr event into TournamentSettings
+const parseTournamentEvent = (event: any): TournamentSettings | null => {
+    try {
+        const content = JSON.parse(event.content);
+        const dTag = event.tags?.find((t: string[]) => t[0] === 'd')?.[1] || '';
+        return {
+            id: dTag,
+            eventId: event.id,
+            pubkey: event.pubkey,
+            name: content.name || '',
+            courseName: content.courseName || '',
+            date: content.date || '',
+            holeCount: content.holeCount || 18,
+            par: content.par || 54,
+            entryFeeSats: content.entryFeeSats || 0,
+            acePotFeeSats: content.acePotFeeSats || 0,
+            maxPlayers: content.maxPlayers || 20,
+            cardSize: content.cardSize || 4,
+            cardAssignmentMode: content.cardAssignmentMode || 'random',
+            phase: content.phase || 'registration',
+            cards: content.cards || [],
+            registeredPlayers: content.registeredPlayers || [],
+            payoutConfig: content.payoutConfig,
+            playerHandicaps: content.playerHandicaps,
+            isFinalized: content.isFinalized || false,
+            latitude: content.latitude,
+            longitude: content.longitude,
+            geohash: content.geohash,
+            locationName: content.locationName,
+        };
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Fetch a specific tournament event by its d-tag ID.
+ *
+ * @param tournamentId - The tournament's d-tag identifier
+ * @returns Parsed TournamentSettings or null if not found
+ */
+export const fetchTournament = async (tournamentId: string): Promise<TournamentSettings | null> => {
+    try {
+        const events = await pool.querySync(
+            getRelays(),
+            { kinds: [NOSTR_KIND_TOURNAMENT], '#d': [tournamentId] } as any
+        );
+
+        if (!events || events.length === 0) return null;
+
+        // Get most recent version
+        const latest = events.sort((a, b) => b.created_at - a.created_at)[0];
+        return parseTournamentEvent(latest);
+    } catch (e) {
+        console.warn('Failed to fetch tournament:', e);
+        return null;
+    }
+};
+
+export const subscribeToPlayerTournaments = (userPubkey: string, callback: (event: Event) => void) => {
+    const filters: Filter[] = [{
+        kinds: [NOSTR_KIND_TOURNAMENT],
+        '#p': [userPubkey],
+        since: Math.floor(Date.now() / 1000) - (60 * 60 * 24) // Look back 24 hours
+    }];
+
+    return pool.subscribeMany(
+        getRelays(),
+        filters as any,
+        {
+            onevent(event) {
+                callback(event);
+            },
+        }
+    );
+};
+
+// --- Tournament Discovery ---
+
+/**
+ * Discover tournaments near a geographic location using geohash prefix matching.
+ *
+ * Queries relays for Kind 30003 events with matching `g` tags at specified
+ * geohash precision levels. Deduplicates by d-tag, keeping the most recent.
+ *
+ * @param ghPrefixes - Geohash prefixes to search (e.g., ["9x0", "9x1"])
+ * @param since - Unix timestamp to search from
+ * @returns Array of nearby tournament settings
+ */
+export const discoverNearbyTournaments = async (ghPrefixes: string[], since: number): Promise<TournamentSettings[]> => {
+    if (ghPrefixes.length === 0) return [];
+    try {
+        const events = await listEvents(getRelays(), [{
+            kinds: [NOSTR_KIND_TOURNAMENT],
+            '#g': ghPrefixes,
+            since,
+            limit: 50,
+        } as any]);
+
+        // Deduplicate by d-tag, keeping most recent
+        const byDTag = new Map<string, any>();
+        for (const ev of events) {
+            const dTag = ev.tags?.find((t: string[]) => t[0] === 'd')?.[1];
+            if (!dTag) continue;
+            const existing = byDTag.get(dTag);
+            if (!existing || ev.created_at > existing.created_at) {
+                byDTag.set(dTag, ev);
+            }
+        }
+
+        return Array.from(byDTag.values())
+            .map(parseTournamentEvent)
+            .filter((t): t is TournamentSettings => t !== null);
+    } catch (e) {
+        console.warn('Failed to discover nearby tournaments:', e);
+        return [];
+    }
+};
+
+/**
+ * Discover tournaments that friends/contacts are participating in.
+ *
+ * Queries for Kind 30003 events tagged with any of the provided pubkeys.
+ *
+ * @param pubkeys - Array of friend/contact public keys
+ * @param since - Unix timestamp to search from
+ * @returns Array of tournament settings friends are in
+ */
+export const discoverFriendsTournaments = async (pubkeys: string[], since: number): Promise<TournamentSettings[]> => {
+    if (pubkeys.length === 0) return [];
+    try {
+        const events = await listEvents(getRelays(), [{
+            kinds: [NOSTR_KIND_TOURNAMENT],
+            '#p': pubkeys,
+            since,
+            limit: 100,
+        } as any]);
+
+        // Deduplicate by d-tag, keeping most recent
+        const byDTag = new Map<string, any>();
+        for (const ev of events) {
+            const dTag = ev.tags?.find((t: string[]) => t[0] === 'd')?.[1];
+            if (!dTag) continue;
+            const existing = byDTag.get(dTag);
+            if (!existing || ev.created_at > existing.created_at) {
+                byDTag.set(dTag, ev);
+            }
+        }
+
+        return Array.from(byDTag.values())
+            .map(parseTournamentEvent)
+            .filter((t): t is TournamentSettings => t !== null);
+    } catch (e) {
+        console.warn('Failed to discover friends tournaments:', e);
+        return [];
+    }
+};
+
+// --- Gift Wrap ---
+
+/**
+ * Subscribe to incoming NIP-17 Gift Wrap events (Kind 1059) for the current user.
+ *
+ * Automatically unwraps each gift wrap using NIP-44 decryption and passes the
+ * inner rumor event to the callback. Used by WalletContext for detecting incoming
+ * Cashu token payments and payment requests.
+ *
+ * @param callback - Called with the unwrapped rumor event
+ * @returns Subscription object with close() method
+ */
 export const subscribeToGiftWraps = (callback: (event: Event) => void) => {
     const session = getSession();
     if (!session) return { close: () => { } };
@@ -1309,6 +1969,15 @@ export const fetchHistoricalGiftWraps = async (
     }
 };
 
+/**
+ * Generate a "magic" Lightning address using npub.cash.
+ *
+ * Converts a hex pubkey to npub and constructs an `npub@npubx.cash` address
+ * that the npub.cash gateway will resolve to a Cashu-backed Lightning endpoint.
+ *
+ * @param pubkey - User's Nostr public key (hex)
+ * @returns Lightning address string (e.g., "npub1abc...@npubx.cash")
+ */
 export const getMagicLightningAddress = (pubkey: string): string => {
     try {
         const npub = nip19.npubEncode(pubkey);
@@ -1320,6 +1989,21 @@ export const getMagicLightningAddress = (pubkey: string): string => {
     }
 };
 
+/**
+ * Send a NIP-17 Gift Wrap message (3-layer encrypted) to a recipient.
+ *
+ * Constructs: Rumor (Kind 14) -> Seal (Kind 13, NIP-44 encrypted) ->
+ * Gift Wrap (Kind 1059, NIP-44 encrypted with ephemeral key).
+ *
+ * Used for P2P Cashu token transfers, payment requests, and payment confirmations.
+ *
+ * @param recipientPubkey - Recipient's Nostr public key (hex)
+ * @param content - Message content (typically JSON with type, amount, token)
+ * @returns The published Gift Wrap event
+ * @throws {Error} If not authenticated or publishing fails
+ *
+ * @see NIP-17 https://github.com/nostr-protocol/nips/blob/master/17.md
+ */
 export const sendGiftWrap = async (recipientPubkey: string, content: string) => {
     // 1. Create Rumor (Kind 14)
     // The rumor is the actual message.
@@ -1388,6 +2072,15 @@ const parseProfileContent = (content: any): UserProfile => {
 
 
 
+/**
+ * Fetch a user's Kind 0 profile metadata from relays.
+ *
+ * Uses a 3-second timeout for fast UX. Returns the most recent profile
+ * event if multiple versions exist.
+ *
+ * @param pubkey - User's public key (hex)
+ * @returns Parsed profile data, or null if not found
+ */
 export const fetchProfile = async (pubkey: string): Promise<UserProfile | null> => {
     console.log(`Fetching profile for ${pubkey.substring(0, 8)}...`);
 
@@ -1435,6 +2128,15 @@ export const fetchUserHistory = async (pubkey: string) => {
 
 // --- Search / Lookup ---
 
+/**
+ * Look up a Nostr user by npub, NIP-05 address, or hex pubkey.
+ *
+ * Tries resolution in order: npub decode -> NIP-05 lookup -> hex pubkey.
+ * After resolving the pubkey, fetches the user's profile for display info.
+ *
+ * @param query - Search query (npub1..., user@domain.com, or 64-char hex)
+ * @returns Display profile with pubkey, name, and image, or null if not found
+ */
 export const lookupUser = async (query: string): Promise<DisplayProfile | null> => {
     let cleanQuery = query.trim();
 
@@ -1541,10 +2243,24 @@ export const lookupByPDGA = async (pdgaNumber: string): Promise<DisplayProfile |
     }
 };
 
+/** Get the shared SimplePool instance for use by other services */
 export const getPool = () => pool;
 
 // --- Direct Messages (NIP-04) ---
 
+/**
+ * Send a NIP-04 encrypted direct message (Kind 4).
+ *
+ * Used for feedback submission. For P2P payments, use sendGiftWrap() instead
+ * (NIP-17 is the preferred protocol for new encrypted messaging).
+ *
+ * @param recipientPubkey - Recipient's public key (hex)
+ * @param content - Plaintext message (will be NIP-04 encrypted)
+ * @returns The published event
+ * @throws {Error} If not authenticated
+ *
+ * @see NIP-04 https://github.com/nostr-protocol/nips/blob/master/04.md
+ */
 export const sendDirectMessage = async (recipientPubkey: string, content: string) => {
     const session = getSession();
     if (!session) throw new Error("Not authenticated");
@@ -1562,6 +2278,15 @@ export const sendDirectMessage = async (recipientPubkey: string, content: string
     return event;
 };
 
+/**
+ * Subscribe to incoming NIP-04 encrypted direct messages (Kind 4).
+ *
+ * Automatically decrypts each message and passes both the raw event and
+ * decrypted content to the callback.
+ *
+ * @param callback - Called with the event and decrypted message content
+ * @returns Subscription object with close() method
+ */
 export const subscribeToDirectMessages = (callback: (event: Event, decryptedContent: string) => void) => {
     const session = getSession();
     if (!session) return { close: () => { } };

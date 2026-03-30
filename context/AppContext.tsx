@@ -1,19 +1,36 @@
 /**
- * AppContext - Composition Layer
+ * @file AppContext.tsx
+ * @description Composition layer that wires all five domain contexts (Auth, Wallet,
+ * Profile, Round, Tournament) into a single unified `useApp()` hook.
  *
- * Composes AuthContext, WalletContext, ProfileContext, and RoundContext
- * into a single unified `useApp()` hook for backward compatibility.
+ * Provides backward-compatible access to all context state and implements
+ * cross-cutting actions that span multiple contexts:
  *
- * Also contains cross-cutting actions that span multiple contexts:
- * - createAccount / createAccountFromMnemonic
- * - performLogout
- * - createRound / joinRoundAndPay / finalizeRound
+ * **Account lifecycle:**
+ * - `createAccount()` - Promote guest to full account (publish profile, register gateways)
+ * - `createAccountFromMnemonic()` - Generate new mnemonic-based account
+ * - `performLogout()` - Clear all state, storage, and Breez connection
+ *
+ * **Round lifecycle:**
+ * - `createRound()` - Create round, initialize players, publish to Nostr
+ * - `joinRoundAndPay()` - Join a round, pay entry fee via Cashu token in DM
+ * - `finalizeRound()` - Calculate payouts, process payments, publish finalization
+ *
+ * **Tournament lifecycle:**
+ * - `createTournament()` - Create tournament, generate cards, publish to Nostr
+ * - `joinTournament()` - Join tournament, pay entry fee
+ * - `startTournament()` - Publish card rounds, assign active round for current user
+ * - `finalizeTournament()` - Calculate payouts from standings, distribute, finalize
+ *
+ * @architecture Outermost context in the provider hierarchy. Nests all domain providers
+ * (AuthProvider > WalletProvider > ProfileProvider > RoundProvider > TournamentProvider)
+ * and the AppComposition component which has access to all of them via hooks.
  */
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { AppState, Player, RoundSettings, WalletTransaction, UserProfile, UserStats, Mint, DisplayProfile, Proof, PayoutConfig } from '../types';
+import { AppState, Player, RoundSettings, WalletTransaction, UserProfile, UserStats, Mint, DisplayProfile, Proof, PayoutConfig, TournamentSettings, TournamentStanding, TournamentCard } from '../types';
 import { DEFAULT_HOLE_COUNT } from '../constants';
-import { publishRound, publishScore, sendDirectMessage, getMagicLightningAddress, generateNewProfileFromMnemonic } from '../services/nostrService';
+import { publishRound, publishScore, publishTournament, sendDirectMessage, getMagicLightningAddress, generateNewProfileFromMnemonic } from '../services/nostrService';
 import { logout as nostrLogout } from '../services/nostrService';
 import { clearMnemonicStorage } from '../services/mnemonicService';
 import { disconnectBreez } from '../services/breezService';
@@ -22,11 +39,13 @@ import { AuthSource } from '../services/mnemonicService';
 import { NWCService } from '../services/nwcService';
 import { calculatePayouts } from '../utils/payoutCalculations';
 import { processPayouts, PayoutRecipient, PaymentResult } from '../services/paymentRouter';
+import { notifyRoundFinalized, notifyTournamentFinalized } from '../services/notificationService';
 
 import { AuthProvider, useAuth, AuthContextType } from './AuthContext';
 import { WalletProvider, useWallet, WalletContextType } from './WalletContext';
 import { ProfileProvider, useProfile, ProfileContextType } from './ProfileContext';
 import { RoundProvider, useRound, RoundContextType } from './RoundContext';
+import { TournamentProvider, useTournament, TournamentContextType } from './TournamentContext';
 
 // Re-export utility functions from their new location
 export { getTopHeavyDistribution, getLinearDistribution, calculatePayouts } from '../utils/payoutCalculations';
@@ -36,7 +55,8 @@ interface AppContextType extends AppState {
   createRound: (
     settings: Omit<RoundSettings, 'id' | 'isFinalized' | 'pubkey' | 'players' | 'eventId'>,
     selectedPlayers: DisplayProfile[],
-    paymentSelections?: Record<string, { entry: boolean; ace: boolean }>
+    paymentSelections?: Record<string, { entry: boolean; ace: boolean }>,
+    roundId?: string
   ) => Promise<void>;
   updateUserProfile: (profile: UserProfile) => Promise<void>;
   updateScore: (hole: number, score: number, playerId?: string) => void;
@@ -134,6 +154,20 @@ interface AppContextType extends AppState {
 
   // Resume/foreground reconciliation
   reconcileOnResume: () => Promise<void>;
+
+  // Tournament state & actions
+  activeTournament: TournamentSettings | null;
+  tournamentStandings: TournamentStanding[];
+  isDirector: boolean;
+  createTournament: (settings: Omit<TournamentSettings, 'id' | 'eventId' | 'pubkey' | 'phase' | 'cards' | 'registeredPlayers' | 'isFinalized'>) => Promise<void>;
+  joinTournament: (tournamentId: string, tournamentData?: any) => Promise<boolean>;
+  startTournament: () => Promise<void>;
+  finalizeTournament: () => Promise<void>;
+  updateCardAssignment: (cardId: string, playerPubkey: string) => void;
+  removeFromCard: (cardId: string, playerPubkey: string) => void;
+  randomizeCards: () => void;
+  addRegisteredPlayer: (pubkey: string) => void;
+  setActiveTournament: React.Dispatch<React.SetStateAction<TournamentSettings | null>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -147,12 +181,18 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
   const wallet = useWallet();
   const profile = useProfile();
   const round = useRound();
+  const tournament = useTournament();
 
   // Round Summary Modal State (cross-cutting: set by finalizeRound, read by Layout)
   const [roundSummary, setRoundSummary] = useState<AppContextType['roundSummary']>(null);
 
   // --- Cross-cutting Actions ---
 
+  /**
+   * Promote the current guest session to a full account.
+   * Sets up initial profile with a magic Lightning address, publishes to Nostr,
+   * registers with all payment gateways, and creates an initial wallet backup.
+   */
   const createAccount = async () => {
     auth.setIsGuest(false);
     localStorage.removeItem('is_guest_mode');
@@ -187,6 +227,12 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
     }
   };
 
+  /**
+   * Generate a brand new account from a fresh BIP-39 mnemonic.
+   * Derives Nostr keys via NIP-06 derivation, sets up auth state, publishes profile,
+   * registers with payment gateways, and creates initial wallet backup.
+   * @returns {Promise<{ mnemonic: string }>} The generated mnemonic for user backup
+   */
   const createAccountFromMnemonic = async (): Promise<{ mnemonic: string }> => {
     const { mnemonic, pk } = generateNewProfileFromMnemonic();
 
@@ -236,6 +282,11 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return { mnemonic };
   };
 
+  /**
+   * Full logout: disconnects Breez SDK, clears Nostr session, removes all localStorage
+   * data (keys, profile, wallet, rounds, relays, gateway registrations, processed payments),
+   * and resets all context state to defaults.
+   */
   const performLogout = () => {
     // Disconnect Breez SDK
     disconnectBreez().catch(e => console.warn('Breez disconnect error:', e));
@@ -295,12 +346,22 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
     round.setCurrentHole(1);
   };
 
+  /**
+   * Create a new disc golf round. Initializes round settings, builds the player list
+   * with payment selections and handicaps, publishes the round event to Nostr, and
+   * adds selected players to the recent players list.
+   * @param {Omit<RoundSettings, 'id' | 'isFinalized' | 'pubkey' | 'players' | 'eventId'>} settings - Round configuration
+   * @param {DisplayProfile[]} selectedPlayers - Players to include in the round
+   * @param {Record<string, { entry: boolean; ace: boolean }>} [paymentSelections] - Per-player payment opt-in/out
+   * @param {string} [preGeneratedRoundId] - Optional pre-generated round ID (for QR code pre-sharing)
+   */
   const createRound = async (
     settings: Omit<RoundSettings, 'id' | 'isFinalized' | 'pubkey' | 'players' | 'eventId'>,
     selectedPlayers: DisplayProfile[],
-    paymentSelections: Record<string, { entry: boolean; ace: boolean }> = {}
+    paymentSelections: Record<string, { entry: boolean; ace: boolean }> = {},
+    preGeneratedRoundId?: string
   ) => {
-    const roundId = Math.random().toString(36).substring(7);
+    const roundId = preGeneratedRoundId || Math.random().toString(36).substring(7);
     const newRound: RoundSettings = {
       ...settings,
       holeCount: settings.holeCount || DEFAULT_HOLE_COUNT,
@@ -366,6 +427,15 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
     }
   };
 
+  /**
+   * Join an existing round and pay the entry fee. Creates a Cashu token for the fee
+   * amount, sends it to the host via NIP-04 DM, sets up the local round state, and
+   * publishes an initial score event to signal participation. If the DM fails, reclaims
+   * the token to prevent fund loss.
+   * @param {string} roundId - ID of the round to join
+   * @param {any} [roundData] - Round metadata (name, fees, host pubkey, etc.)
+   * @returns {Promise<boolean>} True if successfully joined (and paid if required)
+   */
   const joinRoundAndPay = async (roundId: string, roundData?: any): Promise<boolean> => {
     const fee = (roundData?.entryFeeSats || 0) + (roundData?.acePotFeeSats || 0);
     const hostPubkey = roundData?.pubkey;
@@ -445,7 +515,13 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return true;
   };
 
-  // Helper to resolve Lightning Address to an invoice
+  /**
+   * Resolve a Lightning Address (user@domain) to a BOLT11 invoice via LNURL-pay.
+   * Fetches the LNURL metadata from .well-known/lnurlp, then requests an invoice.
+   * @param {string} address - Lightning address (e.g., user@domain.com)
+   * @param {number} amountSats - Amount in satoshis for the invoice
+   * @returns {Promise<string | null>} BOLT11 invoice string, or null on failure
+   */
   const resolveLightningAddress = async (address: string, amountSats: number): Promise<string | null> => {
     try {
       const [user, domain] = address.split('@');
@@ -475,6 +551,13 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
     }
   };
 
+  /**
+   * Finalize the active round: sort standings with tiebreaking, calculate entry pot
+   * and ace pot payouts using configurable distribution algorithms, detect aces,
+   * process all payouts via processPayouts (smart routing with fallbacks), show the
+   * round summary modal, publish finalization to Nostr, save to round history, and
+   * clean up localStorage. If any payout fails, the round is NOT finalized to allow retry.
+   */
   const finalizeRound = async () => {
     if (!round.activeRound) return;
     if (round.players.length === 0) {
@@ -665,6 +748,9 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
     round.setActiveRound(prev => prev ? { ...prev, isFinalized: true } : null);
 
+    // Notify round participants
+    notifyRoundFinalized(round.activeRound.name || 'Round');
+
     // Save to round history
     try {
       const historicalRound = {
@@ -698,6 +784,267 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
     localStorage.removeItem('cdg_players');
     localStorage.removeItem('cdg_current_hole');
     profile.refreshStats();
+  };
+
+  // --- Tournament Cross-Cutting Actions ---
+
+  /**
+   * Create a new tournament. Generates a tournament ID, creates empty card slots
+   * based on maxPlayers/cardSize, registers the director as the first player,
+   * and publishes the Kind 30003 tournament event to Nostr.
+   * @param {Omit<TournamentSettings, 'id' | 'eventId' | 'pubkey' | 'phase' | 'cards' | 'registeredPlayers' | 'isFinalized'>} settings - Tournament configuration
+   */
+  const createTournament = async (
+    settings: Omit<TournamentSettings, 'id' | 'eventId' | 'pubkey' | 'phase' | 'cards' | 'registeredPlayers' | 'isFinalized'>
+  ) => {
+    const tournamentId = Math.random().toString(36).substring(2, 9);
+    const numCards = Math.ceil(settings.maxPlayers / settings.cardSize);
+
+    const cards: TournamentCard[] = [];
+    for (let i = 0; i < numCards; i++) {
+      const letter = String.fromCharCode(65 + i);
+      cards.push({
+        id: `${tournamentId}_card_${letter.toLowerCase()}`,
+        name: `Card ${letter}`,
+        players: [],
+        maxPlayers: settings.cardSize,
+      });
+    }
+
+    const newTournament: TournamentSettings = {
+      ...settings,
+      id: tournamentId,
+      pubkey: auth.currentUserPubkey,
+      phase: 'registration',
+      cards,
+      registeredPlayers: [auth.currentUserPubkey],
+      isFinalized: false,
+    };
+
+    tournament.setActiveTournament(newTournament);
+
+    try {
+      const event = await publishTournament(newTournament);
+      tournament.setActiveTournament(prev => prev ? { ...prev, eventId: event.id } : null);
+    } catch (e) {
+      console.warn('Failed to publish tournament:', e);
+    }
+  };
+
+  /**
+   * Join an existing tournament and pay the entry fee (if any).
+   * Sends fee via Cashu token in a DM to the director and sets the tournament as active.
+   * @param {string} tournamentId - Tournament ID to join
+   * @param {any} [tournamentData] - Tournament metadata (name, fees, director, etc.)
+   * @returns {Promise<boolean>} True if successfully joined
+   */
+  const joinTournament = async (tournamentId: string, tournamentData?: any): Promise<boolean> => {
+    const fee = (tournamentData?.entryFeeSats || 0) + (tournamentData?.acePotFeeSats || 0);
+    const directorPubkey = tournamentData?.pubkey;
+
+    if (fee > 0 && wallet.walletBalance < fee) return false;
+
+    if (fee > 0 && directorPubkey) {
+      try {
+        const token = await wallet.createToken(fee);
+        await sendDirectMessage(directorPubkey, JSON.stringify({
+          type: 'tournament_entry',
+          tournamentId,
+          amount: fee,
+          token,
+        }));
+        wallet.addTransaction('send', fee, `Tournament entry: ${tournamentData?.name || tournamentId}`);
+      } catch (e) {
+        console.warn('Failed to send tournament entry fee:', e);
+        return false;
+      }
+    }
+
+    // Set as active tournament for the player
+    if (tournamentData) {
+      tournament.setActiveTournament({
+        id: tournamentId,
+        eventId: tournamentData.eventId,
+        pubkey: directorPubkey || '',
+        name: tournamentData.name || 'Tournament',
+        courseName: tournamentData.courseName || '',
+        date: tournamentData.date || new Date().toISOString(),
+        holeCount: tournamentData.holeCount || 18,
+        par: tournamentData.par || 54,
+        entryFeeSats: tournamentData.entryFeeSats || 0,
+        acePotFeeSats: tournamentData.acePotFeeSats || 0,
+        maxPlayers: tournamentData.maxPlayers || 20,
+        cardSize: tournamentData.cardSize || 4,
+        cardAssignmentMode: tournamentData.cardAssignmentMode || 'random',
+        phase: tournamentData.phase || 'registration',
+        cards: tournamentData.cards || [],
+        registeredPlayers: tournamentData.registeredPlayers || [],
+        payoutConfig: tournamentData.payoutConfig,
+        playerHandicaps: tournamentData.playerHandicaps,
+        isFinalized: false,
+      });
+    }
+
+    return true;
+  };
+
+  /**
+   * Start the tournament: publish each card as a standard Kind 30001 round event,
+   * set the current user's card as their active round with initialized players,
+   * and transition the tournament phase to 'active'.
+   */
+  const startTournament = async () => {
+    if (!tournament.activeTournament) return;
+    const t = tournament.activeTournament;
+
+    // Publish each card as a standard Kind 30001 round
+    for (const card of t.cards) {
+      if (card.players.length === 0) continue;
+
+      const cardRound: RoundSettings = {
+        id: card.id,
+        pubkey: t.pubkey,
+        name: `${t.name} - ${card.name}`,
+        courseName: t.courseName,
+        entryFeeSats: 0, // Fees are at tournament level, not per card
+        acePotFeeSats: 0,
+        date: t.date,
+        isFinalized: false,
+        holeCount: t.holeCount,
+        players: card.players,
+        par: t.par,
+        startingHole: 1,
+        trackPenalties: false,
+        hideOverallScore: false,
+      };
+
+      try {
+        await publishRound(cardRound);
+      } catch (e) {
+        console.warn(`Failed to publish card ${card.name}:`, e);
+      }
+    }
+
+    // Find the current user's card and set it as the active round
+    const myCard = t.cards.find(c => c.players.includes(auth.currentUserPubkey));
+    if (myCard) {
+      const myRound: RoundSettings = {
+        id: myCard.id,
+        pubkey: t.pubkey,
+        name: `${t.name} - ${myCard.name}`,
+        courseName: t.courseName,
+        entryFeeSats: 0,
+        acePotFeeSats: 0,
+        date: t.date,
+        isFinalized: false,
+        holeCount: t.holeCount,
+        players: myCard.players,
+        par: t.par,
+        startingHole: 1,
+        trackPenalties: false,
+        hideOverallScore: false,
+      };
+      round.setActiveRound(myRound);
+
+      // Initialize players for the card
+      const initialPlayers: Player[] = myCard.players.map(pubkey => ({
+        id: pubkey,
+        name: pubkey === auth.currentUserPubkey ? profile.userProfile.name : 'Loading...',
+        handicap: t.playerHandicaps?.[pubkey] || 0,
+        paid: true, // Fees already collected at tournament registration
+        paysEntry: true,
+        paysAce: true,
+        scores: {},
+        totalScore: t.playerHandicaps?.[pubkey] || 0,
+        isCurrentUser: pubkey === auth.currentUserPubkey,
+        photoUrl: pubkey === auth.currentUserPubkey ? profile.userProfile.picture : undefined,
+      }));
+      round.setPlayers(initialPlayers);
+    }
+
+    // Update tournament phase
+    const updatedTournament: TournamentSettings = { ...t, phase: 'active' };
+    tournament.setActiveTournament(updatedTournament);
+
+    try {
+      await publishTournament(updatedTournament);
+    } catch (e) {
+      console.warn('Failed to publish tournament phase update:', e);
+    }
+  };
+
+  /**
+   * Finalize the tournament: calculate total pot from all registered players,
+   * compute payouts using standings and payout config, process payments to winners
+   * via processPayouts with smart routing, publish finalization event, send
+   * notifications, and save to tournament history.
+   */
+  const finalizeTournamentAction = async () => {
+    if (!tournament.activeTournament) return;
+    const t = tournament.activeTournament;
+    const finalStandings = tournament.standings;
+
+    if (finalStandings.length === 0) return;
+
+    // Calculate total pot from all registered players
+    const entryPot = t.entryFeeSats * t.registeredPlayers.length;
+    const acePot = t.acePotFeeSats * t.registeredPlayers.length;
+    const totalPot = entryPot + acePot;
+
+    if (totalPot > 0) {
+      // Build Player[] array for calculatePayouts (reuse existing util)
+      const playersForPayout: Player[] = finalStandings.map(s => ({
+        id: s.pubkey,
+        name: s.name,
+        handicap: 0,
+        paid: true,
+        paysEntry: true,
+        paysAce: true,
+        scores: s.scores,
+        totalScore: s.totalScore,
+        isCurrentUser: s.isCurrentUser,
+      }));
+
+      const payoutsMap = calculatePayouts(playersForPayout, totalPot, t.payoutConfig);
+
+      // Build payout recipients
+      const recipients: PayoutRecipient[] = [];
+      payoutsMap.forEach((amount, pubkey) => {
+        if (amount > 0 && pubkey !== auth.currentUserPubkey) {
+          const standing = finalStandings.find(s => s.pubkey === pubkey);
+          recipients.push({ pubkey, amountSats: amount, name: standing?.name });
+        }
+      });
+
+      if (recipients.length > 0) {
+        try {
+          const cashuPayFn = async (invoice: string) => wallet.sendFunds(0, invoice);
+          const cashuTokenFn = async (amount: number) => wallet.createToken(amount);
+          await processPayouts(recipients, cashuPayFn, cashuTokenFn);
+        } catch (e) {
+          console.warn('Some tournament payouts failed:', e);
+        }
+      }
+    }
+
+    // Finalize tournament
+    const finalizedTournament: TournamentSettings = { ...t, phase: 'finalized', isFinalized: true };
+    tournament.setActiveTournament(finalizedTournament);
+
+    try {
+      await publishTournament(finalizedTournament);
+      notifyTournamentFinalized(t.name);
+    } catch (e) {
+      console.warn('Failed to publish tournament finalization:', e);
+    }
+
+    // Save to tournament history
+    try {
+      const history = JSON.parse(localStorage.getItem('cdg_tournament_history') || '[]');
+      history.unshift({ ...finalizedTournament, finalStandings });
+      if (history.length > 50) history.length = 50;
+      localStorage.setItem('cdg_tournament_history', JSON.stringify(history));
+    } catch { /* ignore */ }
   };
 
   // Compose all context values into the unified AppContextType
@@ -789,6 +1136,20 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
     createRound,
     joinRoundAndPay,
     finalizeRound,
+
+    // Tournament state & actions
+    activeTournament: tournament.activeTournament,
+    tournamentStandings: tournament.standings,
+    isDirector: tournament.isDirector,
+    createTournament,
+    joinTournament,
+    startTournament,
+    finalizeTournament: finalizeTournamentAction,
+    updateCardAssignment: tournament.updateCardAssignment,
+    removeFromCard: tournament.removeFromCard,
+    randomizeCards: tournament.randomizeCards,
+    addRegisteredPlayer: tournament.addRegisteredPlayer,
+    setActiveTournament: tournament.setActiveTournament,
   };
 
   return (
@@ -808,9 +1169,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       <WalletProvider>
         <ProfileProvider>
           <RoundProvider>
-            <AppComposition>
-              {children}
-            </AppComposition>
+            <TournamentProvider>
+              <AppComposition>
+                {children}
+              </AppComposition>
+            </TournamentProvider>
           </RoundProvider>
         </ProfileProvider>
       </WalletProvider>
@@ -818,6 +1181,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 };
 
+/**
+ * Hook to access the unified app state and all actions.
+ * Provides backward-compatible access to all domain context state (auth, wallet,
+ * profile, round, tournament) plus cross-cutting actions (account, round, tournament lifecycle).
+ * @returns {AppContextType} Unified app state and actions.
+ * @throws {Error} If called outside of AppProvider.
+ */
 export const useApp = () => {
   const context = useContext(AppContext);
   if (context === undefined) {

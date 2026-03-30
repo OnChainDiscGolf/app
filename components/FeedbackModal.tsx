@@ -1,14 +1,41 @@
+/**
+ * @file FeedbackModal.tsx
+ * @description Modal dialog for submitting user feedback (bug reports, feature
+ * requests, or general feedback) via encrypted Nostr DM. Also exports a
+ * compact {@link FeedbackButton} trigger component for placement in settings views.
+ */
+
 import React, { useState } from 'react';
 import { Icons } from './Icons';
 import { Button } from './Button';
 import { sendFeedback, canSendFeedback, FeedbackPayload } from '../services/feedbackService';
 
+/**
+ * Props for the {@link FeedbackModal} component.
+ *
+ * @property isOpen - Whether the modal is visible.
+ * @property onClose - Callback invoked when the modal is dismissed.
+ * @property defaultType - Initial feedback category selection. Defaults to `'feedback'`.
+ */
 interface FeedbackModalProps {
     isOpen: boolean;
     onClose: () => void;
     defaultType?: 'bug' | 'feedback' | 'feature';
 }
 
+/**
+ * Full-screen modal for composing and sending user feedback.
+ *
+ * Provides a type selector (bug / feedback / feature), a message textarea,
+ * and optional checkboxes to include app logs and device info. Feedback is
+ * sent as an encrypted Nostr DM to the developer. Requires a Nostr profile
+ * to be active (checked via `canSendFeedback()`).
+ *
+ * Displays success/error states inline and auto-dismisses after a successful send.
+ *
+ * @param props - {@link FeedbackModalProps}
+ * @returns The modal overlay, or `null` when `isOpen` is false.
+ */
 export const FeedbackModal: React.FC<FeedbackModalProps> = ({ 
     isOpen, 
     onClose,
@@ -271,12 +298,24 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
     );
 };
 
-// Compact button to place at bottom of settings views
+/**
+ * Props for the {@link FeedbackButton} component.
+ *
+ * @property onClick - Callback invoked when the button is tapped (typically opens FeedbackModal).
+ * @property className - Additional CSS classes to apply to the wrapper.
+ */
 interface FeedbackButtonProps {
     onClick: () => void;
     className?: string;
 }
 
+/**
+ * Compact "Send Feedback" button intended for placement at the bottom of
+ * settings or profile views. Renders a bordered button with a feedback icon.
+ *
+ * @param props - {@link FeedbackButtonProps}
+ * @returns The feedback trigger button.
+ */
 export const FeedbackButton: React.FC<FeedbackButtonProps> = ({ onClick, className = '' }) => {
     return (
         <div className={`mt-auto pt-8 pb-4 ${className}`}>

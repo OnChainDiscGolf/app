@@ -1,10 +1,18 @@
 /**
- * OnboardingContext
- * 
- * Holds temporary identity state during onboarding flow.
- * Nothing is persisted until the Finalization step.
- * 
- * Flow: Welcome → Profile Setup → Mnemonic Backup → Finalization → Home
+ * @file OnboardingContext.tsx
+ * @description Ephemeral identity state management during the new-user onboarding flow.
+ *
+ * This context holds a generated Nostr keypair, mnemonic, and Lightning addresses
+ * entirely in memory. Nothing is persisted to localStorage or published to relays
+ * until the Finalization step commits the identity via AppContext.
+ *
+ * **Onboarding Flow:**
+ * Welcome (generate identity) -> Profile Setup (collect name/picture/PDGA) ->
+ * Mnemonic Backup (user writes down 12 words) -> Finalization (persist & publish) -> Home
+ *
+ * @architecture Part of the context layer. Consumed by Onboarding.tsx page.
+ * Sits outside the main AuthContext/WalletContext/ProfileContext hierarchy;
+ * the finalization step bridges onboarding state into those contexts.
  */
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
@@ -53,6 +61,20 @@ interface OnboardingContextType {
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
+/**
+ * OnboardingProvider - Manages ephemeral identity and profile state during onboarding.
+ *
+ * **State managed:**
+ * - `identity` - Generated keypair, mnemonic, and Lightning addresses (null until Welcome)
+ * - `profile` - User-entered name, picture URL, and optional PDGA number
+ * - `lightningAddressType` - Which Lightning address format to use ('breez' or 'npubcash')
+ * - `isOnboarding` - Flag indicating the onboarding flow is active
+ *
+ * **Exposed actions:**
+ * - `generateIdentity()` - Creates a new BIP-39 mnemonic and derives Nostr keys + Lightning addresses
+ * - `setProfileData()` - Partial update of profile fields
+ * - `clearOnboarding()` - Resets all ephemeral state (called on cancel or after finalization)
+ */
 export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [identity, setIdentity] = useState<OnboardingIdentity | null>(null);
     const [profile, setProfile] = useState<OnboardingProfile>({
@@ -137,6 +159,12 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
 };
 
+/**
+ * Hook to access onboarding state and actions.
+ * Must be used within an OnboardingProvider.
+ * @returns {OnboardingContextType} Ephemeral identity state, profile data, and onboarding actions.
+ * @throws {Error} If called outside of OnboardingProvider.
+ */
 export const useOnboarding = () => {
     const context = useContext(OnboardingContext);
     if (context === undefined) {

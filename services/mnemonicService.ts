@@ -1,6 +1,21 @@
 /**
- * Mnemonic Service
- * 
+ * @fileoverview Mnemonic Service -- BIP-39 seed phrase generation with NIP-06 Nostr key derivation.
+ *
+ * This is the most security-critical service in the app. It handles:
+ * - BIP-39 mnemonic generation (12 or 24 words via @scure/bip39)
+ * - NIP-06 Nostr key derivation (m/44'/1237'/0'/0/0 via @scure/bip32)
+ * - Encrypted mnemonic storage in localStorage (XOR with pubkey-derived key)
+ * - Auth source tracking (mnemonic, nsec, amber, nip46, legacy)
+ * - Unified seed flag (same mnemonic for Nostr + Breez wallet)
+ *
+ * Architecture:
+ * - NEW USERS: Single 12-word mnemonic -> Nostr key + Breez wallet (unified backup)
+ * - EXISTING NSEC USERS: Their nsec + SEPARATE Breez mnemonic (two backups)
+ * - AMBER USERS: Amber holds Nostr key + SEPARATE Breez mnemonic (two backups)
+ *
+ * @see NIP-06 https://github.com/nostr-protocol/nips/blob/master/06.md
+ * @see BIP-39 https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
+ *
  * Handles BIP-39 mnemonic generation and NIP-06 Nostr key derivation.
  * Also prepares for Breez wallet initialization with the same seed.
  * 
@@ -95,10 +110,13 @@ const STORAGE_KEYS = {
     HAS_UNIFIED_SEED: 'cdg_unified_seed',
 } as const; // `as const` prevents accidental modification
 
+/** How the user authenticated -- determines backup strategy and key management */
 export type AuthSource = 'mnemonic' | 'nsec' | 'amber' | 'nip46' | 'legacy';
 
 /**
- * Generate a new 12-word BIP-39 mnemonic
+ * Generate a new 12-word BIP-39 mnemonic (128 bits of entropy).
+ *
+ * @returns Space-separated mnemonic phrase (12 words from BIP-39 English wordlist)
  */
 export const generateMnemonic = (): string => {
     // 128 bits = 12 words
@@ -106,7 +124,11 @@ export const generateMnemonic = (): string => {
 };
 
 /**
- * Generate a 24-word mnemonic (more secure, but harder to backup)
+ * Generate a 24-word BIP-39 mnemonic (256 bits of entropy).
+ *
+ * More secure but harder to back up. Used rarely.
+ *
+ * @returns Space-separated mnemonic phrase (24 words)
  */
 export const generateMnemonic24 = (): string => {
     // 256 bits = 24 words
@@ -114,7 +136,12 @@ export const generateMnemonic24 = (): string => {
 };
 
 /**
- * Validate a mnemonic phrase
+ * Validate a BIP-39 mnemonic phrase against the English wordlist.
+ *
+ * Checks word count, wordlist membership, and checksum validity.
+ *
+ * @param mnemonic - Space-separated mnemonic phrase to validate
+ * @returns True if the mnemonic is valid BIP-39
  */
 export const validateMnemonic = (mnemonic: string): boolean => {
     return bip39Validate(mnemonic, wordlist);
@@ -300,7 +327,10 @@ export const retrieveMnemonicEncrypted = (
 };
 
 /**
- * Check if user has a stored mnemonic
+ * Check if the user has an encrypted mnemonic stored in localStorage.
+ *
+ * @param isBreezMnemonic - If true, checks for the separate Breez mnemonic
+ * @returns True if an encrypted mnemonic exists
  */
 export const hasStoredMnemonic = (isBreezMnemonic: boolean = false): boolean => {
     const storageKey = isBreezMnemonic ? STORAGE_KEYS.BREEZ_MNEMONIC_ENCRYPTED : STORAGE_KEYS.MNEMONIC_ENCRYPTED;
@@ -308,7 +338,12 @@ export const hasStoredMnemonic = (isBreezMnemonic: boolean = false): boolean => 
 };
 
 /**
- * Get the authentication source
+ * Get the authentication source (how the user logged in).
+ *
+ * Checks the modern storage key first, then falls back to legacy
+ * `auth_method` for backward compatibility.
+ *
+ * @returns AuthSource type, or null if not authenticated
  */
 export const getAuthSource = (): AuthSource | null => {
     const source = localStorage.getItem(STORAGE_KEYS.AUTH_SOURCE);
@@ -324,7 +359,9 @@ export const getAuthSource = (): AuthSource | null => {
 };
 
 /**
- * Set the authentication source
+ * Set the authentication source in localStorage.
+ *
+ * @param source - The auth method used for login
  */
 export const setAuthSource = (source: AuthSource): void => {
     localStorage.setItem(STORAGE_KEYS.AUTH_SOURCE, source);

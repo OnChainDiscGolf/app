@@ -1,22 +1,43 @@
 /**
- * Bitcoin Price Service
- * Fetches BTC/USD price from mempool.space with caching
- * Designed for minimal resource usage on mobile
+ * @fileoverview Bitcoin Price Service -- BTC/USD price feed with caching.
+ *
+ * Fetches the current BTC price from mempool.space's public API and caches
+ * it for 5 minutes. Used throughout the wallet UI to display sats-to-USD
+ * conversions. Falls back to stale cache on network failure.
+ *
+ * Design goals:
+ * - Minimal network usage (5-min cache is plenty for a disc golf app)
+ * - Graceful degradation (stale cache > null > crash)
+ * - No API key required (mempool.space is free and Bitcoin-native)
+ *
+ * @see https://mempool.space/docs/api/rest#get-price
  */
 
+/** Cache duration: 5 minutes in milliseconds */
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes - plenty fresh for a disc golf app
 
+/** Internal price cache structure */
 interface PriceCache {
   usd: number;
   timestamp: number;
 }
 
+/** Module-level cached price (null = never fetched) */
 let cachedPrice: PriceCache | null = null;
 
 /**
- * Get current BTC price in USD
- * Uses mempool.space as primary source (Bitcoin-native, reliable)
- * Returns cached value if fresh, otherwise fetches new price
+ * Get the current BTC price in USD.
+ *
+ * Uses mempool.space as the primary source (Bitcoin-native, reliable, no API key).
+ * Returns a cached value if still within the 5-minute freshness window;
+ * otherwise fetches a new price. On failure, returns stale cache if available,
+ * or null if no price has ever been fetched.
+ *
+ * @returns The BTC price in USD, or null if unavailable
+ *
+ * @example
+ * const price = await getBtcPrice();
+ * if (price) console.log(`1 BTC = $${price}`);
  */
 export const getBtcPrice = async (): Promise<number | null> => {
   // Return cached if still fresh

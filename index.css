@@ -1,3 +1,12 @@
+/**
+ * @file index.css — Global styles for On-Chain Disc Golf.
+ *
+ * Defines CSS custom properties, safe-area handling for iOS/Android notches,
+ * splash screen animations, scroll utilities, and base typography.
+ * Tailwind CSS 4 handles component/utility styles via PostCSS; this file
+ * covers what Tailwind can't (CSS animations, env() safe areas, vendor scrollbar hiding).
+ */
+
 /* Global Styles */
 :root {
   --nav-height: 5rem; /* 80px - matches BottomNav height (h-16 + pt-2 + buffer) */

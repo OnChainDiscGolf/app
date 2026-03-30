@@ -1,8 +1,17 @@
 /**
- * Feedback Service
- * 
- * Collects app logs, device info, and sends feedback via Gift Wrap (NIP-59)
- * to the developer's npub for review.
+ * @fileoverview Feedback Service -- Error logging, device diagnostics, and encrypted feedback DMs.
+ *
+ * Provides three capabilities:
+ * 1. **Error capture** -- Intercepts console.error/warn into ring buffers for diagnostics
+ * 2. **Device info** -- Collects platform, browser, PWA state, wallet status, session stats
+ * 3. **Feedback send** -- Packages user message + optional logs into an encrypted NIP-04 DM
+ *    sent to the developer's npub
+ *
+ * The feedback DM includes a JSON payload with structured device info, recent errors/warnings,
+ * navigation history, and wallet state (balance amounts only, never secrets).
+ *
+ * Privacy: No sensitive data (keys, proofs, tokens) is ever included in feedback.
+ * Only aggregate counts and status flags are reported.
  */
 
 import { nip19 } from 'nostr-tools';
@@ -50,7 +59,15 @@ const MAX_WARNING_BUFFER = 30;
 const navigationHistory: { timestamp: number; path: string }[] = [];
 const MAX_NAV_HISTORY = 20;
 
-// Initialize error capture (call once on app start)
+/**
+ * Initialize error and warning capture by monkey-patching console.error/warn.
+ *
+ * Call once during app startup (e.g., in App.tsx useEffect). Captured messages
+ * are stored in fixed-size ring buffers and included in feedback reports.
+ *
+ * Messages are truncated (errors: 500 chars, warnings: 300 chars) to keep
+ * buffer memory bounded. Stack traces are limited to 4 frames.
+ */
 export const initErrorCapture = () => {
     // Capture console.error
     const originalError = console.error;
@@ -94,7 +111,14 @@ export const initErrorCapture = () => {
     };
 };
 
-// Track navigation (call from your router)
+/**
+ * Track a navigation event for inclusion in feedback reports.
+ *
+ * Call from the router on every route change. Maintains a rolling
+ * buffer of the last 20 navigations with timestamps.
+ *
+ * @param path - The route path the user navigated to (e.g., "/wallet")
+ */
 export const trackNavigation = (path: string) => {
     navigationHistory.push({
         timestamp: Date.now(),
@@ -250,14 +274,21 @@ const getNavigationHistory = () => {
     }));
 };
 
+/** User-submitted feedback payload */
 export interface FeedbackPayload {
+    /** Category of feedback */
     type: 'bug' | 'feedback' | 'feature';
+    /** User's free-text message */
     message: string;
+    /** Whether to attach error/warning logs and app state */
     includeLogs: boolean;
+    /** Whether to attach device/browser info */
     includeDeviceInfo: boolean;
+    /** Current route path at time of submission */
     currentPath?: string;
 }
 
+/** Collected diagnostic data attached to feedback */
 export interface CollectedLogs {
     device?: ReturnType<typeof getDeviceInfo>;
     appState?: ReturnType<typeof getAppState>;
@@ -268,7 +299,12 @@ export interface CollectedLogs {
     timestamp: string;
 }
 
-// Collect all logs
+/**
+ * Collect all diagnostic logs into a single object for feedback submission.
+ *
+ * @param includeDevice - Whether to include device/browser info (default: true)
+ * @returns Structured log data including errors, warnings, navigation, and app state
+ */
 export const collectLogs = (includeDevice: boolean = true): CollectedLogs => {
     const logs: CollectedLogs = {
         appVersion: APP_VERSION,
@@ -287,7 +323,16 @@ export const collectLogs = (includeDevice: boolean = true): CollectedLogs => {
     return logs;
 };
 
-// Send feedback via encrypted DM (kind 4)
+/**
+ * Send feedback to the developer via an encrypted NIP-04 direct message (Kind 4).
+ *
+ * The message body includes the user's text plus an optional JSON payload
+ * with device info, app state, recent errors, and navigation history.
+ *
+ * @param payload - Feedback content and options
+ * @returns Success status and optional error message
+ * @throws Never -- errors are caught and returned in the result object
+ */
 export const sendFeedback = async (payload: FeedbackPayload): Promise<{ success: boolean; error?: string }> => {
     try {
         console.log('📤 Starting feedback send...');
@@ -342,7 +387,11 @@ export const sendFeedback = async (payload: FeedbackPayload): Promise<{ success:
     }
 };
 
-// Check if user can send feedback (has session with secret key)
+/**
+ * Check if the user can send feedback (requires an active session with a secret key).
+ *
+ * @returns True if the user has a signing key available for encrypted DMs
+ */
 export const canSendFeedback = (): boolean => {
     const session = getSession();
     return !!(session?.sk);

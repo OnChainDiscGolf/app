@@ -1,9 +1,28 @@
+/**
+ * @file RoundDetails.tsx
+ *
+ * Round details and payment page for non-host players.
+ *
+ * When a player joins a round with an entry fee, this page shows:
+ * - Round info: course name, hole count, entry fee, ace pot, player list.
+ * - Payment status: whether the current player has paid.
+ * - Payment modal: generates a Lightning invoice via `depositFunds()`, shows
+ *   the invoice QR code, and polls `checkDepositStatus()` until payment is confirmed.
+ * - Option to pay with in-app wallet or copy the invoice for external payment.
+ * - After payment, sends a `payment_confirmation` Gift Wrap DM back to the host.
+ *
+ * Route: /round-details
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Icons } from '../components/Icons';
 import { sendGiftWrap } from '../services/nostrService';
 
+/**
+ * Round details page -- shows round info and handles entry fee payment for non-host players.
+ */
 export const RoundDetails: React.FC = () => {
     const {
         activeRound,

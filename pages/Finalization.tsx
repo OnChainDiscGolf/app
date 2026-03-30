@@ -1,16 +1,22 @@
 /**
- * Finalization Screen
- * 
- * Handles all persistence and network operations after onboarding:
- * 1. Store identity in localStorage
- * 2. Publish profile metadata to Nostr
- * 3. Register lightning address with gateways
- * 4. Initialize wallet backup and sync
- * 5. Sync with Nostr network
- * 6. Initialize Breez Lightning wallet (background, non-blocking)
- * 
- * Shows AccountCreatedAnimation (reverse of logout animation) while tasks complete.
- * Animation is quick (~2s) to match the faster initialization process.
+ * @file Finalization.tsx
+ *
+ * Post-onboarding finalization screen -- handles all persistence and network
+ * operations after a new user completes the onboarding wizard.
+ *
+ * Tasks executed (in order):
+ * 1. Store identity (mnemonic + keys) in localStorage via mnemonicService.
+ * 2. Publish profile metadata (Kind 0) to Nostr relays.
+ * 3. Register Lightning address with npub.cash gateways.
+ * 4. Initialize wallet backup and sync (encrypted Nostr backup).
+ * 5. Sync contacts and recent players from Nostr network.
+ * 6. Initialize Breez Lightning wallet in background (non-blocking).
+ *
+ * Shows AccountCreatedAnimation (reverse of the logout explosion) while tasks
+ * complete. Animation is quick (~2s) to match the fast initialization process.
+ * On completion, clears OnboardingContext and navigates to Home.
+ *
+ * Route: /finalization
  */
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -36,6 +42,10 @@ import {
 import { BREEZ_API_KEY } from '../constants';
 import { UserProfile } from '../types';
 
+/**
+ * Finalization page -- persists identity, publishes profile to Nostr,
+ * registers Lightning address, and initializes wallets after onboarding.
+ */
 export const Finalization: React.FC = () => {
     const navigate = useNavigate();
     const { identity, profile, lightningAddressType, clearOnboarding } = useOnboarding();
@@ -211,8 +221,8 @@ export const Finalization: React.FC = () => {
                 // Brief delay to show success state
                 await new Promise(resolve => setTimeout(resolve, 800));
 
-                // Navigate to Home
-                navigate('/');
+                // Navigate to Home (replace so back doesn't return to finalization)
+                navigate('/', { replace: true });
 
             } catch (e) {
                 console.error('❌ [Finalization] Error:', e);
@@ -232,7 +242,7 @@ export const Finalization: React.FC = () => {
                     <p className="text-lg font-bold mb-2">Something went wrong</p>
                     <p className="text-sm text-slate-400 mb-4">No identity found. Please start over.</p>
                     <button
-                        onClick={() => navigate('/')}
+                        onClick={() => navigate('/', { replace: true })}
                         className="px-6 py-2 bg-slate-700 rounded-lg text-white hover:bg-slate-600 transition-colors"
                     >
                         Go Back
@@ -255,7 +265,7 @@ export const Finalization: React.FC = () => {
                     <p className="text-lg font-bold text-white mb-2">Setup Failed</p>
                     <p className="text-sm text-slate-400 mb-4">{error}</p>
                     <button
-                        onClick={() => navigate('/')}
+                        onClick={() => navigate('/', { replace: true })}
                         className="px-6 py-2 bg-slate-700 rounded-lg text-white hover:bg-slate-600 transition-colors"
                     >
                         Try Again

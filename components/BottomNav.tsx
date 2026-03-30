@@ -1,8 +1,26 @@
+/**
+ * @file BottomNav.tsx
+ * @description Fixed bottom navigation bar for the app's four main tabs:
+ * Play, Events, Wallet, and Profile. Handles tab switching with route
+ * replacement (so browser back doesn't cycle through tabs) and dispatches
+ * a `popToRoot` CustomEvent when the user taps an already-active tab.
+ */
+
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Icons } from './Icons';
 
-
+/**
+ * Bottom navigation bar rendered at the root layout level.
+ *
+ * Renders four tab buttons (Play, Events, Wallet, Profile) anchored to the
+ * bottom of the viewport. Uses `replace` navigation so tab switches don't
+ * pollute the browser history stack. When the user taps the already-active
+ * tab, a `popToRoot` CustomEvent is dispatched so the corresponding page
+ * can reset its internal navigation state.
+ *
+ * @returns The fixed-position bottom navigation bar.
+ */
 export const BottomNav: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -10,6 +28,7 @@ export const BottomNav: React.FC = () => {
 
   const navItems = [
     { path: '/', icon: Icons.Trophy, label: 'Play', tourId: 'tour-nav-play' },
+    { path: '/events', icon: Icons.Calendar, label: 'Events', tourId: 'tour-nav-events' },
     { path: '/wallet', icon: Icons.Wallet, label: 'Wallet', tourId: 'tour-nav-wallet' },
     { path: '/profile', icon: Icons.Users, label: 'Profile', tourId: 'tour-nav-profile' },
   ];
@@ -20,8 +39,8 @@ export const BottomNav: React.FC = () => {
       const event = new CustomEvent('popToRoot', { detail: { path } });
       window.dispatchEvent(event);
     } else {
-      // Navigate to the new tab
-      navigate(path);
+      // Navigate to the new tab (replace so back doesn't cycle through tabs)
+      navigate(path, { replace: true });
     }
   };
 
