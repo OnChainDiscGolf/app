@@ -10,7 +10,7 @@ Ironically, despite the name, all payments are actually *off-chain*. ;)
 [![Built with Nostr](https://img.shields.io/badge/Built%20with-Nostr-purple.svg)](https://nostr.com)
 [![Powered by Bitcoin](https://img.shields.io/badge/Powered%20by-Bitcoin-orange.svg)](https://bitcoin.org)
 
-[![Download APK](https://img.shields.io/badge/Download_APK-Android-brightgreen?style=for-the-badge)](https://github.com/OnChainDiscGolf/app/releases/latest)
+[![Download APK](https://img.shields.io/badge/Download_APK-Android-brightgreen?style=for-the-badge)](https://github.com/OnChainDiscGolf/app/releases/latest/download/on-chain-disc-golf-v1.1.0.apk)
 [![Open Web App](https://img.shields.io/badge/Open_Web_App-PWA-blue?style=for-the-badge)](https://app.onchaindiscgolf.com)
 
 ---
@@ -48,7 +48,7 @@ Ironically, despite the name, all payments are actually *off-chain*. ;)
 
 **Web (recommended):** Open [app.onchaindiscgolf.com](https://app.onchaindiscgolf.com) and add to your home screen.
 
-**Android:** Download the latest [APK from releases](https://github.com/OnChainDiscGolf/app/releases/latest).
+**Android:** [Download the APK](https://github.com/OnChainDiscGolf/app/releases/latest/download/on-chain-disc-golf-v1.1.0.apk) and install it directly. Or browse [all releases](https://github.com/OnChainDiscGolf/app/releases).
 
 ---
 
