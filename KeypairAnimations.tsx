@@ -268,174 +268,134 @@ export const KeypairFormingAnimation: React.FC = () => {
 };
 
 /**
- * Account Created Animation
- * 
- * A quick animation (~2s) that is the visual reverse of the logout animation.
- * Used when a new account/wallet has been successfully created.
- * 
- * Visual flow:
- * 1. Keys come together from edges (reverse of breaking apart)
- * 2. Teal connection line forms (reverse of red fracture)
- * 3. Spark particles converge inward (reverse of exploding)
- * 4. "Account Created" success text
- * 5. Growing dots (reverse of fading)
+ * Account Created Animation — Disc-in-Basket
+ *
+ * A disc flies in from the upper-right and lands in a disc golf basket.
+ * Chains rattle on impact, an emerald glow pulses, and "Account Created"
+ * fades in below. ~2 seconds total.
  */
 
 interface AccountCreatedAnimationProps {
     isComplete?: boolean;
 }
 
-export const AccountCreatedAnimation: React.FC<AccountCreatedAnimationProps> = ({ 
-    isComplete = false 
+export const AccountCreatedAnimation: React.FC<AccountCreatedAnimationProps> = ({
+    isComplete = false
 }) => {
     const [showSuccess, setShowSuccess] = useState(false);
 
     useEffect(() => {
-        // Show success state after keys come together
-        const timer = setTimeout(() => setShowSuccess(true), 1200);
+        const timer = setTimeout(() => setShowSuccess(true), 1000);
         return () => clearTimeout(timer);
     }, []);
 
     return (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-b from-brand-dark via-slate-900 to-black">
-            
-            {/* Main animation container */}
             <div className="relative flex flex-col items-center justify-center">
-                
-                {/* Keypair container */}
-                <div className="relative w-24 h-16 flex items-center justify-center">
-                    
-                    {/* Connection Line - forms when keys unite (teal/green for success) */}
-                    <div
-                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-12"
-                        style={{
-                            background: 'linear-gradient(to bottom, transparent, #10b981, #22d3ee, transparent)',
-                            boxShadow: '0 0 15px rgba(16, 185, 129, 0.8), 0 0 30px rgba(16, 185, 129, 0.4)',
-                            animation: 'connectionLineForm 0.4s ease-out 1.0s forwards',
-                            opacity: 0,
-                            transform: 'translate(-50%, -50%) scaleY(0)'
-                        }}
-                    />
 
-                    {/* Left Key (Purple - Private) - slides in from left */}
-                    <div
-                        className="absolute left-1/2 top-1/2"
-                        style={{
-                            animation: 'keyFormLeftNew 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards'
-                        }}
-                    >
-                        <div className="relative">
-                            <Icons.Key 
-                                size={40} 
-                                className="text-purple-400" 
-                                style={{ 
-                                    filter: 'drop-shadow(0 0 12px rgba(139, 92, 246, 0.8))',
-                                    transform: 'translate(-50%, -50%) rotate(-45deg)'
-                                }} 
-                            />
-                        </div>
-                    </div>
+                {/* Basket + Disc Scene */}
+                <div className="relative" style={{ width: 192, height: 192 }}>
+                    <svg viewBox="0 0 120 130" className="w-full h-full" style={{ overflow: 'visible' }}>
+                        <defs>
+                            <linearGradient id="ac-metal" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stopColor="#e2e8f0" />
+                                <stop offset="50%" stopColor="#94a3b8" />
+                                <stop offset="100%" stopColor="#64748b" />
+                            </linearGradient>
+                            <linearGradient id="ac-pole" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stopColor="#475569" />
+                                <stop offset="100%" stopColor="#1e293b" />
+                            </linearGradient>
+                            <linearGradient id="ac-accent" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stopColor="#fb923c" />
+                                <stop offset="100%" stopColor="#ea580c" />
+                            </linearGradient>
+                            <linearGradient id="ac-disc" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#34d399" />
+                                <stop offset="50%" stopColor="#10b981" />
+                                <stop offset="100%" stopColor="#059669" />
+                            </linearGradient>
+                        </defs>
 
-                    {/* Right Key (Orange - Public) - slides in from right */}
-                    <div
-                        className="absolute left-1/2 top-1/2"
-                        style={{
-                            animation: 'keyFormRightNew 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards'
-                        }}
-                    >
-                        <div className="relative">
-                            <Icons.Key 
-                                size={40} 
-                                className="text-orange-400" 
-                                style={{ 
-                                    filter: 'drop-shadow(0 0 12px rgba(249, 115, 22, 0.8))',
-                                    transform: 'translate(-50%, -50%) rotate(135deg)'
-                                }} 
-                            />
-                        </div>
-                    </div>
+                        {/* Center pole */}
+                        <rect x="57" y="15" width="6" height="95" rx="3" fill="url(#ac-pole)" />
 
-                    {/* Spark particles converging inward */}
-                    {[...Array(8)].map((_, i) => {
-                        const angle = (i / 8) * 360;
-                        const rad = angle * (Math.PI / 180);
-                        const distance = 60;
-                        const startX = Math.cos(rad) * distance;
-                        const startY = Math.sin(rad) * distance;
-                        
-                        return (
-                            <div
-                                key={`spark-${i}`}
-                                className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-full"
-                                style={{
-                                    background: i % 2 === 0 ? '#10b981' : '#22d3ee',
-                                    boxShadow: `0 0 8px ${i % 2 === 0 ? '#10b981' : '#22d3ee'}`,
-                                    animation: `sparkConverge-${i} 0.8s ease-in 0.4s forwards`,
-                                    opacity: 0
-                                }}
-                            >
-                                <style>{`
-                                    @keyframes sparkConverge-${i} {
-                                        0% {
-                                            transform: translate(calc(-50% + ${startX}px), calc(-50% + ${startY}px)) scale(0.5);
-                                            opacity: 1;
-                                        }
-                                        70% {
-                                            opacity: 1;
-                                        }
-                                        100% {
-                                            transform: translate(-50%, -50%) scale(1.2);
-                                            opacity: 0;
-                                        }
-                                    }
-                                `}</style>
-                            </div>
-                        );
-                    })}
+                        {/* Base plate */}
+                        <ellipse cx="60" cy="108" rx="18" ry="4" fill="#334155" />
+                        <ellipse cx="60" cy="106" rx="14" ry="3" fill="#475569" />
+
+                        {/* Top band — orange like real baskets */}
+                        <ellipse cx="60" cy="20" rx="22" ry="5" fill="none" stroke="url(#ac-accent)" strokeWidth="3.5" />
+                        <ellipse cx="60" cy="20" rx="22" ry="5" fill="none" stroke="#fbbf24" strokeWidth="1" opacity="0.5" />
+
+                        {/* Bitcoin cap */}
+                        <circle cx="60" cy="12" r="5" fill="#1e293b" stroke="url(#ac-accent)" strokeWidth="1.5" />
+                        <text x="60" y="15" textAnchor="middle" fill="#f97316" fontSize="7" fontWeight="bold">₿</text>
+
+                        {/* Chains — individually animated on impact */}
+                        <line x1="38" y1="24" x2="42" y2="68" stroke="url(#ac-metal)" strokeWidth="1.5" strokeLinecap="round" className="ac-chain ac-chain-1" />
+                        <line x1="44" y1="22" x2="46" y2="68" stroke="url(#ac-metal)" strokeWidth="1.3" strokeLinecap="round" className="ac-chain ac-chain-2" />
+                        <line x1="50" y1="20" x2="51" y2="68" stroke="url(#ac-metal)" strokeWidth="1.3" strokeLinecap="round" className="ac-chain ac-chain-3" />
+                        <line x1="55" y1="19" x2="55" y2="68" stroke="url(#ac-metal)" strokeWidth="1.2" strokeLinecap="round" className="ac-chain ac-chain-4" />
+                        <line x1="60" y1="18" x2="60" y2="68" stroke="url(#ac-metal)" strokeWidth="1.5" strokeLinecap="round" className="ac-chain ac-chain-5" />
+                        <line x1="65" y1="19" x2="65" y2="68" stroke="url(#ac-metal)" strokeWidth="1.2" strokeLinecap="round" className="ac-chain ac-chain-6" />
+                        <line x1="70" y1="20" x2="69" y2="68" stroke="url(#ac-metal)" strokeWidth="1.3" strokeLinecap="round" className="ac-chain ac-chain-7" />
+                        <line x1="76" y1="22" x2="74" y2="68" stroke="url(#ac-metal)" strokeWidth="1.3" strokeLinecap="round" className="ac-chain ac-chain-8" />
+                        <line x1="82" y1="24" x2="78" y2="68" stroke="url(#ac-metal)" strokeWidth="1.5" strokeLinecap="round" className="ac-chain ac-chain-9" />
+
+                        {/* Chain support rings */}
+                        <ellipse cx="60" cy="24" rx="15" ry="3.5" fill="none" stroke="#64748b" strokeWidth="1" opacity="0.4" />
+                        <ellipse cx="60" cy="45" rx="18" ry="4" fill="none" stroke="#64748b" strokeWidth="0.8" opacity="0.3" />
+
+                        {/* Basket tray */}
+                        <path d="M38 68 L42 84 L78 84 L82 68" fill="none" stroke="url(#ac-metal)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <ellipse cx="60" cy="84" rx="18" ry="4" fill="none" stroke="url(#ac-metal)" strokeWidth="2" />
+                        <ellipse cx="60" cy="68" rx="22" ry="4" fill="none" stroke="#64748b" strokeWidth="1.5" />
+
+                        {/* Impact glow — pulses when disc hits chains */}
+                        <circle cx="60" cy="45" r="22" fill="#10b981" opacity="0" className="ac-impact"
+                            style={{ transformBox: 'fill-box', transformOrigin: 'center' }} />
+
+                        {/* Flying disc */}
+                        <g className="ac-disc-group" style={{ transformBox: 'fill-box', transformOrigin: 'center' }}>
+                            <circle cx="60" cy="45" r="11" fill="url(#ac-disc)" />
+                            <circle cx="60" cy="45" r="7.5" fill="none" stroke="#065f46" strokeWidth="1.2" />
+                            <circle cx="60" cy="45" r="3" fill="#0f172a" />
+                            <ellipse cx="55" cy="41" rx="4" ry="2.5" fill="white" opacity="0.15" transform="rotate(-20 55 41)" />
+                        </g>
+                    </svg>
                 </div>
 
-                {/* Success text - "Account Created" */}
-                <div 
-                    className="text-brand-primary/90 text-sm font-medium tracking-wider uppercase mt-6"
-                    style={{ 
-                        animation: 'fadeInUpText 0.5s ease-out 1.0s forwards', 
+                {/* "Account Created" text */}
+                <div
+                    className="text-brand-primary/90 text-sm font-medium tracking-wider uppercase mt-4"
+                    style={{
+                        animation: 'acFadeInUp 0.5s ease-out 1.0s forwards',
                         opacity: 0,
                         textShadow: '0 0 20px rgba(16, 185, 129, 0.5)'
                     }}
                 >
                     Account Created
                 </div>
-                
-                {/* Growing dots (reverse of fading) */}
-                <div 
+
+                {/* Pulsing dots */}
+                <div
                     className="flex space-x-1 mt-3"
-                    style={{ 
-                        animation: 'dotsAppear 0.6s ease-out 1.2s forwards',
-                        opacity: 0
-                    }}
+                    style={{ animation: 'acDotsAppear 0.6s ease-out 1.2s forwards', opacity: 0 }}
                 >
-                    <div 
-                        className="w-1.5 h-1.5 bg-brand-primary/40 rounded-full" 
-                        style={{ animation: 'dotPulse 1s ease-in-out infinite', animationDelay: '0ms' }} 
-                    />
-                    <div 
-                        className="w-1.5 h-1.5 bg-brand-primary/60 rounded-full" 
-                        style={{ animation: 'dotPulse 1s ease-in-out infinite', animationDelay: '150ms' }} 
-                    />
-                    <div 
-                        className="w-1.5 h-1.5 bg-brand-primary/80 rounded-full" 
-                        style={{ animation: 'dotPulse 1s ease-in-out infinite', animationDelay: '300ms' }} 
-                    />
+                    <div className="w-1.5 h-1.5 bg-brand-primary/40 rounded-full" style={{ animation: 'acDotPulse 1s ease-in-out infinite', animationDelay: '0ms' }} />
+                    <div className="w-1.5 h-1.5 bg-brand-primary/60 rounded-full" style={{ animation: 'acDotPulse 1s ease-in-out infinite', animationDelay: '150ms' }} />
+                    <div className="w-1.5 h-1.5 bg-brand-primary/80 rounded-full" style={{ animation: 'acDotPulse 1s ease-in-out infinite', animationDelay: '300ms' }} />
                 </div>
 
                 {/* Success glow ring */}
                 {showSuccess && (
-                    <div 
-                        className="absolute w-32 h-32 rounded-full pointer-events-none"
+                    <div
+                        className="absolute w-48 h-48 rounded-full pointer-events-none"
                         style={{
-                            border: '2px solid rgba(16, 185, 129, 0.5)',
-                            animation: 'successRing 1s ease-out forwards',
-                            top: '50%',
+                            border: '2px solid rgba(16, 185, 129, 0.4)',
+                            animation: 'acSuccessRing 1s ease-out forwards',
+                            top: '25%',
                             left: '50%',
                             transform: 'translate(-50%, -50%)'
                         }}
@@ -443,101 +403,77 @@ export const AccountCreatedAnimation: React.FC<AccountCreatedAnimationProps> = (
                 )}
             </div>
 
-            {/* Completion flash overlay */}
+            {/* Completion flash */}
             {isComplete && (
-                <div 
+                <div
                     className="absolute inset-0 bg-brand-primary/10 pointer-events-none"
-                    style={{ animation: 'completionFlash 0.4s ease-out forwards' }}
+                    style={{ animation: 'acCompletionFlash 0.4s ease-out forwards' }}
                 />
             )}
 
             {/* Keyframes */}
             <style>{`
-                @keyframes keyFormLeftNew {
-                    0% {
-                        transform: translateX(-100px) translateY(-30px) rotate(-25deg);
-                        opacity: 0;
-                    }
-                    30% {
-                        opacity: 1;
-                    }
-                    80% {
-                        transform: translateX(-8px) rotate(-5deg);
-                        opacity: 1;
-                    }
-                    100% {
-                        transform: translateX(-12px);
-                        opacity: 1;
-                    }
+                /* Disc flight — arcs in from upper-right into the chains */
+                .ac-disc-group {
+                    animation: acDiscFly 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
                 }
-                
-                @keyframes keyFormRightNew {
-                    0% {
-                        transform: translateX(100px) translateY(-30px) rotate(25deg);
-                        opacity: 0;
-                    }
-                    30% {
-                        opacity: 1;
-                    }
-                    80% {
-                        transform: translateX(8px) rotate(5deg);
-                        opacity: 1;
-                    }
-                    100% {
-                        transform: translateX(12px);
-                        opacity: 1;
-                    }
+                @keyframes acDiscFly {
+                    0%   { transform: translate(80px, -90px) rotate(-200deg) scale(0.5); opacity: 0; }
+                    12%  { opacity: 1; }
+                    55%  { transform: translate(3px, -8px) rotate(-20deg) scale(1.05); opacity: 1; }
+                    75%  { transform: translate(0, 2px) rotate(-3deg) scale(1); }
+                    100% { transform: translate(0, 6px) rotate(0deg) scale(0.95); opacity: 1; }
                 }
-                
-                @keyframes connectionLineForm {
-                    0% {
-                        transform: translate(-50%, -50%) scaleY(0);
-                        opacity: 0;
-                    }
-                    50% {
-                        transform: translate(-50%, -50%) scaleY(1.2);
-                        opacity: 1;
-                    }
-                    100% {
-                        transform: translate(-50%, -50%) scaleY(1);
-                        opacity: 0.8;
-                    }
+
+                /* Chain rattle on disc impact — staggered from outside in */
+                .ac-chain { transform-box: fill-box; transform-origin: top center; }
+                .ac-chain-1 { animation: acRattle 0.6s ease-out 0.70s; }
+                .ac-chain-2 { animation: acRattle 0.55s ease-out 0.72s; }
+                .ac-chain-3 { animation: acRattle 0.5s ease-out 0.74s; }
+                .ac-chain-4 { animation: acRattle 0.45s ease-out 0.76s; }
+                .ac-chain-5 { animation: acRattle 0.5s ease-out 0.75s; }
+                .ac-chain-6 { animation: acRattle 0.45s ease-out 0.76s; }
+                .ac-chain-7 { animation: acRattle 0.5s ease-out 0.74s; }
+                .ac-chain-8 { animation: acRattle 0.55s ease-out 0.72s; }
+                .ac-chain-9 { animation: acRattle 0.6s ease-out 0.70s; }
+                @keyframes acRattle {
+                    0%, 100% { transform: translateX(0) rotate(0deg); }
+                    12%  { transform: translateX(3px) rotate(2deg); }
+                    25%  { transform: translateX(-2.5px) rotate(-1.5deg); }
+                    37%  { transform: translateX(2px) rotate(1deg); }
+                    50%  { transform: translateX(-1.5px) rotate(-0.8deg); }
+                    65%  { transform: translateX(1px) rotate(0.5deg); }
+                    80%  { transform: translateX(-0.5px) rotate(-0.2deg); }
                 }
-                
-                @keyframes fadeInUpText {
-                    from {
-                        transform: translateY(10px);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateY(0);
-                        opacity: 1;
-                    }
+
+                /* Impact glow pulse */
+                .ac-impact {
+                    animation: acImpact 0.8s ease-out 0.7s forwards;
                 }
-                
-                @keyframes dotsAppear {
+                @keyframes acImpact {
+                    0%   { opacity: 0; transform: scale(0.6); }
+                    25%  { opacity: 0.5; transform: scale(1.1); }
+                    100% { opacity: 0; transform: scale(1.5); }
+                }
+
+                @keyframes acFadeInUp {
+                    from { transform: translateY(10px); opacity: 0; }
+                    to   { transform: translateY(0); opacity: 1; }
+                }
+                @keyframes acDotsAppear {
                     from { opacity: 0; transform: scale(0.5); }
-                    to { opacity: 1; transform: scale(1); }
+                    to   { opacity: 1; transform: scale(1); }
                 }
-                
-                @keyframes dotPulse {
+                @keyframes acDotPulse {
                     0%, 100% { transform: scale(1); opacity: 0.6; }
-                    50% { transform: scale(1.3); opacity: 1; }
+                    50%      { transform: scale(1.3); opacity: 1; }
                 }
-                
-                @keyframes successRing {
-                    0% { 
-                        transform: translate(-50%, -50%) scale(0.5); 
-                        opacity: 1;
-                    }
-                    100% { 
-                        transform: translate(-50%, -50%) scale(2); 
-                        opacity: 0;
-                    }
+                @keyframes acSuccessRing {
+                    0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+                    100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
                 }
-                
-                @keyframes completionFlash {
-                    0% { opacity: 0.3; }
+                @keyframes acCompletionFlash {
+                    0%   { opacity: 0.3; }
                     100% { opacity: 0; }
                 }
             `}</style>

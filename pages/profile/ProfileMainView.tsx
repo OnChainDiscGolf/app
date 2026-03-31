@@ -327,43 +327,121 @@ export const ProfileMainView: React.FC<ProfileMainViewProps> = ({
                 </div>
             )}
 
-            {/* Keypair Breaking Animation Overlay - Clean & Stylish */}
+            {/* Disc-Leaving-Basket Logout Animation */}
             {isExploding && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden animate-in fade-in duration-200">
-                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-red-950/20 to-black" />
-                    <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.6) 100%)' }} />
+                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-black" />
                     <div className="relative z-10 flex flex-col items-center">
-                        <div className="relative w-48 h-32 mb-6">
-                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-12" style={{ background: 'linear-gradient(to bottom, transparent, #ef4444, #f97316, transparent)', boxShadow: '0 0 15px rgba(239, 68, 68, 0.8), 0 0 30px rgba(239, 68, 68, 0.4)', animation: 'fractureLine 0.3s ease-out forwards' }} />
-                            <div className="absolute left-1/2 top-1/2" style={{ animation: 'keyBreakLeftNew 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards' }}>
-                                <div className="relative">
-                                    <Icons.Key size={40} className="text-purple-400" style={{ filter: 'drop-shadow(0 0 12px rgba(139, 92, 246, 0.8))', transform: 'translate(-50%, -50%) rotate(-45deg)' }} />
-                                    <div className="absolute inset-0 opacity-0" style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(139,92,246,0.1) 2px, rgba(139,92,246,0.1) 4px)', animation: 'glitchFlicker 0.1s linear infinite' }} />
-                                </div>
-                            </div>
-                            <div className="absolute left-1/2 top-1/2" style={{ animation: 'keyBreakRightNew 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards' }}>
-                                <div className="relative">
-                                    <Icons.Key size={40} className="text-orange-400" style={{ filter: 'drop-shadow(0 0 12px rgba(249, 115, 22, 0.8))', transform: 'translate(-50%, -50%) rotate(135deg)' }} />
-                                </div>
-                            </div>
-                            {[...Array(8)].map((_, i) => { const angle = (i / 8) * 360; const rad = angle * (Math.PI / 180); const distance = 30 + Math.random() * 20; const x = Math.cos(rad) * distance; const y = Math.sin(rad) * distance; return (<div key={`spark-${i}`} className="absolute left-1/2 top-1/2 w-1 h-1 rounded-full" style={{ background: i % 2 === 0 ? '#ef4444' : '#f97316', boxShadow: `0 0 6px ${i % 2 === 0 ? '#ef4444' : '#f97316'}`, animation: `sparkFly-${i} 0.6s ease-out 0.15s forwards`, opacity: 0 }}><style>{`@keyframes sparkFly-${i} { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(0); opacity: 0; } }`}</style></div>); })}
+                        {/* Basket + disc scene */}
+                        <div className="relative mb-4" style={{ width: 192, height: 192 }}>
+                            <svg viewBox="0 0 120 130" className="w-full h-full" style={{ overflow: 'visible' }}>
+                                <defs>
+                                    <linearGradient id="lo-metal" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stopColor="#e2e8f0" />
+                                        <stop offset="50%" stopColor="#94a3b8" />
+                                        <stop offset="100%" stopColor="#64748b" />
+                                    </linearGradient>
+                                    <linearGradient id="lo-pole" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stopColor="#475569" />
+                                        <stop offset="100%" stopColor="#1e293b" />
+                                    </linearGradient>
+                                    <linearGradient id="lo-accent" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stopColor="#fb923c" />
+                                        <stop offset="100%" stopColor="#ea580c" />
+                                    </linearGradient>
+                                    <linearGradient id="lo-disc" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stopColor="#34d399" />
+                                        <stop offset="50%" stopColor="#10b981" />
+                                        <stop offset="100%" stopColor="#059669" />
+                                    </linearGradient>
+                                </defs>
+
+                                {/* Basket structure — dims over time */}
+                                <g className="lo-basket">
+                                    <rect x="57" y="15" width="6" height="95" rx="3" fill="url(#lo-pole)" />
+                                    <ellipse cx="60" cy="108" rx="18" ry="4" fill="#334155" />
+                                    <ellipse cx="60" cy="106" rx="14" ry="3" fill="#475569" />
+                                    <ellipse cx="60" cy="20" rx="22" ry="5" fill="none" stroke="url(#lo-accent)" strokeWidth="3.5" />
+                                    <ellipse cx="60" cy="20" rx="22" ry="5" fill="none" stroke="#fbbf24" strokeWidth="1" opacity="0.5" />
+                                    <circle cx="60" cy="12" r="5" fill="#1e293b" stroke="url(#lo-accent)" strokeWidth="1.5" />
+                                    <text x="60" y="15" textAnchor="middle" fill="#f97316" fontSize="7" fontWeight="bold">₿</text>
+
+                                    {/* Chains — gentle sway as disc leaves */}
+                                    <line x1="38" y1="24" x2="42" y2="68" stroke="url(#lo-metal)" strokeWidth="1.5" strokeLinecap="round" className="lo-chain lo-chain-1" />
+                                    <line x1="44" y1="22" x2="46" y2="68" stroke="url(#lo-metal)" strokeWidth="1.3" strokeLinecap="round" className="lo-chain lo-chain-2" />
+                                    <line x1="50" y1="20" x2="51" y2="68" stroke="url(#lo-metal)" strokeWidth="1.3" strokeLinecap="round" className="lo-chain lo-chain-3" />
+                                    <line x1="55" y1="19" x2="55" y2="68" stroke="url(#lo-metal)" strokeWidth="1.2" strokeLinecap="round" className="lo-chain lo-chain-4" />
+                                    <line x1="60" y1="18" x2="60" y2="68" stroke="url(#lo-metal)" strokeWidth="1.5" strokeLinecap="round" className="lo-chain lo-chain-5" />
+                                    <line x1="65" y1="19" x2="65" y2="68" stroke="url(#lo-metal)" strokeWidth="1.2" strokeLinecap="round" className="lo-chain lo-chain-6" />
+                                    <line x1="70" y1="20" x2="69" y2="68" stroke="url(#lo-metal)" strokeWidth="1.3" strokeLinecap="round" className="lo-chain lo-chain-7" />
+                                    <line x1="76" y1="22" x2="74" y2="68" stroke="url(#lo-metal)" strokeWidth="1.3" strokeLinecap="round" className="lo-chain lo-chain-8" />
+                                    <line x1="82" y1="24" x2="78" y2="68" stroke="url(#lo-metal)" strokeWidth="1.5" strokeLinecap="round" className="lo-chain lo-chain-9" />
+
+                                    <ellipse cx="60" cy="24" rx="15" ry="3.5" fill="none" stroke="#64748b" strokeWidth="1" opacity="0.4" />
+                                    <ellipse cx="60" cy="45" rx="18" ry="4" fill="none" stroke="#64748b" strokeWidth="0.8" opacity="0.3" />
+                                    <path d="M38 68 L42 84 L78 84 L82 68" fill="none" stroke="url(#lo-metal)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                    <ellipse cx="60" cy="84" rx="18" ry="4" fill="none" stroke="url(#lo-metal)" strokeWidth="2" />
+                                    <ellipse cx="60" cy="68" rx="22" ry="4" fill="none" stroke="#64748b" strokeWidth="1.5" />
+                                </g>
+
+                                {/* Disc — lifts out and flies away */}
+                                <g className="lo-disc-group" style={{ transformBox: 'fill-box', transformOrigin: 'center' }}>
+                                    <circle cx="60" cy="50" r="11" fill="url(#lo-disc)" />
+                                    <circle cx="60" cy="50" r="7.5" fill="none" stroke="#065f46" strokeWidth="1.2" />
+                                    <circle cx="60" cy="50" r="3" fill="#0f172a" />
+                                    <ellipse cx="55" cy="46" rx="4" ry="2.5" fill="white" opacity="0.15" transform="rotate(-20 55 46)" />
+                                </g>
+                            </svg>
                         </div>
-                        <div className="text-red-400/80 text-sm font-medium tracking-wider uppercase" style={{ animation: 'fadeInUp 0.5s ease-out 0.5s forwards', opacity: 0, textShadow: '0 0 20px rgba(239, 68, 68, 0.5)' }}>Logging Out</div>
-                        <div className="flex space-x-1 mt-2" style={{ animation: 'fadeOut 1s ease-out 1s forwards' }}>
-                            <div className="w-1.5 h-1.5 bg-red-400/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                            <div className="w-1.5 h-1.5 bg-red-400/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                            <div className="w-1.5 h-1.5 bg-red-400/20 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <div className="text-slate-400/80 text-sm font-medium tracking-wider uppercase" style={{ animation: 'loFadeInUp 0.5s ease-out 0.4s forwards', opacity: 0 }}>Logging Out</div>
+                        <div className="flex space-x-1 mt-2" style={{ animation: 'loFadeOut 1s ease-out 1s forwards' }}>
+                            <div className="w-1.5 h-1.5 bg-slate-500/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <div className="w-1.5 h-1.5 bg-slate-500/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <div className="w-1.5 h-1.5 bg-slate-500/20 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                         </div>
                     </div>
-                    <div className="absolute inset-0 bg-black pointer-events-none" style={{ animation: 'fadeToBlack 0.5s ease-in 1.5s forwards', opacity: 0 }} />
+                    <div className="absolute inset-0 bg-black pointer-events-none" style={{ animation: 'loFadeToBlack 0.5s ease-in 1.5s forwards', opacity: 0 }} />
                     <style>{`
-                        @keyframes fractureLine { 0% { transform: translate(-50%, -50%) scaleY(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scaleY(1.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scaleY(1); opacity: 0.8; } }
-                        @keyframes keyBreakLeftNew { 0% { transform: translateX(-12px); opacity: 1; } 20% { transform: translateX(-8px) rotate(-5deg); opacity: 1; } 100% { transform: translateX(-100px) translateY(-30px) rotate(-25deg); opacity: 0; } }
-                        @keyframes keyBreakRightNew { 0% { transform: translateX(12px); opacity: 1; } 20% { transform: translateX(8px) rotate(5deg); opacity: 1; } 100% { transform: translateX(100px) translateY(-30px) rotate(25deg); opacity: 0; } }
-                        @keyframes glitchFlicker { 0%, 100% { opacity: 0; } 50% { opacity: 0.3; } }
-                        @keyframes fadeInUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-                        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-                        @keyframes fadeToBlack { from { opacity: 0; } to { opacity: 1; } }
+                        /* Disc lifts out of basket and flies away upper-left */
+                        .lo-disc-group {
+                            animation: loDiscLeave 1.2s cubic-bezier(0.55, 0, 1, 0.45) 0.2s forwards;
+                        }
+                        @keyframes loDiscLeave {
+                            0%   { transform: translate(0, 6px) rotate(0deg) scale(0.95); opacity: 1; }
+                            20%  { transform: translate(0, -10px) rotate(8deg) scale(1); opacity: 1; }
+                            50%  { transform: translate(-30px, -50px) rotate(50deg) scale(1.05); opacity: 0.8; }
+                            100% { transform: translate(-100px, -110px) rotate(140deg) scale(0.4); opacity: 0; }
+                        }
+
+                        /* Basket dims as disc leaves */
+                        .lo-basket { animation: loBasketDim 1.5s ease-in 0.5s forwards; }
+                        @keyframes loBasketDim {
+                            0%   { opacity: 1; }
+                            100% { opacity: 0.25; }
+                        }
+
+                        /* Gentle chain sway as disc lifts out */
+                        .lo-chain { transform-box: fill-box; transform-origin: top center; }
+                        .lo-chain-1 { animation: loSway 0.8s ease-in-out 0.25s; }
+                        .lo-chain-2 { animation: loSway 0.75s ease-in-out 0.28s; }
+                        .lo-chain-3 { animation: loSway 0.7s ease-in-out 0.30s; }
+                        .lo-chain-4 { animation: loSway 0.65s ease-in-out 0.32s; }
+                        .lo-chain-5 { animation: loSway 0.7s ease-in-out 0.30s; }
+                        .lo-chain-6 { animation: loSway 0.65s ease-in-out 0.32s; }
+                        .lo-chain-7 { animation: loSway 0.7s ease-in-out 0.30s; }
+                        .lo-chain-8 { animation: loSway 0.75s ease-in-out 0.28s; }
+                        .lo-chain-9 { animation: loSway 0.8s ease-in-out 0.25s; }
+                        @keyframes loSway {
+                            0%, 100% { transform: translateX(0) rotate(0deg); }
+                            20%  { transform: translateX(1.5px) rotate(1deg); }
+                            40%  { transform: translateX(-1px) rotate(-0.7deg); }
+                            60%  { transform: translateX(0.5px) rotate(0.3deg); }
+                            80%  { transform: translateX(-0.2px) rotate(-0.1deg); }
+                        }
+
+                        @keyframes loFadeInUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+                        @keyframes loFadeOut { from { opacity: 1; } to { opacity: 0; } }
+                        @keyframes loFadeToBlack { from { opacity: 0; } to { opacity: 1; } }
                     `}</style>
                 </div>
             )}
@@ -405,6 +483,20 @@ export const ProfileMainView: React.FC<ProfileMainViewProps> = ({
                                     <span className="font-mono text-xs">{formatLightningAddress(lightningAddress)}</span>
                                     {copiedAddress ? (<Icons.CheckMark size={14} className="text-green-500" />) : (<Icons.Copy size={14} className="opacity-50 group-hover:opacity-100 transition-opacity text-slate-500" />)}
                                 </button>
+                                {/* Account Type Badge */}
+                                <div className={`flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                                    authSource === 'mnemonic'
+                                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                        : authMethod === 'amber'
+                                        ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                        : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                }`}>
+                                    {authSource === 'mnemonic'
+                                        ? <><Icons.Key size={12} /><span>Seed Phrase Account</span></>
+                                        : authMethod === 'amber'
+                                        ? <><Icons.Android size={12} /><span>Amber Signer</span></>
+                                        : <><Icons.Shield size={12} /><span>Key Login</span></>}
+                                </div>
                             </div>
                             <button onClick={() => setIsEditing(true)} className="mt-4 px-4 py-2 text-purple-400 text-sm font-bold bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-xl transition-all active:scale-95">Edit Profile</button>
                         </>
