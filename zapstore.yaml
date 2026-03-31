@@ -1,4 +1,5 @@
 repository: https://github.com/OnChainDiscGolf/app
 name: On-Chain Disc Golf
-summary: Disc golf scorecard app with integrated Bitcoin Lightning payments
+summary: Disc golf scorecard with automatic Bitcoin Lightning settlement
+icon: ./public/icons/icon-512x512.png
 tags: [bitcoin, lightning, nostr, disc-golf, sports]
