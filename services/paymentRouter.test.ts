@@ -1,14 +1,15 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // vi.mock is hoisted to the top of the file before any imports.
+//
+// Note: paymentRouter imports `sendGiftWrap` from `./nostrService`, NOT from
+// `./giftWrapService`. There are two `sendGiftWrap` implementations in the
+// codebase — the legacy 2-arg version in nostrService.ts and a 5-arg version
+// in giftWrapService.ts. paymentRouter uses the legacy one, which handles
+// session lookup + relay selection internally via getSession() and getRelays().
 vi.mock('./nostrService', () => ({
   fetchProfile: vi.fn(),
   sendGiftWrap: vi.fn(),
-  // TODO: paymentRouter.ts:317 calls sendGiftWrap(recipientPubkey, message) with
-  // 2 args, but giftWrapService.ts:116 requires (content, senderSecretKey,
-  // recipientPubkey, relays, kind?). The Tier-4 cashu_dm path is broken in
-  // production. The test below passes only because sendGiftWrap is mocked.
-  // File a separate issue to fix the call site.
   getMagicLightningAddress: vi.fn(),
   getPool: vi.fn(),
 }));
@@ -163,7 +164,13 @@ describe('routePayment 4-tier cascade', () => {
     expect(result.method).toBe('cashu_dm');
     expect(result.requiresManualClaim).toBe(true);
     expect(createCashuTokenFn).toHaveBeenCalledWith(1000);
-    expect(mockedNostr.sendGiftWrap).toHaveBeenCalled();
+    // Verify the legacy 2-arg sendGiftWrap signature from nostrService.ts.
+    // Pinning the exact shape so any future drift (e.g., a refactor that
+    // switches to giftWrapService's 5-arg version) trips this test loudly.
+    expect(mockedNostr.sendGiftWrap).toHaveBeenCalledWith(
+      HEX_PUBKEY,         // recipientPubkey
+      expect.any(String), // content (JSON-encoded cashu_payment)
+    );
   });
 
   it('All tiers fail → method=failed', async () => {
