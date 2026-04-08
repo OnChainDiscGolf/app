@@ -132,6 +132,12 @@ export interface PaymentResult {
     feeSats?: number;
     /** Error message if payment failed */
     error?: string;
+    /**
+     * True when the recipient must take a manual action to claim funds (e.g.,
+     * `cashu_dm` sends an eCash token via Gift Wrap that the recipient has to
+     * import). The host should be warned so they don't assume delivery is final.
+     */
+    requiresManualClaim?: boolean;
 }
 
 /** A recipient in a batch payout (e.g., round settlement) */
@@ -328,15 +334,22 @@ const sendCashuViaDm = async (
 // =============================================================================
 
 /**
- * Route a payment to a recipient
- * 
- * This is the main function that implements the payment priority:
- * 1. Try Breez (if available)
- * 2. Try Lightning via recipient's lud16 or npub.cash
- * 3. Fallback to Cashu DM
- * 
+ * Route a payment to a recipient.
+ *
+ * Outgoing payment policy:
+ * - If Breez SDK is initialized AND has sufficient balance, **all** outgoing
+ *   payments go through Breez. This is independent of the host's `walletMode`
+ *   (which only governs which wallet generates *receive* invoices). If Breez is
+ *   funded but the payment still fails, we surface the failure rather than
+ *   silently falling back to Cashu — the host can retry.
+ * - If Breez is unavailable or unfunded, fall back to the legacy Cashu→LNURL
+ *   melt path via the supplied `cashuPaymentFn` (which respects walletMode).
+ * - As an absolute last resort, send a Cashu token via NIP-17 Gift Wrap. This
+ *   path is marked `requiresManualClaim` so the host knows the recipient must
+ *   take action.
+ *
  * @param recipient - Recipient details (pubkey, amount)
- * @param cashuPaymentFn - Function to execute Cashu → Lightning payment
+ * @param cashuPaymentFn - Function to execute Cashu → Lightning payment (legacy fallback)
  * @param createCashuTokenFn - Function to create Cashu token for DM fallback
  */
 export const routePayment = async (
@@ -350,52 +363,95 @@ export const routePayment = async (
     const { address, source } = await getRecipientLightningAddress(recipient.pubkey);
     console.log(`📍 Lightning address: ${address} (source: ${source})`);
 
-    // Step 2: Try Breez first (if available)
-    if (isBreezInitialized()) {
-        console.log('⚡ Attempting Breez payment...');
-        const breezResult = await payViaBreez(
-            address,
-            recipient.amountSats,
-            `On-Chain Disc Golf payout to ${recipient.name || 'player'}`
-        );
+    const comment = `On-Chain Disc Golf payout to ${recipient.name || 'player'}`;
 
-        if (breezResult.success) {
-            console.log('✅ Breez payment successful!');
-            return breezResult;
+    // -------------------------------------------------------------------------
+    // Step 2: Breez is the primary outgoing rail when initialized AND funded.
+    // -------------------------------------------------------------------------
+    if (isBreezInitialized()) {
+        const balance = await getBreezBalance();
+
+        if (balance.balanceSats >= recipient.amountSats) {
+            console.log(`⚡ Breez funded (${balance.balanceSats} sats) — attempting Breez payment...`);
+
+            // 2a: Try Breez's built-in lightning-address pay path.
+            const breezResult = await payViaBreez(address, recipient.amountSats, comment);
+            if (breezResult.success) {
+                console.log('✅ Breez payment successful!');
+                return breezResult;
+            }
+            console.log(`⚠️ Breez direct pay failed: ${breezResult.error}. Retrying via LNURL → Breez payInvoice...`);
+
+            // 2b: Some lightning addresses (notably npub.cash) need manual LNURL
+            // resolution before Breez can pay. Resolve invoice ourselves, then
+            // pay it through Breez. This still uses Breez funds — never Cashu.
+            const invoice = await resolveAndGetInvoice(address, recipient.amountSats, comment);
+            if (invoice) {
+                const result = await breezPayInvoice(invoice);
+                if (result.success) {
+                    console.log('✅ Breez (LNURL invoice) payment successful!');
+                    return {
+                        success: true,
+                        method: 'breez',
+                        txId: result.paymentHash,
+                        feeSats: result.feeSats
+                    };
+                }
+                console.log(`⚠️ Breez payInvoice failed: ${result.error}`);
+            } else {
+                console.log('⚠️ LNURL invoice resolution failed.');
+            }
+
+            // Breez was funded but every Breez attempt failed. Do NOT silently
+            // fall through to Cashu — the host should know and retry.
+            return {
+                success: false,
+                method: 'breez',
+                error: breezResult.error || 'Breez payment failed (LNURL resolution or invoice payment)'
+            };
         }
-        console.log(`⚠️ Breez payment failed: ${breezResult.error}`);
+
+        console.log(`⚠️ Breez initialized but underfunded (${balance.balanceSats} < ${recipient.amountSats}) — falling back to Cashu paths.`);
+    } else {
+        console.log('⚠️ Breez SDK not initialized — falling back to Cashu paths.');
     }
 
-    // Step 3: Try Lightning via LNURL (using Cashu to melt)
-    console.log('⚡ Attempting LNURL payment...');
-    const invoice = await resolveAndGetInvoice(
+    // -------------------------------------------------------------------------
+    // Step 3: Legacy Cashu → LNURL melt fallback. Only reached if Breez is
+    // unavailable or unfunded. Honors the host's walletMode via cashuPaymentFn.
+    // -------------------------------------------------------------------------
+    console.log('⚡ Attempting LNURL payment via fallback wallet...');
+    const fallbackInvoice = await resolveAndGetInvoice(
         address,
         recipient.amountSats,
-        `On-Chain Disc Golf payout`
+        comment
     );
 
-    if (invoice) {
-        const cashuResult = await payViaCashu(invoice, cashuPaymentFn);
+    if (fallbackInvoice) {
+        const cashuResult = await payViaCashu(fallbackInvoice, cashuPaymentFn);
         if (cashuResult.success) {
-            console.log('✅ LNURL payment successful!');
+            console.log('✅ Fallback LNURL payment successful!');
             return {
                 ...cashuResult,
                 method: source === 'kind0' ? 'lnurl' : 'npubcash'
             };
         }
-        console.log(`⚠️ LNURL payment failed: ${cashuResult.error}`);
+        console.log(`⚠️ Fallback LNURL payment failed: ${cashuResult.error}`);
     }
 
-    // Step 4: Fallback to Cashu DM
+    // -------------------------------------------------------------------------
+    // Step 4: Last-resort Cashu DM. Marked requiresManualClaim so the host
+    // sees a clear warning instead of treating it as a normal payout.
+    // -------------------------------------------------------------------------
     if (createCashuTokenFn) {
-        console.log('📨 Falling back to Cashu DM...');
+        console.log('📨 Falling back to Cashu DM (recipient must manually claim)...');
         try {
             const token = await createCashuTokenFn(recipient.amountSats);
             const dmResult = await sendCashuViaDm(recipient.pubkey, recipient.amountSats, token);
 
             if (dmResult.success) {
-                console.log('✅ Cashu DM sent successfully!');
-                return dmResult;
+                console.log('⚠️ Cashu DM sent — recipient must claim manually.');
+                return { ...dmResult, requiresManualClaim: true };
             }
         } catch (error) {
             console.error('Failed to create Cashu token for DM:', error);

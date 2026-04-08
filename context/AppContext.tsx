@@ -675,8 +675,9 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
       isProcessingPayments: totalPot > 0
     });
 
-    const payoutsMade: { playerName: string; amount: number; isCurrentUser: boolean }[] = [];
+    const payoutsMade: { playerName: string; amount: number; isCurrentUser: boolean; requiresManualClaim?: boolean }[] = [];
     const failedPayouts: { playerName: string; playerId: string; amount: number }[] = [];
+    const manualClaimPayouts: { playerName: string; amount: number }[] = [];
 
     // --- Process payouts using routePayment with fallbacks ---
     if (totalPot > 0) {
@@ -711,7 +712,15 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
           if (paymentResult?.success) {
             console.log(`✅ Paid ${amount} sats to ${player.name} via ${paymentResult.method}`);
             wallet.addTransaction('payout', amount, `Payout to ${player.name}`);
-            payoutsMade.push({ playerName: player.name, amount, isCurrentUser: false });
+            payoutsMade.push({
+              playerName: player.name,
+              amount,
+              isCurrentUser: false,
+              requiresManualClaim: paymentResult.requiresManualClaim
+            });
+            if (paymentResult.requiresManualClaim) {
+              manualClaimPayouts.push({ playerName: player.name, amount });
+            }
           } else {
             console.error(`❌ Failed to pay ${player.name}: ${paymentResult?.error}`);
             failedPayouts.push({ playerName: player.name, playerId: player.id, amount });
@@ -732,6 +741,17 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
           `Some payouts failed. The round has NOT been finalized so you can retry.\n\nFailed payouts:\n${failedList}\n\nPlease check your wallet balance and try finalizing again.`
         );
         return; // Do NOT finalize - allow retry
+      }
+
+      // --- Warn the host about payouts that landed as Cashu DM tokens ---
+      // These succeeded technically (the Gift Wrap was delivered) but the
+      // recipient must manually import the token in their wallet. The host
+      // should know so they can follow up out-of-band.
+      if (manualClaimPayouts.length > 0) {
+        const claimList = manualClaimPayouts.map(p => `${p.playerName}: ${p.amount} sats`).join('\n');
+        alert(
+          `Heads up — these payouts were sent as eCash tokens via DM and need to be claimed manually by the recipient:\n\n${claimList}\n\nThis usually means Breez was unfunded and Lightning fallback failed. Let them know to open their wallet and accept the token.`
+        );
       }
     } else {
       setRoundSummary(prev => prev ? { ...prev, isProcessingPayments: false } : null);

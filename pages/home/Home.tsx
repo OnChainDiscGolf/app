@@ -744,7 +744,7 @@ export const Home: React.FC = () => {
                 if (payment.entry && entryFee > 0) amount += entryFee;
                 if (payment.ace && acePot > 0) amount += acePot;
                 if (amount === 0) continue;
-                const { invoice, paymentHash } = await depositFunds(amount);
+                const { request: invoice, quote: paymentHash } = await depositFunds(amount);
                 const messageContent = JSON.stringify({
                     type: 'payment_request',
                     round: { course: courseName || 'Disc Golf Round', host: userProfile.name, date: `${startDate} ${startTime}` },
@@ -782,7 +782,7 @@ export const Home: React.FC = () => {
                 if (payment.entry && entryFee > 0) amount += entryFee;
                 if (payment.ace && acePot > 0) amount += acePot;
                 if (amount === 0) continue;
-                const { invoice, paymentHash } = await depositFunds(amount);
+                const { request: invoice, quote: paymentHash } = await depositFunds(amount);
                 const messageContent = JSON.stringify({
                     type: 'payment_request',
                     round: { course: courseName || 'Disc Golf Round', host: userProfile.name, date: `${startDate} ${startTime}` },

@@ -218,10 +218,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const [walletMode, setWalletModeState] = useState<'cashu' | 'nwc' | 'breez'>(() => {
-    const savedMode = localStorage.getItem('cdg_wallet_mode') as 'cashu' | 'nwc' | 'breez';
+    const savedMode = localStorage.getItem('cdg_wallet_mode') as 'cashu' | 'nwc' | 'breez' | null;
     const savedString = localStorage.getItem('cdg_nwc_string');
     if (savedMode === 'nwc' && savedString) return 'nwc';
-    return 'cashu';
+    if (savedMode === 'breez') return 'breez';
+    if (savedMode === 'cashu') return 'cashu';
+    // New users default to Breez — Breez SDK is initialized at the end of onboarding
+    // (Finalization.tsx) and is the intended primary wallet for round settlement.
+    return 'breez';
   });
 
   const [nwcString, setNwcString] = useState<string>(() => {
