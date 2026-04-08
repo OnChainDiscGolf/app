@@ -198,17 +198,26 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const HomeOrOnboarding: React.FC = () => {
   const { isAuthenticated } = useApp();
   const { isOnboarding } = useOnboarding();
-  
+  const navigate = useNavigate();
+
+  // After Amber login completes, redirect to profile setup
+  useEffect(() => {
+    if (isAuthenticated && localStorage.getItem('amber_needs_profile_setup')) {
+      localStorage.removeItem('amber_needs_profile_setup');
+      navigate('/profile-setup', { state: { isRecovery: true }, replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
   // If authenticated, always show Home (never show onboarding to logged-in users)
   if (isAuthenticated) {
     return <Home />;
   }
-  
+
   // If actively onboarding (started the new user flow), show Onboarding
   if (isOnboarding) {
     return <Onboarding />;
   }
-  
+
   // Not authenticated, show Onboarding
   return <Onboarding />;
 };

@@ -18,7 +18,7 @@
  */
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Icons } from '../components/Icons';
 import { nip19 } from 'nostr-tools';
@@ -28,7 +28,9 @@ import { getSession, uploadProfileImage } from '../services/nostrService';
  * Profile setup page -- set display name, avatar, and PDGA# after account creation.
  */
 export const ProfileSetup: React.FC = () => {
-    const { userProfile, updateUserProfile, currentUserPubkey, activeRound, createAccount, isGuest } = useApp();
+    const { userProfile, updateUserProfile, currentUserPubkey, activeRound, createAccount, isGuest, authSource, authMethod } = useApp();
+    const location = useLocation();
+    const isRecovery = (location.state as any)?.isRecovery === true;
     const [name, setName] = useState(userProfile.name || 'Disc Golfer');
     const [picture, setPicture] = useState(userProfile.picture || '');
     const [pdga, setPdga] = useState(userProfile.pdga || '');
@@ -100,13 +102,71 @@ export const ProfileSetup: React.FC = () => {
             {/* Header */}
             <div className="bg-slate-900/80 backdrop-blur-md border-b border-white/5 p-4">
                 <div className="max-w-md mx-auto">
-                    <h1 className="text-3xl font-bold text-white">Welcome!</h1>
-                    <p className="text-slate-400 text-sm mt-1">Let's set up your profile</p>
+                    <h1 className="text-3xl font-bold text-white">
+                        {isRecovery
+                            ? (authSource === 'mnemonic' ? 'Account Recovered!' : authMethod === 'amber' ? 'Connected!' : 'Signed In!')
+                            : 'Welcome!'}
+                    </h1>
+                    <p className="text-slate-400 text-sm mt-1">
+                        {isRecovery ? 'Confirm your profile details' : "Let's set up your profile"}
+                    </p>
                 </div>
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 max-w-md mx-auto w-full space-y-6 nav-safe-bottom">
+
+                {/* Recovery Status Summary */}
+                {isRecovery && (
+                    <div className={`p-4 rounded-xl border ${
+                        authSource === 'mnemonic'
+                            ? 'bg-amber-500/10 border-amber-500/30'
+                            : authMethod === 'amber'
+                            ? 'bg-orange-500/10 border-orange-500/30'
+                            : 'bg-purple-500/10 border-purple-500/30'
+                    }`}>
+                        <div className="flex items-center space-x-3 mb-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                authSource === 'mnemonic' ? 'bg-amber-500/20' : authMethod === 'amber' ? 'bg-orange-500/20' : 'bg-purple-500/20'
+                            }`}>
+                                {authSource === 'mnemonic'
+                                    ? <Icons.Key size={16} className="text-amber-500" />
+                                    : authMethod === 'amber'
+                                    ? <Icons.Android size={16} className="text-orange-500" />
+                                    : <Icons.Shield size={16} className="text-purple-500" />}
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-white">
+                                    {authSource === 'mnemonic' ? 'Full Recovery' : authMethod === 'amber' ? 'Amber Signer' : 'Nostr Key Login'}
+                                </p>
+                                <p className="text-[10px] text-slate-400">
+                                    {authSource === 'mnemonic'
+                                        ? 'Your identity and Bitcoin wallet have been restored'
+                                        : authMethod === 'amber'
+                                        ? 'Signed in via Amber. Lightning wallet requires separate setup.'
+                                        : 'Your Nostr identity is ready. Lightning wallet requires separate setup.'}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] rounded-full border border-emerald-500/30">
+                                Cashu ready
+                            </span>
+                            <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-[10px] rounded-full border border-purple-500/30">
+                                NWC ready
+                            </span>
+                            {authSource === 'mnemonic' ? (
+                                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-[10px] rounded-full border border-blue-500/30">
+                                    Lightning restored
+                                </span>
+                            ) : (
+                                <span className="px-2 py-0.5 bg-slate-500/20 text-slate-400 text-[10px] rounded-full border border-slate-500/30">
+                                    Lightning — setup needed
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* Profile Picture */}
                 <div className="space-y-3">
@@ -184,106 +244,118 @@ export const ProfileSetup: React.FC = () => {
                     </p>
                 </div>
 
-                {/* Key Explanation */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                    <button
-                        onClick={() => setShowKeyInfo(!showKeyInfo)}
-                        className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors"
-                    >
-                        <div className="flex items-center space-x-2">
-                            <Icons.Key className="text-purple-500" size={20} />
-                            <h3 className="font-bold text-white">Your Keys</h3>
-                        </div>
-                        <Icons.ChevronDown
-                            size={20}
-                            className={`transition-transform duration-200 text-slate-400 ${showKeyInfo ? 'rotate-180' : ''}`}
-                        />
-                    </button>
-
-                    {showKeyInfo && (
-                        <div className="px-4 pb-4 space-y-4 text-sm animate-in slide-in-from-top duration-200">
-                            <p className="text-slate-300 leading-relaxed">
-                                <strong className="text-white">Your identity, your control.</strong> Think of Nostr like having your own house key instead of renting an apartment from a landlord who can kick you out anytime.
-                            </p>
-
-                            <p className="text-slate-300 leading-relaxed">
-                                <strong className="text-purple-400">With Nostr, YOU own your identity.</strong> You have a private key (like a master password) that proves you're you. No company can take it away.
-                            </p>
-
-                            {/* Public Key */}
-                            <div className="bg-black/30 rounded-lg p-3 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wide">Public Key</p>
-                                    <span className="text-[10px] text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">SAFE TO SHARE</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <code className="flex-1 font-mono text-xs text-brand-primary break-all">{npub.slice(0, 40)}...</code>
-                                    <button
-                                        onClick={handleCopyNpub}
-                                        className="p-2 hover:bg-slate-800 rounded transition-colors text-brand-primary shrink-0"
-                                    >
-                                        {copiedKeyType === 'npub' ? <Icons.CheckMark size={14} /> : <Icons.Copy size={14} />}
-                                    </button>
-                                </div>
-                                <p className="text-slate-400 text-xs italic">
-                                    Like your email address - anyone can use this to find you or send you sats!
-                                </p>
-                            </div>
-
-                            {/* Private Key */}
-                            <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-3 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-orange-300 text-xs font-bold uppercase tracking-wide">Private Key</p>
-                                    <span className="text-[10px] text-orange-400 bg-orange-500/20 px-2 py-0.5 rounded-full">KEEP SECRET</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <code className="flex-1 font-mono text-xs text-orange-300 break-all">{nsec.slice(0, 40)}...</code>
-                                    <button
-                                        onClick={handleCopyNsec}
-                                        className="p-2 hover:bg-orange-900/30 rounded transition-colors text-orange-400 shrink-0"
-                                    >
-                                        {copiedKeyType === 'nsec' ? <Icons.CheckMark size={14} /> : <Icons.Copy size={14} />}
-                                    </button>
-                                </div>
-                                <p className="text-orange-200/80 text-xs">
-                                    <strong>This controls your funds.</strong> Losing it means losing your money forever. Save it somewhere safe!
-                                </p>
-                            </div>
-
-                            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 space-y-2">
-                                <p className="text-purple-300 text-xs leading-relaxed">
-                                    💡 <strong>One key, infinite apps.</strong> Your identity travels with you across any Nostr app:
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    <a
-                                        href="https://damus.io"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full hover:bg-purple-500/30 transition-colors text-xs font-bold border border-purple-500/30"
-                                    >
-                                        Damus
-                                    </a>
-                                    <a
-                                        href="https://primal.net"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full hover:bg-purple-500/30 transition-colors text-xs font-bold border border-purple-500/30"
-                                    >
-                                        Primal
-                                    </a>
-                                    <a
-                                        href="https://fountain.fm"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full hover:bg-purple-500/30 transition-colors text-xs font-bold border border-purple-500/30"
-                                    >
-                                        Fountain
-                                    </a>
-                                </div>
+                {/* Key Explanation — hidden for Amber users (keys are in Amber app) */}
+                {authMethod === 'amber' ? (
+                    <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
+                        <div className="flex items-center space-x-3">
+                            <Icons.Android className="text-orange-500" size={20} />
+                            <div>
+                                <p className="text-sm font-bold text-white">Keys managed by Amber</p>
+                                <p className="text-xs text-slate-400">Your private key is stored securely in the Amber app</p>
                             </div>
                         </div>
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                        <button
+                            onClick={() => setShowKeyInfo(!showKeyInfo)}
+                            className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors"
+                        >
+                            <div className="flex items-center space-x-2">
+                                <Icons.Key className="text-purple-500" size={20} />
+                                <h3 className="font-bold text-white">Your Keys</h3>
+                            </div>
+                            <Icons.ChevronDown
+                                size={20}
+                                className={`transition-transform duration-200 text-slate-400 ${showKeyInfo ? 'rotate-180' : ''}`}
+                            />
+                        </button>
+
+                        {showKeyInfo && (
+                            <div className="px-4 pb-4 space-y-4 text-sm animate-in slide-in-from-top duration-200">
+                                <p className="text-slate-300 leading-relaxed">
+                                    <strong className="text-white">Your identity, your control.</strong> Think of Nostr like having your own house key instead of renting an apartment from a landlord who can kick you out anytime.
+                                </p>
+
+                                <p className="text-slate-300 leading-relaxed">
+                                    <strong className="text-purple-400">With Nostr, YOU own your identity.</strong> You have a private key (like a master password) that proves you're you. No company can take it away.
+                                </p>
+
+                                {/* Public Key */}
+                                <div className="bg-black/30 rounded-lg p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wide">Public Key</p>
+                                        <span className="text-[10px] text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">SAFE TO SHARE</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <code className="flex-1 font-mono text-xs text-brand-primary break-all">{npub.slice(0, 40)}...</code>
+                                        <button
+                                            onClick={handleCopyNpub}
+                                            className="p-2 hover:bg-slate-800 rounded transition-colors text-brand-primary shrink-0"
+                                        >
+                                            {copiedKeyType === 'npub' ? <Icons.CheckMark size={14} /> : <Icons.Copy size={14} />}
+                                        </button>
+                                    </div>
+                                    <p className="text-slate-400 text-xs italic">
+                                        Like your email address - anyone can use this to find you or send you sats!
+                                    </p>
+                                </div>
+
+                                {/* Private Key */}
+                                <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-orange-300 text-xs font-bold uppercase tracking-wide">Private Key</p>
+                                        <span className="text-[10px] text-orange-400 bg-orange-500/20 px-2 py-0.5 rounded-full">KEEP SECRET</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <code className="flex-1 font-mono text-xs text-orange-300 break-all">{nsec.slice(0, 40)}...</code>
+                                        <button
+                                            onClick={handleCopyNsec}
+                                            className="p-2 hover:bg-orange-900/30 rounded transition-colors text-orange-400 shrink-0"
+                                        >
+                                            {copiedKeyType === 'nsec' ? <Icons.CheckMark size={14} /> : <Icons.Copy size={14} />}
+                                        </button>
+                                    </div>
+                                    <p className="text-orange-200/80 text-xs">
+                                        <strong>This controls your funds.</strong> Losing it means losing your money forever. Save it somewhere safe!
+                                    </p>
+                                </div>
+
+                                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 space-y-2">
+                                    <p className="text-purple-300 text-xs leading-relaxed">
+                                        💡 <strong>One key, infinite apps.</strong> Your identity travels with you across any Nostr app:
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        <a
+                                            href="https://damus.io"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full hover:bg-purple-500/30 transition-colors text-xs font-bold border border-purple-500/30"
+                                        >
+                                            Damus
+                                        </a>
+                                        <a
+                                            href="https://primal.net"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full hover:bg-purple-500/30 transition-colors text-xs font-bold border border-purple-500/30"
+                                        >
+                                            Primal
+                                        </a>
+                                        <a
+                                            href="https://fountain.fm"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-full hover:bg-purple-500/30 transition-colors text-xs font-bold border border-purple-500/30"
+                                        >
+                                            Fountain
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Continue Button */}
                 <button

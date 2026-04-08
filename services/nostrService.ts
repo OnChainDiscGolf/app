@@ -529,10 +529,11 @@ export const loginWithAmber = async (relay: string = 'wss://relay.damus.io') => 
         // Create nostrconnect:// URI
         const connectURI = generateNostrConnectURI(clientPubkey, relay);
 
-        // Save session info
+        // Save session info for completeAmberConnection() to read on return
         localStorage.setItem('amber_ephemeral_sk', ephemeralSkHex);
         localStorage.setItem('amber_relay', relay);
-        localStorage.setItem('amber_pending', 'true'); // Flag to check when user returns
+        localStorage.setItem('amber_pending', 'true');
+        localStorage.setItem('amber_needs_profile_setup', 'true');
 
         // Open Amber app via deep-link
         window.location.href = connectURI;
@@ -589,6 +590,7 @@ export const logout = () => {
     localStorage.removeItem('amber_remote_pk');
     localStorage.removeItem('amber_relay');
     localStorage.removeItem('amber_pending');
+    localStorage.removeItem('amber_needs_profile_setup');
 };
 
 // --- Wrappers for Auth & Encryption ---

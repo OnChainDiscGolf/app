@@ -36,7 +36,6 @@ import {
   clearMnemonicStorage,
 } from '../services/mnemonicService';
 import { completeAmberConnection } from '../services/amberSigner';
-import { bytesToHex } from '@noble/hashes/utils';
 
 export interface AuthContextType {
   isAuthenticated: boolean;
@@ -106,18 +105,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initSession = async () => {
       let session = getSession();
 
-      // Check for completed Amber connection
+      // Check for completed Amber connection (user returned from Amber app).
+      // completeAmberConnection() reads the pending state from localStorage,
+      // waits for Amber's NIP-46 ack, and persists the session internally.
       const amberResult = await completeAmberConnection();
       if (amberResult) {
-        console.log('✅ Amber connection completed:', amberResult);
+        console.log('✅ Amber connection completed:', amberResult.userPubkey);
         session = {
-          method: 'amber',
+          method: 'amber' as const,
           pk: amberResult.userPubkey,
-          sk: ''
+          sk: undefined
         };
         localStorage.removeItem('is_guest_mode');
-        localStorage.setItem('amber_ephemeral_sk', bytesToHex(amberResult.ephemeralSk));
-        localStorage.setItem('amber_relay', amberResult.relay);
       }
 
       if (session) {

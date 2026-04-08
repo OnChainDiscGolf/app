@@ -1,29 +1,17 @@
 /**
  * @file useQrScanner.ts
- * @description Hook for QR code scanning with automatic platform detection.
- * Uses the Capacitor native barcode scanner (Google Barcode Scanner module)
- * on Android/iOS, and falls back to a web-based scanner using the camera
- * MediaStream API + jsQR library on desktop/PWA.
+ * @description Hook for QR code scanning using an embedded in-app camera view.
+ * Uses the MediaStream API + jsQR library on all platforms (web, iOS, Android)
+ * to keep the camera feed inside the app UI rather than launching a full-screen
+ * native OS scanner.
  *
- * The web scanner continuously reads frames from a video element, draws them
+ * The scanner continuously reads frames from a video element, draws them
  * to an off-screen canvas, and runs jsQR on the pixel data every animation frame.
- *
- * The native scanner delegates to the OS barcode scanning UI and returns results
- * via a one-shot promise.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsQR from 'jsqr';
-import {
-    isNativeScanningSupported,
-    isScannerAvailable,
-    startNativeScan,
-    checkPermissions,
-    requestPermissions,
-    isGoogleBarcodeScannerModuleAvailable,
-    installGoogleBarcodeScannerModule,
-    openSettings
-} from '../services/nativeQrScanner';
+import { openSettings } from '../services/nativeQrScanner';
 
 /**
  * Props for the {@link useQrScanner} hook.
@@ -66,13 +54,12 @@ interface UseQrScannerReturn {
 }
 
 /**
- * QR code scanner hook with native/web platform detection.
+ * QR code scanner hook using an embedded in-app camera view.
  *
- * On mount, checks for Capacitor native scanning support. If available (and
- * the Google Barcode Scanner module is installed), sets `isNativeScanner=true`
- * and waits for user-initiated `startNativeScan()` calls. Otherwise, falls
- * back to a web scanner that requests the device camera, streams to a video
- * element, and runs jsQR per animation frame.
+ * Requests the device camera via MediaStream API (preferring the rear/environment
+ * camera), streams to a video element, and runs jsQR per animation frame on all
+ * platforms (web, iOS, Android). The camera stays embedded in the app UI rather
+ * than handing off to the OS scanner.
  *
  * The `onScan` callback is stored in a ref to prevent scanner restarts when
  * the callback identity changes.
@@ -85,9 +72,7 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [scannedData, setScannedData] = useState<string | null>(null);
     const [logs, setLogs] = useState<string[]>([]);
-    const [isNativeScanner, setIsNativeScanner] = useState(false);
     const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'prompt' | 'unknown'>('unknown');
-    const [nativeReady, setNativeReady] = useState(false);
 
     const log = (msg: string) => {
         const timestampedMsg = `${new Date().toISOString().split('T')[1].slice(0, 8)}: ${msg}`;
@@ -106,50 +91,6 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
     useEffect(() => {
         onScanRef.current = onScan;
     }, [onScan]);
-
-    // Check if native scanning is available on mount
-    useEffect(() => {
-        const checkNativeSupport = async () => {
-            if (isNativeScanningSupported()) {
-                log("Checking native scanner support...");
-                const available = await isScannerAvailable();
-                
-                if (available) {
-                    // On Android, check if Google Barcode Scanner module is available
-                    const moduleAvailable = await isGoogleBarcodeScannerModuleAvailable();
-                    if (!moduleAvailable) {
-                        log("Installing Google Barcode Scanner module...");
-                        const installed = await installGoogleBarcodeScannerModule();
-                        if (!installed) {
-                            log("Module installation failed, falling back to web scanner");
-                            setIsNativeScanner(false);
-                            setNativeReady(false);
-                            return;
-                        }
-                    }
-                    
-                    log("Native scanner available");
-                    setIsNativeScanner(true);
-                    setNativeReady(true);
-                    
-                    // Check permissions
-                    const perm = await checkPermissions();
-                    setPermissionStatus(perm);
-                    log(`Permission status: ${perm}`);
-                } else {
-                    log("Native scanner not supported, using web scanner");
-                    setIsNativeScanner(false);
-                    setNativeReady(false);
-                }
-            } else {
-                log("Not a native platform, using web scanner");
-                setIsNativeScanner(false);
-                setNativeReady(false);
-            }
-        };
-
-        checkNativeSupport();
-    }, []);
 
     const stopScanner = useCallback(() => {
         if (streamRef.current) {
@@ -195,57 +136,9 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
         animationFrameRef.current = requestAnimationFrame(tick);
     }, [active, videoRef, canvasRef]);
 
-    // Native scan function
-    const handleNativeScan = useCallback(async () => {
-        if (!nativeReady) {
-            log("Native scanner not ready");
-            return;
-        }
-
-        setIsCameraLoading(true);
-        setCameraError(null);
-        log("Starting native scan...");
-
-        try {
-            // Check and request permissions if needed
-            let perm = await checkPermissions();
-            if (perm !== 'granted') {
-                log("Requesting camera permission...");
-                perm = await requestPermissions();
-                setPermissionStatus(perm);
-                
-                if (perm !== 'granted') {
-                    setCameraError("Camera permission denied. Please enable camera access in settings.");
-                    setIsCameraLoading(false);
-                    return;
-                }
-            }
-
-            const result = await startNativeScan();
-            
-            if (result.success && result.data) {
-                log(`Scanned: ${result.data.substring(0, 30)}...`);
-                setScannedData(result.data);
-                if (onScanRef.current) {
-                    onScanRef.current(result.data);
-                }
-            } else if (result.cancelled) {
-                log("Scan cancelled by user");
-            } else if (result.error) {
-                log(`Scan error: ${result.error}`);
-                setCameraError(result.error);
-            }
-        } catch (error: any) {
-            log(`Native scan error: ${error.message}`);
-            setCameraError(error.message || "Scanner error");
-        } finally {
-            setIsCameraLoading(false);
-        }
-    }, [nativeReady]);
-
-    // Web-based scanner start function
+    // Embedded camera scanner start function
     const startWebScanner = useCallback(async (retryCount = 0) => {
-        if (!active || isNativeScanner) return;
+        if (!active) return;
 
         if (retryCount === 0) log("Starting web scanner...");
 
@@ -277,18 +170,18 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
         try {
             let mediaStream: MediaStream;
 
-            // Aggressive Camera Request (Generic first, then Environment fallback)
+            // Prefer rear/environment camera for QR scanning; fall back to any camera
             try {
-                mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                log("Generic camera acquired");
-            } catch (genericError) {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                log("Environment camera acquired");
+            } catch (envError) {
                 try {
-                    mediaStream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'environment' }
-                    });
-                    log("Environment camera acquired via fallback");
-                } catch (envError) {
-                    throw envError;
+                    mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    log("Generic camera acquired via fallback");
+                } catch (genericError) {
+                    throw genericError;
                 }
             }
 
@@ -325,20 +218,14 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
             setCameraError(errorName === 'NotAllowedError' ? "Access Denied: Check OS/Browser permissions." : `Camera failed: ${errorName}`);
             setIsCameraLoading(false);
         }
-    }, [active, isNativeScanner, stopScanner, tick, videoRef]);
+    }, [active, stopScanner, tick, videoRef]);
 
     // Main effect to start/stop scanner based on active state
     useEffect(() => {
         isMountedRef.current = true;
 
         if (active) {
-            if (isNativeScanner && nativeReady) {
-                // Don't auto-start native scanner - it's triggered by user action
-                log("Native scanner ready - waiting for user to initiate scan");
-            } else if (!isNativeScanner) {
-                // Start web scanner automatically
-                startWebScanner();
-            }
+            startWebScanner();
         } else {
             stopScanner();
         }
@@ -347,7 +234,7 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
             isMountedRef.current = false;
             stopScanner();
         };
-    }, [active, isNativeScanner, nativeReady, startWebScanner, stopScanner]);
+    }, [active, startWebScanner, stopScanner]);
 
     const handleOpenSettings = useCallback(async () => {
         await openSettings();
@@ -357,10 +244,10 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
         isCameraLoading,
         cameraError,
         scannedData,
-        restart: () => isNativeScanner ? handleNativeScan() : startWebScanner(0),
+        restart: () => startWebScanner(0),
         logs,
-        isNativeScanner,
-        startNativeScan: handleNativeScan,
+        isNativeScanner: false,
+        startNativeScan: async () => {},
         permissionStatus,
         openAppSettings: handleOpenSettings
     };

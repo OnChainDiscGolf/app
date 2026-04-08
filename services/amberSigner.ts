@@ -281,55 +281,98 @@ export const connectWithAmber = async (
 };
 
 /**
+ * Wait for the NIP-46 ack from Amber after the user approves the connection.
+ *
+ * In the client-initiated flow (nostrconnect://), Amber publishes a Kind 24133
+ * event as an ack. The event's `pubkey` field is the user's actual Nostr pubkey,
+ * and the NIP-04 encrypted content contains `{"result": "ack"}`.
+ *
+ * @param clientSk - The ephemeral client secret key
+ * @param relay - Relay to listen on for Amber's response
+ * @param timeoutMs - How long to wait (default 30s — event should already be on the relay)
+ * @returns The user's Nostr public key (hex)
+ */
+const waitForAmberAck = async (
+    clientSk: Uint8Array,
+    relay: string,
+    timeoutMs: number = 30000
+): Promise<string> => {
+    const clientPubkey = getPublicKey(clientSk);
+    return new Promise((resolve, reject) => {
+        const sub = pool.subscribeMany(
+            [relay],
+            [{ kinds: [24133], '#p': [clientPubkey] }] as any,
+            {
+                async onevent(event: Event) {
+                    try {
+                        // The signer's (user's) pubkey is the event author
+                        const signerPubkey = event.pubkey;
+
+                        // Decrypt using our ephemeral SK and the signer's pubkey
+                        const decryptedContent = await nip04.decrypt(clientSk, signerPubkey, event.content);
+                        const response = JSON.parse(decryptedContent);
+
+                        if (response.result === 'ack') {
+                            sub.close();
+                            resolve(signerPubkey);
+                        }
+                    } catch (e) {
+                        // May receive unrelated events — ignore decrypt failures
+                        console.warn('Failed to process potential Amber ack:', e);
+                    }
+                }
+            }
+        );
+
+        setTimeout(() => {
+            sub.close();
+            reject(new Error('Amber connection timeout. Please ensure Amber is open and the connection was approved.'));
+        }, timeoutMs);
+    });
+};
+
+/**
  * Complete the Amber connection handshake when the user returns to the app.
  *
- * Reads the pending connection attempt from sessionStorage, requests the
- * user's public key from Amber via NIP-46, and stores the successful result.
+ * Reads the pending connection from localStorage (set by loginWithAmber in
+ * nostrService.ts), subscribes to the relay for Amber's NIP-46 ack event,
+ * extracts the user's pubkey, and persists the session.
  *
  * @returns Connection result if handshake succeeded, null if no pending connection or failure
  */
 export const completeAmberConnection = async (): Promise<AmberConnectionResult | null> => {
     try {
-        // Check if we have a pending connection attempt
-        const attemptData = sessionStorage.getItem('amber_connect_attempt');
-        if (!attemptData) {
-            return null; // No pending connection
-        }
+        // Check if we have a pending Amber connection
+        const pending = localStorage.getItem('amber_pending');
+        if (!pending) return null;
 
-        const attempt = JSON.parse(attemptData);
-        const ephemeralSk = hexToBytes(attempt.ephemeralSk);
+        const ephemeralSkHex = localStorage.getItem('amber_ephemeral_sk');
+        const relay = localStorage.getItem('amber_relay');
+        if (!ephemeralSkHex || !relay) return null;
+
+        const ephemeralSk = hexToBytes(ephemeralSkHex);
 
         console.log('🔄 Completing Amber connection handshake...');
 
-        // The remote pubkey should be the user's actual pubkey
-        // In practice, Amber might provide this, or we need to request it
-        // For now, we'll try to get it from the connection
+        // Subscribe to relay and wait for Amber's ack event.
+        // The ack is a Kind 24133 event from the signer, tagged to our client pubkey.
+        // The event's .pubkey field is the user's actual Nostr pubkey.
+        const userPubkey = await waitForAmberAck(ephemeralSk, relay);
 
-        // Try to get the user's public key
-        // This is a simplified version - in practice you'd need to handle the Amber protocol properly
-        try {
-            // This would need to be implemented based on Amber's actual API
-            const userPubkey = await sendAmberRequest('get_public_key', [], ephemeralSk, '', attempt.relay);
+        console.log('✅ Amber ack received, user pubkey:', userPubkey);
 
-            // Store successful connection
-            sessionStorage.setItem('amber_connection_result', JSON.stringify({
-                userPubkey,
-                timestamp: Date.now()
-            }));
+        // Persist the full session so getSession() works on subsequent reloads
+        localStorage.setItem('nostr_pk', userPubkey);
+        localStorage.setItem('amber_remote_pk', userPubkey);
+        localStorage.setItem('auth_method', 'amber');
+        localStorage.removeItem('amber_pending');
+        localStorage.removeItem('nostr_sk'); // No local SK for Amber auth
 
-            // Clean up
-            sessionStorage.removeItem('amber_connect_attempt');
-
-            return {
-                userPubkey,
-                ephemeralSk,
-                relay: attempt.relay
-            };
-        } catch (e) {
-            console.warn('Could not get public key from Amber, connection may still be pending');
-            return null;
-        }
-
+        return {
+            userPubkey,
+            ephemeralSk,
+            relay
+        };
     } catch (error) {
         console.error('Failed to complete Amber connection:', error);
         return null;

@@ -566,6 +566,12 @@ export const MnemonicRecoveryInput: React.FC<{
                 <p className="text-slate-400 text-sm">Enter your 12-word recovery phrase</p>
             </div>
 
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+                <p className="text-xs text-slate-300">
+                    <strong className="text-amber-400">Full recovery:</strong> Your 12-word phrase restores both your Nostr identity and your Bitcoin Lightning wallet.
+                </p>
+            </div>
+
             {/* Toggle between grid and paste */}
             <div className="flex justify-center space-x-2 mb-4">
                 <button

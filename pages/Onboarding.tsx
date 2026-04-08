@@ -757,6 +757,7 @@ const ExistingAccountModal: React.FC<{
                             <div>
                                 <p className="font-bold text-white">Recovery Phrase</p>
                                 <p className="text-xs text-slate-400">12 words from this app</p>
+                                <p className="text-[10px] text-amber-400/70 mt-0.5">Restores your identity + Bitcoin wallet</p>
                             </div>
                         </div>
                     </button>
@@ -773,6 +774,7 @@ const ExistingAccountModal: React.FC<{
                             <div>
                                 <p className="font-bold text-white">Private Key (nsec)</p>
                                 <p className="text-xs text-slate-400">From Damus, Primal, etc.</p>
+                                <p className="text-[10px] text-purple-400/70 mt-0.5">Identity only — Lightning wallet set up separately</p>
                             </div>
                         </div>
                     </button>
@@ -790,6 +792,7 @@ const ExistingAccountModal: React.FC<{
                                 <div>
                                     <p className="font-bold text-white">Amber Signer</p>
                                     <p className="text-xs text-slate-400">Android key manager</p>
+                                    <p className="text-[10px] text-orange-400/70 mt-0.5">Identity only — Lightning wallet set up separately</p>
                                 </div>
                             </div>
                         </button>
@@ -862,9 +865,9 @@ const NsecLoginForm: React.FC<{
                 </div>
             )}
 
-            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3">
-                <p className="text-xs text-slate-400">
-                    <strong className="text-slate-300">Note:</strong> Your nsec is stored locally on this device. We never send it anywhere. However, logging in with nsec means your Bitcoin wallet will be separate from your Nostr identity.
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-3">
+                <p className="text-xs text-slate-300">
+                    <strong className="text-purple-400">What to expect:</strong> Your Nostr identity will be restored and stored locally on this device. Cashu and NWC wallets work right away. For Lightning (Breez), you'll create a separate wallet in the Wallet tab.
                 </p>
             </div>
 
