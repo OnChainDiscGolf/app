@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import path from 'path';
 import { defineConfig, loadEnv, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -129,6 +130,26 @@ export default defineConfig(({ mode }) => {
     // Worker format for WASM support
     worker: {
       format: 'es'
+    },
+
+    test: {
+      environment: 'happy-dom',
+      globals: false,
+      include: ['**/*.{test,spec}.{ts,tsx}'],
+      exclude: [
+        'node_modules',
+        'dist',
+        'android',
+        'ios',
+        '.claude/**',
+      ],
+      setupFiles: ['./test/setup.ts'],
+      testTimeout: 10_000,
+      coverage: {
+        provider: 'v8',
+        include: ['utils/**', 'services/paymentRouter.ts', 'services/giftWrapService.ts'],
+        exclude: ['**/*.test.ts', 'node_modules/**'],
+      },
     }
   };
 });

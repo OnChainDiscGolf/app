@@ -31,6 +31,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQrScanner } from '../../hooks/useQrScanner';
 import { useApp } from '../../context/AppContext';
 import { sendGiftWrap, getMagicLightningAddress } from '../../services/nostrService';
+import { resolveAndGetInvoice } from '../../services/paymentRouter';
+import { getPreferredSendWallet } from '../../utils/walletSelection';
+import { filterAndSortTransactions } from '../../utils/transactionFilters';
+import { parseAndValidateInvoice } from '../../utils/invoiceValidation';
+import { validateBreezInvoiceAmount, prepareBreezSend } from '../../utils/breezPaymentUtils';
+import { createDepositPoller } from '../../services/depositPollingService';
 import { Button } from '../../components/Button';
 import { Icons } from '../../components/Icons';
 import { FeedbackModal, FeedbackButton } from '../../components/FeedbackModal';
@@ -63,7 +69,7 @@ import { WALLET_COLORS, WALLET_ORDER, getLeftGlowColor } from './walletConstants
  * send/receive flows, transaction history, and wallet configuration.
  */
 export const Wallet: React.FC = () => {
-    const { walletBalance, isBalanceLoading, transactions, userProfile, currentUserPubkey, mints, setActiveMint, addMint, removeMint, sendFunds, receiveEcash, depositFunds, checkDepositStatus, confirmDeposit, getLightningQuote, isAuthenticated, refreshWalletBalance, walletMode, nwcString, setWalletMode, setNwcConnection, checkForPayments, walletBalances, refreshAllBalances, authSource } = useApp();
+    const { walletBalance, isBalanceLoading, transactions, userProfile, currentUserPubkey, mints, setActiveMint, addMint, removeMint, sendFunds, receiveEcash, depositFunds, checkDepositStatus, confirmDeposit, getLightningQuote, isAuthenticated, refreshWalletBalance, walletMode, nwcString, setWalletMode, setNwcConnection, checkForPayments, walletBalances, refreshAllBalances, authSource, authMethod } = useApp();
     const navigate = useNavigate();
 
     // Breez Wallet Creation State (for non-mnemonic users)
@@ -214,8 +220,8 @@ export const Wallet: React.FC = () => {
 
     // Breez invoice generation helper
     const generateBreezInvoice = async () => {
-        const amount = parseInt(breezInvoiceAmount);
-        if (isNaN(amount) || amount <= 0) return;
+        const amount = validateBreezInvoiceAmount(breezInvoiceAmount);
+        if (amount === null) return;
 
         setIsGeneratingBreezInvoice(true);
         try {
@@ -239,20 +245,18 @@ export const Wallet: React.FC = () => {
         setBreezSendFee(null);
 
         try {
-            const parsed = await parseBreezInput(breezSendInput.trim());
-            if (parsed) {
-                setBreezSendParsed(parsed);
-
-                // If it's a bolt11 invoice, prepare the payment to get fee
-                if (parsed.type === 'bolt11Invoice') {
-                    const prepared = await prepareSendPayment(breezSendInput.trim());
-                    if (prepared) {
-                        setBreezSendPrepared(prepared);
-                        // Fee is in the payment method details
-                        if (prepared.paymentMethod.type === 'bolt11Invoice') {
-                            setBreezSendFee(prepared.paymentMethod.lightningFeeSats);
-                        }
-                    }
+            const result = await prepareBreezSend(
+                breezSendInput.trim(),
+                parseBreezInput,
+                prepareSendPayment,
+            );
+            if (result) {
+                setBreezSendParsed(result.parsed);
+                if (result.prepared) {
+                    setBreezSendPrepared(result.prepared);
+                }
+                if (result.feeSats !== null) {
+                    setBreezSendFee(result.feeSats);
                 }
             } else {
                 setBreezSendError('Could not parse input. Check format.');
@@ -360,42 +364,6 @@ export const Wallet: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('cdg_default_quick_send_wallet', defaultQuickSendWallet);
     }, [defaultQuickSendWallet]);
-
-    // Smart wallet selection - picks the best wallet to send from based on balance
-    // Priority: NWC (if connected & funded) > Breez (if available & funded) > Cashu (default)
-    const getPreferredSendWallet = (): 'breez' | 'nwc' | 'cashu' => {
-        // If user has set a specific preference, use it (if that wallet has balance)
-        if (defaultQuickSendWallet !== 'auto') {
-            const preferredBalance = walletBalances[defaultQuickSendWallet];
-            // Check if preferred wallet is available and has balance
-            if (defaultQuickSendWallet === 'nwc' && nwcString && preferredBalance > 0) return 'nwc';
-            if (defaultQuickSendWallet === 'breez' && hasBreezWallet && preferredBalance > 0) return 'breez';
-            if (defaultQuickSendWallet === 'cashu' && preferredBalance > 0) return 'cashu';
-            // If preferred wallet has no balance, fall through to auto-selection
-        }
-
-        // Auto-selection: Priority 1 - NWC (if connected and has balance)
-        if (nwcString && walletBalances.nwc > 0) {
-            return 'nwc';
-        }
-
-        // Priority 2: Breez - if wallet exists and has balance
-        if (hasBreezWallet && walletBalances.breez > 0) {
-            return 'breez';
-        }
-
-        // Priority 3: Cashu - if has balance
-        if (walletBalances.cashu > 0) {
-            return 'cashu';
-        }
-
-        // Fallback: Check for any wallet with balance (handles edge cases)
-        if (walletBalances.nwc > 0 && nwcString) return 'nwc';
-        if (walletBalances.breez > 0 && hasBreezWallet) return 'breez';
-
-        // Default to Cashu (built-in wallet, always available)
-        return 'cashu';
-    };
 
     // Helper to use default wallet or show selection modal
     const handleAllWalletsSend = () => {
@@ -638,43 +606,20 @@ export const Wallet: React.FC = () => {
     // Auto-Polling for Deposit Confirmation
     useEffect(() => {
         if (view === 'deposit' && depositQuote && !depositSuccess) {
-            const startTime = Date.now();
-            const THIRTY_SECONDS = 30 * 1000;
-            const TWO_MINUTES = 2 * 60 * 1000;
-            let timeoutId: NodeJS.Timeout;
-
-            const poll = async () => {
-                const isPaid = await checkDepositStatus(depositQuote);
-                if (isPaid) {
+            const poller = createDepositPoller({
+                checkPaid: () => checkDepositStatus(depositQuote),
+                onPaid: async () => {
                     const amount = parseInt(depositAmount);
                     const success = await confirmDeposit(depositQuote, amount);
                     if (success) {
                         setDepositSuccess(true);
                         setSuccessMode('deposit');
                     }
-                    return; // Stop polling
-                }
+                },
+            });
+            poller.start();
 
-                // Tiered polling: 2s → 3s → 5s
-                const elapsed = Date.now() - startTime;
-                let delay;
-                if (elapsed < THIRTY_SECONDS) {
-                    delay = 2000; // First 30s: Very aggressive
-                } else if (elapsed < TWO_MINUTES) {
-                    delay = 3000; // 30s-2min: Moderate
-                } else {
-                    delay = 5000; // After 2min: Lighter
-                }
-
-                timeoutId = setTimeout(poll, delay);
-            };
-
-            // Start polling immediately
-            poll();
-
-            return () => {
-                if (timeoutId) clearTimeout(timeoutId);
-            };
+            return () => poller.stop();
         }
     }, [view, depositQuote, depositSuccess, depositAmount, checkDepositStatus, confirmDeposit]);
 
@@ -697,20 +642,16 @@ export const Wallet: React.FC = () => {
                 setIsCheckingInvoice(true);
                 setTransactionError(null);
                 try {
-                    const { amount, fee } = await getLightningQuote(input);
-                    setSendAmount(amount.toString());
-                    setQuoteFee(fee);
-                    setIsFixedAmount(true);
-
-                    if (walletBalance < (amount + fee)) {
-                        setInsufficientFunds(true);
+                    const result = await parseAndValidateInvoice(input, walletBalance, getLightningQuote);
+                    if (result.amount !== null) {
+                        setSendAmount(result.amount.toString());
+                        setQuoteFee(result.fee);
+                        setIsFixedAmount(true);
+                        setInsufficientFunds(!result.isSufficient);
                     } else {
-                        setInsufficientFunds(false);
+                        setQuoteFee(null);
+                        setIsFixedAmount(false);
                     }
-                } catch (e) {
-                    console.error("Failed to check invoice", e);
-                    setQuoteFee(null);
-                    setIsFixedAmount(false);
                 } finally {
                     setIsCheckingInvoice(false);
                 }
@@ -822,31 +763,6 @@ export const Wallet: React.FC = () => {
         alert("Copied to clipboard!");
     };
 
-    const resolveLightningAddress = async (address: string, amountSats: number): Promise<string | null> => {
-        try {
-            const [user, domain] = address.split('@');
-            if (!user || !domain) return null;
-
-            const res = await fetch(`https://${domain}/.well-known/lnurlp/${user}`);
-            const data = await res.json();
-
-            if (data.callback) {
-                const millisats = amountSats * 1000;
-                if (millisats < data.minSendable || millisats > data.maxSendable) {
-                    alert(`Amount must be between ${(data.minSendable / 1000).toLocaleString()} and ${(data.maxSendable / 1000).toLocaleString()} sats`);
-                    return null;
-                }
-                const callbackUrl = `${data.callback}${data.callback.includes('?') ? '&' : '?'}amount=${millisats}`;
-                const invoiceRes = await fetch(callbackUrl);
-                const invoiceData = await invoiceRes.json();
-                return invoiceData.pr;
-            }
-        } catch (e) {
-            console.error("LN Address resolution failed", e);
-        }
-        return null;
-    };
-
     const handleSend = async () => {
         const amount = parseInt(sendAmount);
         let targetInvoice = sendInput.trim();
@@ -876,7 +792,11 @@ export const Wallet: React.FC = () => {
 
         try {
             if (targetInvoice.includes('@') && !targetInvoice.startsWith('lnbc')) {
-                const resolvedInvoice = await resolveLightningAddress(targetInvoice, amount);
+                const resolvedInvoice = await resolveAndGetInvoice(
+                    targetInvoice,
+                    amount,
+                    'On-Chain Disc Golf wallet send'
+                );
                 if (!resolvedInvoice) {
                     setTransactionError("Could not resolve Lightning Address. Please check validity.");
                     setIsProcessing(false);
@@ -1151,7 +1071,7 @@ export const Wallet: React.FC = () => {
                                     {authSource !== 'mnemonic' && (
                                         <div className="w-full bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4">
                                             <p className="text-xs text-amber-400">
-                                                <span className="font-bold">⚠️ Note:</span> This will create a <strong>separate</strong> 12-word backup phrase for your Bitcoin wallet. You'll need to backup both your Nostr key and this new phrase.
+                                                <span className="font-bold">Why a separate backup?</span> You signed in with {authMethod === 'amber' ? 'Amber' : 'an nsec key'}, so your identity and Bitcoin wallet use different keys. This wallet will have its own 12-word phrase to save.
                                             </p>
                                         </div>
                                     )}
@@ -1667,7 +1587,7 @@ export const Wallet: React.FC = () => {
                             {authSource !== 'mnemonic' && (
                                 <div className="w-full bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-6">
                                     <p className="text-xs text-amber-400">
-                                        <span className="font-bold">⚠️ Note:</span> This creates a <strong>separate</strong> 12-word backup for your Bitcoin wallet.
+                                        <span className="font-bold">Why a separate backup?</span> You signed in with {authMethod === 'amber' ? 'Amber' : 'an nsec key'}, so your identity and Bitcoin wallet use different keys. This wallet will have its own 12-word phrase to save.
                                     </p>
                                 </div>
                             )}
@@ -2367,7 +2287,7 @@ export const Wallet: React.FC = () => {
                             {authSource !== 'mnemonic' && (
                                 <div className="w-full bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-6">
                                     <p className="text-xs text-amber-400">
-                                        <span className="font-bold">⚠️ Note:</span> This creates a <strong>separate</strong> 12-word backup for your Bitcoin wallet.
+                                        <span className="font-bold">Why a separate backup?</span> You signed in with {authMethod === 'amber' ? 'Amber' : 'an nsec key'}, so your identity and Bitcoin wallet use different keys. This wallet will have its own 12-word phrase to save.
                                     </p>
                                 </div>
                             )}
@@ -3241,7 +3161,12 @@ export const Wallet: React.FC = () => {
                             onClick={() => {
                                 if (viewMode === 'all') {
                                     // Smart auto-select: pick wallet with funds
-                                    const preferredWallet = getPreferredSendWallet();
+                                    const preferredWallet = getPreferredSendWallet({
+                                        defaultQuickSendWallet,
+                                        walletBalances,
+                                        nwcString,
+                                        hasBreezWallet,
+                                    });
                                     setViewMode(preferredWallet);
                                     setWalletMode(preferredWallet);
                                     setIsWalletSelectorExpanded(true);
@@ -3282,9 +3207,7 @@ export const Wallet: React.FC = () => {
                         <p>No transactions yet.</p>
                     </div>
                 ) : (
-                    transactions
-                        .filter(tx => viewMode === 'all' || (tx.walletType || 'cashu') === viewMode)
-                        .sort((a, b) => b.timestamp - a.timestamp) // Chronological sort (newest first)
+                    filterAndSortTransactions(transactions, viewMode)
                         .map((tx) => {
                             // Wallet color coding: Breez=blue, Cashu=emerald, NWC=purple
                             const walletColors = {
