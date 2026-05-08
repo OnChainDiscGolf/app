@@ -584,6 +584,18 @@ export const Wallet: React.FC = () => {
         hasCashuMint: !!activeMint,
         isNwcConnected: !!nwcString,
     });
+    const getTransactionStatusCopy = (status?: 'pending' | 'complete' | 'failed') => {
+        switch (status) {
+            case 'pending':
+                return { label: 'Pending', className: 'bg-amber-500/10 text-amber-300 border-amber-500/30' };
+            case 'failed':
+                return { label: 'Failed', className: 'bg-red-500/10 text-red-300 border-red-500/30' };
+            case 'complete':
+                return { label: 'Complete', className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' };
+            default:
+                return null;
+        }
+    };
     const settingsWalletOptions = [walletModeUx.primary, ...walletModeUx.advanced];
     const receiveAddress = walletMode === 'cashu'
         ? getMagicLightningAddress(currentUserPubkey)
@@ -3340,13 +3352,29 @@ export const Wallet: React.FC = () => {
                                             <p className="text-xs text-slate-500">{new Date(tx.timestamp).toLocaleDateString()}</p>
                                         </div>
                                     </div>
-                                    <span className={`font-mono font-bold ${['deposit', 'payout', 'ace_pot', 'receive'].includes(tx.type) ? 'text-green-400' : 'text-white'}`}>
-                                        {['payment', 'send'].includes(tx.type) ? '-' : '+'}{tx.amountSats}
-                                    </span>
+                                    <div className="text-right space-y-1">
+                                        <span className={`block font-mono font-bold ${['deposit', 'payout', 'ace_pot', 'receive'].includes(tx.type) ? 'text-green-400' : 'text-white'}`}>
+                                            {['payment', 'send'].includes(tx.type) ? '-' : '+'}{tx.amountSats}
+                                        </span>
+                                        {(() => {
+                                            const statusCopy = getTransactionStatusCopy(tx.status);
+                                            return statusCopy ? (
+                                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusCopy.className}`}>
+                                                    {statusCopy.label}
+                                                </span>
+                                            ) : null;
+                                        })()}
+                                    </div>
                                 </div>
                             );
                         })
                 )}
+            </div>
+
+            <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+                <p className="text-xs leading-relaxed text-amber-100/90">
+                    <span className="font-bold text-amber-200">Beta safety note:</span> Wallet features are self-custodial and still in beta. Try small amounts first, save your recovery phrase, and treat failed or pending payments as unresolved until they show complete.
+                </p>
             </div>
             {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => {
                 if (action === 'lightning-explainer') { setHelpModal(null); setReturnToWalletHelp(false); setShowLightningExplainer(true); }

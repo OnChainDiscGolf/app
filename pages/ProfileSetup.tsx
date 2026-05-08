@@ -317,7 +317,7 @@ export const ProfileSetup: React.FC = () => {
                                         </button>
                                     </div>
                                     <p className="text-orange-200/80 text-xs">
-                                        <strong>This controls your funds.</strong> Losing it means losing your money forever. Save it somewhere safe!
+                                        <strong>This controls your Nostr identity.</strong> It does not replace your wallet recovery phrase. Keep both backups somewhere safe.
                                     </p>
                                 </div>
 

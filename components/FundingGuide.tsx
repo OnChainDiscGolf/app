@@ -182,7 +182,7 @@ export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, am
                   Paste the address below and enter the amount
                 </Step>
                 <Step number={5} color="[#00D64F]">
-                  Confirm the send. Funds arrive instantly!
+                  Confirm the send. Most Lightning payments arrive in seconds; if one stays pending, wait for a clear success before trying again.
                 </Step>
               </div>
 
@@ -216,7 +216,7 @@ export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, am
                   Enter the amount{amountNeeded ? <span className="text-blue-400"> ({amountNeeded.toLocaleString()} sats)</span> : ''}, tap <span className="font-bold text-white">Send</span>
                 </Step>
                 <Step number={5} color="blue-400">
-                  That's it. Arrives in seconds.
+                  That's it. Most payments arrive in seconds; if one stays pending, wait for a clear success before trying again.
                 </Step>
               </div>
 
