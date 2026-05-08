@@ -34,6 +34,11 @@ import { EventsNearbyView } from './EventsNearbyView';
 import { EventsFriendsView } from './EventsFriendsView';
 import { EventsMineView } from './EventsMineView';
 import { Icons } from '../../components/Icons';
+import { isNative } from '../../services/capacitorService';
+import {
+  getGeolocationUnsupportedMessage,
+  getLocationPermissionDeniedMessage,
+} from './locationPermissionCopy';
 
 /**
  * Events page orchestrator -- manages geolocation, relay discovery queries,
@@ -74,8 +79,10 @@ export const Events: React.FC = () => {
 
   // --- Geolocation ---
   const requestLocation = useCallback(() => {
+    const isNativeRuntime = isNative();
+
     if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser');
+      setLocationError(getGeolocationUnsupportedMessage(isNativeRuntime));
       return;
     }
     locationRequested.current = true;
@@ -86,7 +93,7 @@ export const Events: React.FC = () => {
       },
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
-          setLocationError('Location permission denied. Enable it in your browser settings.');
+          setLocationError(getLocationPermissionDeniedMessage(isNativeRuntime));
         } else {
           setLocationError('Unable to determine your location.');
         }
