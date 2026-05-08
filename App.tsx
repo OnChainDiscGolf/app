@@ -75,8 +75,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {
     const cleanup = setupDeepLinkHandler(
       (url) => {
-        // nostrconnect:// handler — already handled by Amber signer flow
-        console.log('📱 Nostr Connect deep link:', url);
+        // nostrconnect:// handler — already handled by Amber signer flow. Do not log raw deep links; they may contain signer connection material.
+        console.log('📱 Nostr Connect deep link received');
       },
       undefined,
       (url) => {
@@ -86,7 +86,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             navigate(parsed.pathname + parsed.search);
           }
         } catch {
-          console.warn('📱 Failed to parse deep link URL:', url);
+          console.warn('📱 Failed to parse deep link URL');
         }
       }
     );

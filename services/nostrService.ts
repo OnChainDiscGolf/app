@@ -1309,7 +1309,9 @@ export const fetchProfilesBatch = async (pubkeys: string[]): Promise<DisplayProf
                         pdga: profile.pdga
                     });
                 }
-            } catch (e) { }
+            } catch (e) {
+                console.warn('Failed to parse profile event:', e);
+            }
         });
 
         return Array.from(profileMap.values());

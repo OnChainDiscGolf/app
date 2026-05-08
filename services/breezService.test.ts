@@ -64,4 +64,76 @@ describe('breezService initialization readiness', () => {
 
     await disconnectBreez();
   });
+
+  it('does not reconnect after Breez is already initialized', async () => {
+    const sdkInstance = {
+      getLightningAddress: vi.fn().mockResolvedValue({ lightningAddress: 'aceoak42@breez.fun' }),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    };
+    const connect = vi.fn().mockResolvedValue(sdkInstance);
+    mockBreezSdk(connect);
+
+    const { initializeBreez, disconnectBreez, isBreezInitialized } = await import('./breezService');
+
+    await expect(initializeBreez(MNEMONIC, CONFIG)).resolves.toBe(true);
+    await expect(initializeBreez(MNEMONIC, CONFIG)).resolves.toBe(true);
+
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(isBreezInitialized()).toBe(true);
+
+    await disconnectBreez();
+  });
+
+  it('fails fast without connecting when mnemonic is missing', async () => {
+    const connect = vi.fn();
+    mockBreezSdk(connect);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const { initializeBreez, isBreezInitialized } = await import('./breezService');
+
+    await expect(initializeBreez('', CONFIG)).resolves.toBe(false);
+
+    expect(connect).not.toHaveBeenCalled();
+    expect(isBreezInitialized()).toBe(false);
+    expect(warnSpy.mock.calls.flat().join('\n')).toContain('Breez initialization skipped');
+  });
+
+  it('fails fast without connecting when the Breez API key is missing', async () => {
+    const connect = vi.fn();
+    mockBreezSdk(connect);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const { initializeBreez, isBreezInitialized } = await import('./breezService');
+
+    await expect(initializeBreez(MNEMONIC, { ...CONFIG, apiKey: '' })).resolves.toBe(false);
+
+    expect(connect).not.toHaveBeenCalled();
+    expect(isBreezInitialized()).toBe(false);
+    expect(warnSpy.mock.calls.flat().join('\n')).toContain('Breez initialization skipped');
+  });
+
+  it('redacts mnemonic and API key from Breez initialization failure logs', async () => {
+    const secretApiKey = 'pem-secret-api-key';
+    const error = new Error(`connect failed for ${MNEMONIC} using ${secretApiKey}`);
+    error.stack = `Error: connect failed\n    at ${MNEMONIC}\n    with ${secretApiKey}`;
+
+    const connect = vi.fn().mockRejectedValue(error);
+    mockBreezSdk(connect);
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    const { initializeBreez } = await import('./breezService');
+
+    await expect(initializeBreez(MNEMONIC, { ...CONFIG, apiKey: secretApiKey })).resolves.toBe(false);
+
+    const logged = [...errorSpy.mock.calls, ...logSpy.mock.calls]
+      .flat()
+      .map(value => value instanceof Error ? `${value.message}\n${value.stack}` : String(value))
+      .join('\n');
+
+    expect(logged).not.toContain(MNEMONIC);
+    expect(logged).not.toContain(secretApiKey);
+    expect(logged).toContain('[REDACTED]');
+  });
 });

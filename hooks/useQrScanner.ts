@@ -177,12 +177,9 @@ export const useQrScanner = ({ videoRef, canvasRef, onScan, active }: UseQrScann
                 });
                 log("Environment camera acquired");
             } catch (envError) {
-                try {
-                    mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    log("Generic camera acquired via fallback");
-                } catch (genericError) {
-                    throw genericError;
-                }
+                console.warn("Environment camera unavailable, falling back to generic camera:", envError);
+                mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                log("Generic camera acquired via fallback");
             }
 
             // --- SUCCESS PATH ---

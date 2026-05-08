@@ -464,7 +464,7 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
           await wallet.receiveEcash(token);
           console.log("✅ Token reclaimed successfully after DM failure");
         } catch (reclaimErr) {
-          console.error("❌ CRITICAL: Failed to reclaim token after DM failure. Token:", token, reclaimErr);
+          console.error("❌ CRITICAL: Failed to reclaim entry fee token after DM failure", reclaimErr);
           alert(
             `Entry fee payment failed and automatic recovery failed. ` +
             `Your ${fee} sat token may still be claimable. ` +

@@ -55,6 +55,54 @@ const MAX_ERROR_BUFFER = 50;
 const warningBuffer: { timestamp: number; message: string }[] = [];
 const MAX_WARNING_BUFFER = 30;
 
+const SENSITIVE_KEY_PATTERN = /(mnemonic|seed|private|secret|token|proof|preimage|invoice|bolt11|paymenthash|nwc|authorization|apikey|api_key|password)/i;
+const SENSITIVE_STRING_PATTERNS: { pattern: RegExp; replacement: string | ((match: string) => string) }[] = [
+    { pattern: /nostr\+walletconnect:\/\/[^\s"']+/gi, replacement: '[REDACTED:nwc]' },
+    { pattern: /\b(?:nsec|lnbc|lntb|lnurl|cashu)[a-z0-9]+\b/gi, replacement: (match: string) => `[REDACTED:${match.slice(0, 4).toLowerCase()}]` },
+    { pattern: /\b[A-Fa-f0-9]{64}\b/g, replacement: '[REDACTED:hex]' },
+];
+
+const redactSensitiveString = (value: string): string => {
+    return SENSITIVE_STRING_PATTERNS.reduce((redacted, { pattern, replacement }) => {
+        if (typeof replacement === 'function') {
+            return redacted.replace(pattern, replacement);
+        }
+        return redacted.replace(pattern, replacement);
+    }, value);
+};
+
+const stringifyDiagnosticArg = (arg: unknown): string => {
+    if (typeof arg === 'string') return redactSensitiveString(arg);
+    if (typeof arg === 'bigint') return arg.toString();
+    if (arg instanceof Error) {
+        return redactSensitiveString(`${arg.name}: ${arg.message}`);
+    }
+    if (arg && typeof arg === 'object') {
+        const seen = new WeakSet<object>();
+        try {
+            return redactSensitiveString(JSON.stringify(arg, (key, value) => {
+                if (SENSITIVE_KEY_PATTERN.test(key)) {
+                    return `[REDACTED:${key}]`;
+                }
+                if (typeof value === 'bigint') return value.toString();
+                if (typeof value === 'string') return redactSensitiveString(value);
+                if (value && typeof value === 'object') {
+                    if (seen.has(value)) return '[Circular]';
+                    seen.add(value);
+                }
+                return value;
+            }, 2));
+        } catch {
+            return '[Unserializable object]';
+        }
+    }
+    return redactSensitiveString(String(arg));
+};
+
+export const sanitizeDiagnosticMessage = (args: unknown[]): string => (
+    args.map(stringifyDiagnosticArg).join(' ')
+);
+
 // Navigation history buffer
 const navigationHistory: { timestamp: number; path: string }[] = [];
 const MAX_NAV_HISTORY = 20;
@@ -72,9 +120,7 @@ export const initErrorCapture = () => {
     // Capture console.error
     const originalError = console.error;
     console.error = (...args) => {
-        const message = args.map(arg =>
-            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-        ).join(' ');
+        const message = sanitizeDiagnosticMessage(args);
 
         errorBuffer.push({
             timestamp: Date.now(),
@@ -87,15 +133,13 @@ export const initErrorCapture = () => {
             errorBuffer.shift();
         }
 
-        originalError.apply(console, args);
+        originalError.call(console, message);
     };
 
     // Capture console.warn
     const originalWarn = console.warn;
     console.warn = (...args) => {
-        const message = args.map(arg =>
-            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-        ).join(' ');
+        const message = sanitizeDiagnosticMessage(args);
 
         warningBuffer.push({
             timestamp: Date.now(),
@@ -107,7 +151,7 @@ export const initErrorCapture = () => {
             warningBuffer.shift();
         }
 
-        originalWarn.apply(console, args);
+        originalWarn.call(console, message);
     };
 };
 

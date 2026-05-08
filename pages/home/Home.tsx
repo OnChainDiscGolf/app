@@ -631,12 +631,13 @@ export const Home: React.FC = () => {
                     });
                 });
                 switch (cancelFundOption) {
-                    case 'pay-winner':
+                    case 'pay-winner': {
                         const sortedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
                         const winner = sortedPlayers[0];
                         if (winner && entryPot > 0) console.log(`[Cancel Round] Paying winner ${winner.name}: ${entryPot} sats`);
                         if (aceWinners.length > 0 && acePotTotal > 0) console.log(`[Cancel Round] Paying ace winner ${aceWinners[0].name}: ${acePotTotal} sats`);
                         break;
+                    }
                     case 'redistribute':
                         players.forEach(player => {
                             let refundAmount = 0;

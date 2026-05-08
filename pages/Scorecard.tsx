@@ -60,6 +60,7 @@ export const Scorecard: React.FC = () => {
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showInviteQr, setShowInviteQr] = useState(false);
     const [inviteBannerDismissed, setInviteBannerDismissed] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
 
     // Calculate pots based on granular payment selections
     const entryPayers = players.filter(p => p.paysEntry);
@@ -71,6 +72,92 @@ export const Scorecard: React.FC = () => {
     // Check if current user is in an active round as a non-host player
     const currentPlayer = players.find(p => p.isCurrentUser);
     const isNonHostInRound = activeRound && !activeRound.isFinalized && !isHost && currentPlayer;
+
+    // Compute payout preview for the finalization modal
+    const payoutPreview = useMemo(() => {
+        if (!activeRound || (entryPot <= 0 && acePot <= 0)) return null;
+
+        const payoutConfig = activeRound.payoutConfig;
+        const rankedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
+
+        // Entry pot payouts
+        const entryPayouts = entryPot > 0
+            ? calculatePayouts(players, entryPot, payoutConfig)
+            : new Map<string, number>();
+
+        // Detect ace winners: any player who scored 1 on any hole
+        const aceWinners = players.filter(p =>
+            Object.values(p.scores).some(s => s === 1)
+        );
+
+        // Ace pot distribution
+        const acePayouts = new Map<string, number>();
+        let acePotRemainder = acePot;
+        let acePotRedistributionMode: string | null = null;
+
+        if (acePot > 0) {
+            if (aceWinners.length > 0) {
+                const perAceWinner = Math.floor(acePot / aceWinners.length);
+                let distributed = 0;
+                aceWinners.forEach((p, idx) => {
+                    if (idx === aceWinners.length - 1) {
+                        acePayouts.set(p.id, acePot - distributed);
+                    } else {
+                        acePayouts.set(p.id, perAceWinner);
+                        distributed += perAceWinner;
+                    }
+                });
+                acePotRemainder = 0;
+            } else {
+                // No aces hit - apply redistribution rule
+                const redistribution = payoutConfig?.acePotRedistribution || 'add-to-entry-pot';
+                acePotRedistributionMode = redistribution;
+                if (redistribution === 'add-to-entry-pot' && entryPot > 0) {
+                    // Recalculate entry payouts with ace pot added
+                    const combinedPot = entryPot + acePot;
+                    const combined = calculatePayouts(players, combinedPot, payoutConfig);
+                    // Replace entry payouts with combined
+                    combined.forEach((amount, id) => entryPayouts.set(id, amount));
+                    acePotRemainder = 0;
+                } else if (redistribution === 'redistribute-to-participants') {
+                    const acePaying = players.filter(p => p.paysAce);
+                    if (acePaying.length > 0) {
+                        const perPlayer = Math.floor(acePot / acePaying.length);
+                        let distributed = 0;
+                        acePaying.forEach((p, idx) => {
+                            if (idx === acePaying.length - 1) {
+                                acePayouts.set(p.id, acePot - distributed);
+                            } else {
+                                acePayouts.set(p.id, perPlayer);
+                                distributed += perPlayer;
+                            }
+                        });
+                        acePotRemainder = 0;
+                    }
+                }
+                // 'forfeit' mode: acePotRemainder stays, pot rolls over
+            }
+        }
+
+        // Merge total payouts per player
+        const totalPayouts = new Map<string, number>();
+        entryPayouts.forEach((amount, id) => {
+            totalPayouts.set(id, (totalPayouts.get(id) || 0) + amount);
+        });
+        acePayouts.forEach((amount, id) => {
+            totalPayouts.set(id, (totalPayouts.get(id) || 0) + amount);
+        });
+
+        return {
+            rankedPlayers,
+            entryPayouts,
+            acePayouts,
+            aceWinners,
+            acePotRemainder,
+            acePotRedistributionMode,
+            totalPayouts,
+        };
+    }, [players, entryPot, acePot, activeRound?.payoutConfig]);
 
     // Handle "View Current Round" button click
     const handleViewCurrentRound = () => {
@@ -259,8 +346,6 @@ export const Scorecard: React.FC = () => {
         return holes;
     };
 
-    const [isPublishing, setIsPublishing] = useState(false);
-
     const handleNext = async () => {
         const startingHole = activeRound.startingHole || 1;
         const totalHoles = activeRound.holeCount;
@@ -394,91 +479,7 @@ export const Scorecard: React.FC = () => {
         return aTotal.total - bTotal.total;
     });
 
-    // Compute payout preview for the finalization modal
-    const payoutPreview = useMemo(() => {
-        if (entryPot <= 0 && acePot <= 0) return null;
 
-        const payoutConfig = activeRound?.payoutConfig;
-        const rankedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
-
-        // Entry pot payouts
-        const entryPayouts = entryPot > 0
-            ? calculatePayouts(players, entryPot, payoutConfig)
-            : new Map<string, number>();
-
-        // Detect ace winners: any player who scored 1 on any hole
-        const aceWinners = players.filter(p =>
-            Object.values(p.scores).some(s => s === 1)
-        );
-
-        // Ace pot distribution
-        let acePayouts = new Map<string, number>();
-        let acePotRemainder = acePot;
-        let acePotRedistributionMode: string | null = null;
-
-        if (acePot > 0) {
-            if (aceWinners.length > 0) {
-                const perAceWinner = Math.floor(acePot / aceWinners.length);
-                let distributed = 0;
-                aceWinners.forEach((p, idx) => {
-                    if (idx === aceWinners.length - 1) {
-                        acePayouts.set(p.id, acePot - distributed);
-                    } else {
-                        acePayouts.set(p.id, perAceWinner);
-                        distributed += perAceWinner;
-                    }
-                });
-                acePotRemainder = 0;
-            } else {
-                // No aces hit - apply redistribution rule
-                const redistribution = payoutConfig?.acePotRedistribution || 'add-to-entry-pot';
-                acePotRedistributionMode = redistribution;
-                if (redistribution === 'add-to-entry-pot' && entryPot > 0) {
-                    // Recalculate entry payouts with ace pot added
-                    const combinedPot = entryPot + acePot;
-                    const combined = calculatePayouts(players, combinedPot, payoutConfig);
-                    // Replace entry payouts with combined
-                    combined.forEach((amount, id) => entryPayouts.set(id, amount));
-                    acePotRemainder = 0;
-                } else if (redistribution === 'redistribute-to-participants') {
-                    const acePaying = players.filter(p => p.paysAce);
-                    if (acePaying.length > 0) {
-                        const perPlayer = Math.floor(acePot / acePaying.length);
-                        let distributed = 0;
-                        acePaying.forEach((p, idx) => {
-                            if (idx === acePaying.length - 1) {
-                                acePayouts.set(p.id, acePot - distributed);
-                            } else {
-                                acePayouts.set(p.id, perPlayer);
-                                distributed += perPlayer;
-                            }
-                        });
-                        acePotRemainder = 0;
-                    }
-                }
-                // 'forfeit' mode: acePotRemainder stays, pot rolls over
-            }
-        }
-
-        // Merge total payouts per player
-        const totalPayouts = new Map<string, number>();
-        entryPayouts.forEach((amount, id) => {
-            totalPayouts.set(id, (totalPayouts.get(id) || 0) + amount);
-        });
-        acePayouts.forEach((amount, id) => {
-            totalPayouts.set(id, (totalPayouts.get(id) || 0) + amount);
-        });
-
-        return {
-            rankedPlayers,
-            entryPayouts,
-            acePayouts,
-            aceWinners,
-            acePotRemainder,
-            acePotRedistributionMode,
-            totalPayouts,
-        };
-    }, [players, entryPot, acePot, activeRound?.payoutConfig]);
 
     // --- REVIEW UI (Shared for Halfway and Final) ---
     if (showHalfwayReview || showFinalReview) {
@@ -1287,7 +1288,7 @@ export const Scorecard: React.FC = () => {
                                 
                                 // Show 5 holes centered around current hole
                                 let startIdx = Math.max(0, currentIndex - 2);
-                                let endIdx = Math.min(totalHoles - 1, startIdx + 4);
+                                const endIdx = Math.min(totalHoles - 1, startIdx + 4);
                                 if (endIdx - startIdx < 4) startIdx = Math.max(0, endIdx - 4);
                                 
                                 const visibleHoles = allHolesInOrder.slice(startIdx, endIdx + 1);

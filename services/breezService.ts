@@ -239,6 +239,27 @@ let isInitialized = false;
 let initializationPromise: Promise<boolean> | null = null;
 let staticLightningAddress: string | null = null;
 
+const redactForBreezLogs = (value: unknown, secrets: Array<string | null | undefined> = []): string => {
+    const activeSecrets = secrets.filter((secret): secret is string => Boolean(secret));
+    let message: string;
+
+    if (value instanceof Error) {
+        message = value.stack || value.message || value.name;
+    } else if (typeof value === 'string') {
+        message = value;
+    } else {
+        try {
+            message = JSON.stringify(value);
+        } catch {
+            message = String(value);
+        }
+    }
+
+    return activeSecrets.reduce((redacted, secret) => {
+        return redacted.split(secret).join('[REDACTED]');
+    }, message);
+};
+
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
@@ -295,6 +316,16 @@ export const initializeBreez = async (
 ): Promise<boolean> => {
     // Already initialized — nothing to do
     if (isInitialized) return true;
+
+    if (!mnemonic.trim()) {
+        console.warn('Breez initialization skipped: wallet seed is missing. Restore or create a wallet seed, then retry.');
+        return false;
+    }
+
+    if (!config.apiKey.trim()) {
+        console.warn('Breez initialization skipped: API key is missing. Configure the Breez API key, then retry.');
+        return false;
+    }
 
     // Initialization already in flight — return the existing promise (dedup)
     if (initializationPromise) return initializationPromise;
@@ -377,13 +408,16 @@ export const initializeBreez = async (
 
             return true;
         } catch (error) {
-            console.error('❌ Breez SDK initialization failed:', error);
+            const safeErrorDetails = redactForBreezLogs(error, [mnemonic, config.apiKey]);
+            console.error('❌ Breez SDK initialization failed:', safeErrorDetails);
 
-            // Log more details for debugging
+            // Log more details for debugging without exposing wallet secrets.
             if (error instanceof Error) {
+                const safeMessage = redactForBreezLogs(error.message, [mnemonic, config.apiKey]);
+                const safeStack = redactForBreezLogs(error.stack || '', [mnemonic, config.apiKey]);
                 console.error('Error name:', error.name);
-                console.error('Error message:', error.message);
-                console.error('Error stack:', error.stack);
+                console.error('Error message:', safeMessage);
+                console.error('Error stack:', safeStack);
 
                 // Check for common issues
                 if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('DNS')) {
@@ -777,7 +811,7 @@ export const payInvoice = async (bolt11: string): Promise<BreezPaymentResult> =>
     }
 
     try {
-        console.log(`⚡ Paying invoice: ${bolt11.substring(0, 30)}...`);
+        console.log('⚡ Paying Breez invoice');
         
         // Step 1: Prepare the payment (required by Breez SDK Spark)
         // This validates the invoice and calculates fees

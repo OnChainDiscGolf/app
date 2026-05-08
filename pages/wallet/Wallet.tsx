@@ -712,7 +712,6 @@ export const Wallet: React.FC = () => {
         if (!file) return;
 
         try {
-            // @ts-ignore
             const jsQRModule = await import('jsqr');
             const jsQR = jsQRModule.default;
 
@@ -2558,7 +2557,6 @@ export const Wallet: React.FC = () => {
                                             setSendInput(contact.lud16);
                                         } else {
                                             // Use magic lightning address
-                                            const { getMagicLightningAddress } = require('../../services/nostrService');
                                             setSendInput(getMagicLightningAddress(contact.pubkey));
                                         }
                                         setView('send-details');
@@ -3155,7 +3153,7 @@ export const Wallet: React.FC = () => {
                                     if (viewMode === 'all') {
                                         handleAllWalletsReceive();
                                     } else {
-                                        walletMode === 'nwc' ? setView('deposit') : setView('receive');
+                                        setView(walletMode === 'nwc' ? 'deposit' : 'receive');
                                     }
                                 }}
                                 className={`flex flex-col items-center justify-center rounded-xl py-2.5 transition-all active:scale-95 ${viewMode === 'all'
