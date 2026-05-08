@@ -21,7 +21,7 @@ vi.mock('./breezService', () => ({
   payInvoice: vi.fn(),
 }));
 
-import { routePayment } from './paymentRouter';
+import { routePayment, formatPaymentMethod } from './paymentRouter';
 import * as nostrService from './nostrService';
 import * as breezService from './breezService';
 
@@ -182,5 +182,15 @@ describe('routePayment 4-tier cascade', () => {
 
     expect(result.success).toBe(false);
     expect(result.method).toBe('failed');
+  });
+});
+
+describe('formatPaymentMethod display copy', () => {
+  it('labels fallback LNURL payments as the active fallback wallet rather than direct payment', () => {
+    expect(formatPaymentMethod('lnurl')).toBe('Lightning (Fallback Wallet)');
+  });
+
+  it('labels Cashu DM as a manual-claim eCash DM', () => {
+    expect(formatPaymentMethod('cashu_dm')).toBe('eCash DM (Manual Claim)');
   });
 });

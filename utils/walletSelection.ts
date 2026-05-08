@@ -22,7 +22,7 @@ export interface WalletSelectionInputs {
  *
  * Priority cascade:
  * 1. Honor an explicit user preference if that wallet exists and has balance.
- * 2. Auto-select: NWC (if configured & funded) → Breez (if exists & funded) → Cashu (if funded).
+ * 2. Auto-select: Breez (if exists & funded) → NWC (if configured & funded) → Cashu (if funded).
  * 3. Edge-case fallback: any wallet with balance, in the same order.
  * 4. Default to Cashu (always available as built-in wallet).
  */
@@ -36,12 +36,12 @@ export function getPreferredSendWallet(inputs: WalletSelectionInputs): WalletKin
     if (defaultQuickSendWallet === 'cashu' && preferredBalance > 0) return 'cashu';
   }
 
-  if (nwcString && walletBalances.nwc > 0) return 'nwc';
   if (hasBreezWallet && walletBalances.breez > 0) return 'breez';
+  if (nwcString && walletBalances.nwc > 0) return 'nwc';
   if (walletBalances.cashu > 0) return 'cashu';
 
-  if (walletBalances.nwc > 0 && nwcString) return 'nwc';
   if (walletBalances.breez > 0 && hasBreezWallet) return 'breez';
+  if (walletBalances.nwc > 0 && nwcString) return 'nwc';
 
   return 'cashu';
 }

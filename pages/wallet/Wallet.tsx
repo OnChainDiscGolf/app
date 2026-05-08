@@ -1011,7 +1011,7 @@ export const Wallet: React.FC = () => {
                 {/* Quick Scan Default Wallet */}
                 <div className="mb-8">
                     <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Quick Scan Default</h3>
-                    <p className="text-xs text-slate-500 mb-3">Choose which wallet to use when tapping the QR scan button</p>
+                    <p className="text-xs text-slate-500 mb-3">Auto uses funded Breez first; pick Cashu or NWC here for an explicit fallback.</p>
                     <div className="grid grid-cols-3 gap-2">
                         {/* Breez */}
                         <button
