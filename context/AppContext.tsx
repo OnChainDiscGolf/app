@@ -111,6 +111,9 @@ interface AppContextType extends AppState {
     breez: number;
   };
   refreshAllBalances: () => Promise<void>;
+  breezReady: boolean;
+  breezInitError: string | null;
+  retryBreezInit: () => void;
 
   // Payment Notification
   paymentNotification: {
@@ -1086,6 +1089,9 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
     mints: wallet.mints,
     proofs: wallet.proofs,
     walletBalances: wallet.walletBalances,
+    breezReady: wallet.breezReady,
+    breezInitError: wallet.breezInitError,
+    retryBreezInit: wallet.retryBreezInit,
     paymentNotification: wallet.paymentNotification,
     setPaymentNotification: wallet.setPaymentNotification,
     lightningStrike: wallet.lightningStrike,

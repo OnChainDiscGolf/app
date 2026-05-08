@@ -23,11 +23,12 @@ export const WalletModeSwitcher: React.FC<{
     activeMode: 'breez' | 'cashu' | 'nwc';
     viewMode: 'all' | 'breez' | 'cashu' | 'nwc';
     isExpanded: boolean;
+    isNwcConnected: boolean;
     onModeChange: (mode: 'breez' | 'cashu' | 'nwc') => void;
     onViewModeChange: (mode: 'all' | 'breez' | 'cashu' | 'nwc') => void;
     onExpandToggle: () => void;
     onWalletSelect: (mode: 'breez' | 'cashu' | 'nwc') => void;
-}> = ({ activeMode, viewMode, isExpanded, onModeChange, onViewModeChange, onExpandToggle, onWalletSelect }) => {
+}> = ({ activeMode, viewMode, isExpanded, isNwcConnected, onModeChange, onViewModeChange, onExpandToggle, onWalletSelect }) => {
     // Track animation state for smooth open/close
     const [animationState, setAnimationState] = useState<'collapsed' | 'expanding' | 'expanded' | 'collapsing'>('collapsed');
     const [shouldRender, setShouldRender] = useState(false);
@@ -144,16 +145,24 @@ export const WalletModeSwitcher: React.FC<{
                         // When a wallet IS selected, selected one expands for label, others stay compact
                         const hasSelection = viewMode !== 'all';
 
+                        const isDisabled = mode.id === 'nwc' && !isNwcConnected;
+
                         return (
                             <button
                                 key={mode.id}
-                                onClick={() => onWalletSelect(mode.id)}
+                                onClick={() => {
+                                    if (isDisabled) return;
+                                    onWalletSelect(mode.id);
+                                }}
+                                disabled={isDisabled}
                                 className={`
                                     relative flex items-center justify-center rounded-lg transition-colors duration-200
                                     min-h-[36px] py-1.5 px-2
-                                    ${isActive
-                                        ? `${colors.active} ${colors.border} border`
-                                        : `${colors.inactive} border border-transparent`
+                                    ${isDisabled
+                                        ? 'bg-slate-800/50 border border-slate-700/50 opacity-30 cursor-not-allowed'
+                                        : isActive
+                                            ? `${colors.active} ${colors.border} border`
+                                            : `${colors.inactive} border border-transparent`
                                     }
                                 `}
                                 style={{
@@ -169,7 +178,7 @@ export const WalletModeSwitcher: React.FC<{
                             >
                                 <IconComponent
                                     size={ICON_SIZE}
-                                    className={`${colors.text} flex-shrink-0 ${isActive ? 'mr-1' : ''}`}
+                                    className={`${isDisabled ? 'text-slate-600' : colors.text} flex-shrink-0 ${isActive ? 'mr-1' : ''}`}
                                 />
                                 {/* Only show label when this wallet is selected */}
                                 {isActive && (

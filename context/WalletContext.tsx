@@ -71,6 +71,9 @@ export interface WalletContextType {
   mints: Mint[];
   proofs: Proof[];
   walletBalances: { cashu: number; nwc: number; breez: number };
+  breezReady: boolean;
+  breezInitError: string | null;
+  retryBreezInit: () => void;
 
   // Payment notifications
   paymentNotification: { amount: number; context?: 'wallet_receive' | 'buyin_qr' } | null;
@@ -196,6 +199,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
+  const [breezReady, setBreezReady] = useState<boolean>(isBreezInitialized());
+  const [breezInitError, setBreezInitError] = useState<string | null>(null);
 
   const [transactions, setTransactions] = useState<WalletTransaction[]>(() => {
     const saved = localStorage.getItem('cdg_txs');
@@ -237,6 +242,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const walletServiceRef = useRef<WalletService | null>(null);
   const nwcServiceRef = useRef<NWCService | null>(null);
   const animatedPaymentIdsRef = useRef<Set<string>>(new Set());
+  const breezPaymentSubscriptionCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      breezPaymentSubscriptionCleanupRef.current?.();
+      breezPaymentSubscriptionCleanupRef.current = null;
+    };
+  }, []);
 
   // Payment notification state
   const [paymentNotification, setPaymentNotification] = useState<{
@@ -811,6 +824,83 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [refreshAllBalances, reconcileBreezPayments]);
 
+  // ---------------------------------------------------------------------------
+  // tryInitBreez — shared Breez init logic (called from Effect 11 + retry button)
+  // ---------------------------------------------------------------------------
+  const tryInitBreez = useCallback(async () => {
+    const hasMnemonic = hasStoredMnemonic(false) || hasStoredMnemonic(true);
+    if (!hasMnemonic) return;
+
+    setBreezInitError(null);
+
+    // Helper: subscribe to Breez payment events and refresh balances
+    const onReady = () => {
+      setBreezReady(true);
+      setBreezInitError(null);
+
+      // Keep exactly one active Breez event listener. Retry/sync paths can call
+      // tryInitBreez after the SDK is already initialized; without cleanup, each
+      // call would register another listener and duplicate transaction handling.
+      breezPaymentSubscriptionCleanupRef.current?.();
+      breezPaymentSubscriptionCleanupRef.current = subscribeToBreezEvents(
+        (payment) => {
+          const amountSats = payment.amountSats;
+          console.log(`Received ${amountSats} sats via Breez! (id: ${payment.id})`);
+          handleIncomingPayment('breez', amountSats, 'Received via Breez Lightning', payment.id);
+        },
+        (payment) => {
+          const amountSats = payment.amountSats;
+          console.log(`Sent ${amountSats} sats via Breez (id: ${payment.id})`);
+          if (amountSats && amountSats > 0) {
+            const txId = payment.id ? `breez-${payment.id}` : undefined;
+            addTransaction('send', amountSats, 'Sent via Breez Lightning', 'breez', { id: txId });
+            refreshAllBalances();
+          }
+        }
+      );
+      refreshAllBalances();
+    };
+
+    // Finalization.tsx may have already initialized Breez — just sync React state
+    if (isBreezInitialized()) {
+      console.log('[WalletContext] Breez already initialized, syncing state...');
+      onReady();
+      return;
+    }
+
+    console.log('[WalletContext] Starting Breez SDK initialization...');
+
+    let mnemonic = retrieveMnemonicEncrypted(currentUserPubkey, false);
+    if (!mnemonic) {
+      mnemonic = retrieveMnemonicEncrypted(currentUserPubkey, true);
+    }
+
+    if (!mnemonic) {
+      console.warn('[WalletContext] No mnemonic found for Breez init');
+      setBreezInitError('No wallet seed found. Try logging out and back in.');
+      return;
+    }
+
+    const breezConfig = {
+      apiKey: BREEZ_API_KEY,
+      environment: 'production' as const
+    };
+
+    try {
+      const success = await initializeBreez(mnemonic, breezConfig);
+      if (success) {
+        console.log('[WalletContext] Breez SDK initialized successfully');
+        onReady();
+      } else {
+        console.warn('[WalletContext] Breez init returned false');
+        setBreezInitError('Lightning wallet failed to start. Tap to retry.');
+      }
+    } catch (e: any) {
+      console.warn('[WalletContext] Breez initialization error:', e);
+      setBreezInitError(e?.message || 'Lightning wallet initialization failed. Tap to retry.');
+    }
+  }, [currentUserPubkey, refreshAllBalances]);
+
   // === Effect 11: Wallet Restoration on Login ===
   // Triggered when `currentUserPubkey` changes. Performs three major tasks:
   // 1. Fetches encrypted wallet backup from Nostr and merges proofs/transactions/mints
@@ -941,57 +1031,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }).catch(e => console.warn("Historical Gift Wrap fetch failed:", e));
 
       // Initialize Breez Lightning Wallet (for mnemonic-based users)
-      const initBreezWallet = async () => {
-        const hasMnemonic = hasStoredMnemonic(false) || hasStoredMnemonic(true);
-
-        if (hasMnemonic && !isBreezInitialized()) {
-          console.log('[WalletContext] Starting Breez SDK initialization...');
-
-          let mnemonic = retrieveMnemonicEncrypted(currentUserPubkey, false);
-          if (!mnemonic) {
-            mnemonic = retrieveMnemonicEncrypted(currentUserPubkey, true);
-          }
-
-          if (mnemonic) {
-            const breezConfig = {
-              apiKey: BREEZ_API_KEY,
-              environment: 'production' as const
-            };
-
-            initializeBreez(mnemonic, breezConfig).then((success) => {
-              if (success) {
-                console.log('[WalletContext] Breez SDK initialized successfully');
-
-                subscribeToBreezEvents(
-                  // On payment received
-                  (payment) => {
-                    const amountSats = payment.amountSats;
-                    console.log(`Received ${amountSats} sats via Breez! (id: ${payment.id})`);
-                    handleIncomingPayment('breez', amountSats, 'Received via Breez Lightning', payment.id);
-                  },
-                  // On payment sent
-                  (payment) => {
-                    const amountSats = payment.amountSats;
-                    console.log(`Sent ${amountSats} sats via Breez (id: ${payment.id})`);
-
-                    if (amountSats && amountSats > 0) {
-                      const txId = payment.id ? `breez-${payment.id}` : undefined;
-                      addTransaction('send', amountSats, 'Sent via Breez Lightning', 'breez', { id: txId });
-                      refreshAllBalances();
-                    }
-                  }
-                );
-
-                refreshAllBalances();
-              }
-            }).catch((e) => {
-              console.warn('[WalletContext] Breez initialization error (will retry):', e);
-            });
-          }
-        }
-      };
-
-      initBreezWallet();
+      tryInitBreez();
     }
   }, [currentUserPubkey, isGuest]);
 
@@ -1839,6 +1879,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mints,
     proofs,
     walletBalances,
+    breezReady,
+    breezInitError,
+    retryBreezInit: tryInitBreez,
 
     // Payment notifications
     paymentNotification,
