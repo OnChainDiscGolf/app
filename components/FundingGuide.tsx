@@ -165,7 +165,7 @@ export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, am
           {activeTab === 'cashapp' && (
             <div className="space-y-3">
               <p className="text-xs text-slate-400">
-                Already have Cash App? You can send Bitcoin via Lightning in under a minute.
+                Already have Cash App? You can send Bitcoin via Lightning quickly, often in under a minute.
               </p>
 
               <div className="space-y-2">
@@ -190,7 +190,7 @@ export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, am
                 name="Cash App"
                 color="#00D64F"
                 url="https://cash.app"
-                note="Free Lightning sends. US & UK."
+                note="Lightning sends may be free in supported regions, including the US & UK."
               />
             </div>
           )}
@@ -199,7 +199,7 @@ export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, am
           {activeTab === 'strike' && (
             <div className="space-y-3">
               <p className="text-xs text-slate-400">
-                Strike has the lowest fees and the simplest Lightning experience.
+                Strike offers a simple Lightning experience in supported regions.
               </p>
 
               <div className="space-y-2">
@@ -224,7 +224,7 @@ export const FundingGuide: React.FC<FundingGuideProps> = ({ lightningAddress, am
                 name="Strike"
                 color="#3B82F6"
                 url="https://strike.me"
-                note="0.3% fees. US, EU & Americas."
+                note="Fees and regional availability may vary."
               />
             </div>
           )}
