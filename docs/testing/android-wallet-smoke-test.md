@@ -27,6 +27,7 @@ Android version:
 Network: Wi-Fi / cellular / mixed
 Wallet mode: Breez
 Breez environment/config source: production / staging / other external config
+Breez config present in build: yes / no / blocked
 Starting Breez balance:
 External test wallet used for receive funding:
 External receive target used for send test:
@@ -36,6 +37,15 @@ Final result: pass / fail / blocked
 ```
 
 ## Preconditions
+
+### Build/config readiness preflight
+
+Before installing the APK for any Breez-focused run, confirm the build was created with Breez configuration present:
+
+1. Put the real Breez SDK Spark API key in local `.env.local` or CI secrets as `VITE_BREEZ_API_KEY`. Use `.env.example` only as a template; never commit or paste the real key.
+2. Rebuild the web assets and Android bundle after changing the env value. Vite reads `VITE_*` values at build time, so installing an older APK will still behave as missing-config even if the local shell is now configured.
+3. On the device, open Wallet -> Breez. If the APK was built without the key, the app must show: `Breez API key is not configured for this build...` and no send/receive test may proceed from that APK.
+4. Record only `Breez config present: yes / no / blocked` in the test record. Do not record the key value, PEM body, screenshots containing secrets, or raw logs.
 
 - Signed or release-like Android APK is installed and launches.
 - The tester can complete onboarding with a test identity.
@@ -62,6 +72,16 @@ Treat as P1 / beta blocker unless accepted:
 - Balance refresh is ambiguous or stale after a settled payment.
 - Send/receive error copy does not tell a casual tester what happened or what to try next.
 - Transaction history is missing entries after refresh/reopen.
+
+## Tiny-funds manual test amounts
+
+Use the smallest amount your external test wallet and current Breez environment will reliably route:
+
+- Default manual receive invoice: 5 sats.
+- Default manual receive address payment: 5 sats.
+- Default manual send amount: 5 sats plus the displayed routing fee.
+- If the external wallet rejects 5 sats, increase only to the minimum it accepts and record the reason.
+- Stop before sending if the app does not show an explicit send/confirm action, the fee looks unreasonable for a tiny test, or the tester cannot verify the destination belongs to the external test wallet.
 
 ## Section A — Breez readiness and balance refresh
 

@@ -40,7 +40,7 @@
 import { CashuMint, CashuWallet, getDecodedToken } from '@cashu/cashu-ts';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { WalletTransaction, Mint, Proof } from '../types';
-import { BREEZ_API_KEY } from '../constants';
+import { BREEZ_API_KEY, BREEZ_CONFIG_READINESS } from '../constants';
 import { publishWalletBackup, fetchWalletBackup, subscribeToDirectMessages, subscribeToGiftWraps, subscribeToNutzaps, subscribeToLightningGiftWraps, fetchHistoricalGiftWraps, getMagicLightningAddress } from '../services/nostrService';
 import { hasStoredMnemonic, retrieveMnemonicEncrypted } from '../services/mnemonicService';
 import {
@@ -878,6 +878,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!mnemonic) {
       console.warn('[WalletContext] No mnemonic found for Breez init');
       setBreezInitError('No wallet seed found. Try logging out and back in.');
+      return;
+    }
+
+    if (!BREEZ_CONFIG_READINESS.hasApiKey) {
+      console.warn('[WalletContext] Breez initialization skipped: VITE_BREEZ_API_KEY is missing from this build.');
+      setBreezInitError(BREEZ_CONFIG_READINESS.missingApiKeyMessage);
       return;
     }
 

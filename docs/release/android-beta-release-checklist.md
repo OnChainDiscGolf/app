@@ -17,6 +17,7 @@ Use this checklist for every public beta Android APK/Zapstore release. It is wri
 - Node dependencies installed with `npm ci`.
 - Android Studio/SDK installed with JDK 17 available.
 - Access to the release signing keystore and its passwords outside the repo. Never commit or paste keystore passwords, mnemonics, API keys, wallet credentials, or private keys.
+- Breez SDK Spark API key available outside the repo as `VITE_BREEZ_API_KEY` for builds where the built-in Lightning wallet is in scope. Keep it in `.env.local` or CI secrets only; `.env.example` documents the variable name without a real value.
 - Zapstore publisher access and the current app listing metadata.
 - A physical Android device or emulator for smoke testing. Prefer a physical device for Breez/Amber/wallet-intent testing.
 
@@ -32,7 +33,12 @@ Use this checklist for every public beta Android APK/Zapstore release. It is wri
    ```bash
    npm ci
    ```
-5. Run the standard quality gates:
+5. Confirm Breez build configuration is present when Breez is in scope:
+   ```bash
+   test -n "$VITE_BREEZ_API_KEY" && echo "Breez config present" || echo "Breez config missing"
+   ```
+   Do not print the key value. If this prints missing, set `VITE_BREEZ_API_KEY` in `.env.local` or CI secrets before building the APK.
+6. Run the standard quality gates:
    ```bash
    npm run typecheck
    npm run lint

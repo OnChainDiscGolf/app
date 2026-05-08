@@ -69,3 +69,14 @@ export const MOCK_QR_CODE = "lnurl1dp68gurn8ghj7um5v93kketj9ehx2amn9uh8wetvdskkk
  * @see {@link ../services/breezService.ts}
  */
 export const BREEZ_API_KEY = import.meta.env.VITE_BREEZ_API_KEY || '';
+
+/**
+ * Non-secret Breez build readiness metadata for debug diagnostics and QA docs.
+ * Never include the API key value in UI, logs, or bug reports; only expose whether
+ * this build was compiled with a non-empty `VITE_BREEZ_API_KEY`.
+ */
+export const BREEZ_CONFIG_READINESS = {
+  hasApiKey: BREEZ_API_KEY.trim().length > 0,
+  missingApiKeyMessage:
+    'Breez API key is not configured for this build. Set VITE_BREEZ_API_KEY in .env.local or CI secrets and rebuild the Android APK. Do not paste the key into bug reports.',
+} as const;
