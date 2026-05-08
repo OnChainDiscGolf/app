@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { collectLogs, initErrorCapture, sanitizeDiagnosticMessage } from './feedbackService';
+import { collectLogs, initErrorCapture, isDebugLoggingEnabled, sanitizeDiagnosticMessage, trackNavigation } from './feedbackService';
 
 describe('feedbackService diagnostic sanitization', () => {
   it('redacts mnemonic, private key, token, and invoice fields before feedback capture', () => {
@@ -47,6 +47,27 @@ describe('feedbackService diagnostic sanitization', () => {
     expect(message).not.toContain('nostr+walletconnect://');
     expect(message).not.toContain('nsec1');
     expect(message).not.toContain('d'.repeat(64));
+  });
+
+  it('gates verbose console forwarding behind development or explicit debug mode', () => {
+    localStorage.removeItem('cdg_debug_logs');
+    expect(isDebugLoggingEnabled(false)).toBe(false);
+
+    localStorage.setItem('cdg_debug_logs', 'true');
+    expect(isDebugLoggingEnabled(false)).toBe(true);
+    expect(isDebugLoggingEnabled(true)).toBe(true);
+  });
+
+  it('redacts secrets from navigation paths included in feedback logs', () => {
+    trackNavigation('/connect?secret=' + 'e'.repeat(64) + '&invoice=' + 'lnbc1'.padEnd(80, 'q'));
+
+    const logs = collectLogs(false);
+    const path = logs.navigation?.at(-1)?.path ?? '';
+
+    expect(path).toContain('[REDACTED:hex]');
+    expect(path).toContain('[REDACTED:lnbc]');
+    expect(path).not.toContain('e'.repeat(64));
+    expect(path).not.toContain('lnbc1');
   });
 
   it('captures sanitized console errors for feedback logs', () => {

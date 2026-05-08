@@ -55,6 +55,18 @@ const MAX_ERROR_BUFFER = 50;
 const warningBuffer: { timestamp: number; message: string }[] = [];
 const MAX_WARNING_BUFFER = 30;
 
+type DiagnosticConsoleMethod = 'log' | 'info' | 'debug' | 'warn' | 'error';
+const originalConsoleMethods: Partial<Record<DiagnosticConsoleMethod, (...args: unknown[]) => void>> = {};
+let errorCaptureInitialized = false;
+
+export const isDebugLoggingEnabled = (isDev: boolean = import.meta.env.DEV): boolean => {
+    try {
+        return isDev || localStorage.getItem('cdg_debug_logs') === 'true';
+    } catch {
+        return isDev;
+    }
+};
+
 const SENSITIVE_KEY_PATTERN = /(mnemonic|seed|private|secret|token|proof|preimage|invoice|bolt11|paymenthash|nwc|authorization|apikey|api_key|password)/i;
 const SENSITIVE_STRING_PATTERNS: { pattern: RegExp; replacement: string | ((match: string) => string) }[] = [
     { pattern: /nostr\+walletconnect:\/\/[^\s"']+/gi, replacement: '[REDACTED:nwc]' },
@@ -117,8 +129,14 @@ const MAX_NAV_HISTORY = 20;
  * buffer memory bounded. Stack traces are limited to 4 frames.
  */
 export const initErrorCapture = () => {
-    // Capture console.error
-    const originalError = console.error;
+    if (errorCaptureInitialized) return;
+    errorCaptureInitialized = true;
+
+    const methods: DiagnosticConsoleMethod[] = ['log', 'info', 'debug', 'warn', 'error'];
+    methods.forEach((method) => {
+        originalConsoleMethods[method] = console[method].bind(console) as (...args: unknown[]) => void;
+    });
+
     console.error = (...args) => {
         const message = sanitizeDiagnosticMessage(args);
 
@@ -128,16 +146,13 @@ export const initErrorCapture = () => {
             stack: new Error().stack?.split('\n').slice(2, 6).join('\n')
         });
 
-        // Keep buffer size limited
         while (errorBuffer.length > MAX_ERROR_BUFFER) {
             errorBuffer.shift();
         }
 
-        originalError.call(console, message);
+        originalConsoleMethods.error?.(message);
     };
 
-    // Capture console.warn
-    const originalWarn = console.warn;
     console.warn = (...args) => {
         const message = sanitizeDiagnosticMessage(args);
 
@@ -146,13 +161,19 @@ export const initErrorCapture = () => {
             message: message.slice(0, 300) // Limit message size
         });
 
-        // Keep buffer size limited
         while (warningBuffer.length > MAX_WARNING_BUFFER) {
             warningBuffer.shift();
         }
 
-        originalWarn.call(console, message);
+        originalConsoleMethods.warn?.(message);
     };
+
+    (['log', 'info', 'debug'] as DiagnosticConsoleMethod[]).forEach((method) => {
+        console[method] = (...args: unknown[]) => {
+            if (!isDebugLoggingEnabled()) return;
+            originalConsoleMethods[method]?.(sanitizeDiagnosticMessage(args));
+        };
+    });
 };
 
 /**
@@ -166,7 +187,7 @@ export const initErrorCapture = () => {
 export const trackNavigation = (path: string) => {
     navigationHistory.push({
         timestamp: Date.now(),
-        path
+        path: redactSensitiveString(path)
     });
 
     while (navigationHistory.length > MAX_NAV_HISTORY) {
@@ -393,11 +414,13 @@ export const sendFeedback = async (payload: FeedbackPayload): Promise<{ success:
         console.log('✓ Target pubkey:', feedbackPubkey.slice(0, 8) + '...');
         console.log('✓ Relays:', relays.slice(0, 3).join(', '), `... (${relays.length} total)`);
 
+        const sanitizedFeedbackMessage = redactSensitiveString(payload.message);
+
         // Build the feedback content
         const feedbackContent: any = {
             type: payload.type,
-            message: payload.message,
-            currentPath: payload.currentPath || window.location.pathname,
+            message: sanitizedFeedbackMessage,
+            currentPath: redactSensitiveString(payload.currentPath || window.location.pathname),
             sentAt: new Date().toISOString()
         };
 
@@ -411,7 +434,7 @@ export const sendFeedback = async (payload: FeedbackPayload): Promise<{ success:
         console.log('✓ Feedback content prepared, type:', payload.type);
 
         // Format as readable message with JSON payload
-        const messageText = `📬 FEEDBACK (${payload.type.toUpperCase()})\n\n${payload.message}\n\n---\n${JSON.stringify(feedbackContent, null, 2)}`;
+        const messageText = `📬 FEEDBACK (${payload.type.toUpperCase()})\n\n${sanitizedFeedbackMessage}\n\n---\n${JSON.stringify(feedbackContent, null, 2)}`;
 
         // Send as encrypted DM (kind 4) - universally supported
         console.log('📧 Sending via encrypted DM (kind 4)...');
