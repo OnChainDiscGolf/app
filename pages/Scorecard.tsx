@@ -47,6 +47,16 @@ export const Scorecard: React.FC = () => {
 
     const isHost = activeRound?.pubkey === currentUserPubkey;
     const isTournamentCard = activeTournament?.cards?.some(c => c.id === activeRound?.id) ?? false;
+    const roundContextLabel = useMemo(() => {
+        if (!activeRound) return '';
+
+        const courseName = activeRound.courseName?.trim();
+        const roundName = activeRound.name?.trim();
+        if (!courseName) return roundName || '';
+        if (!roundName || roundName === courseName || roundName === `${courseName} Round`) return courseName;
+
+        return `${roundName} • ${courseName}`;
+    }, [activeRound?.courseName, activeRound?.name]);
 
     // Initialize view hole to startingHole if available, else 1
     const [viewHole, setViewHole] = useState(activeRound?.startingHole || 1);
@@ -527,8 +537,8 @@ export const Scorecard: React.FC = () => {
                                 <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">
                                     {showHalfwayReview ? 'Halfway Review' : 'Final Review'}
                                 </p>
-                                <h1 className="text-xl font-bold text-white">
-                                    {activeRound.courseName}
+                                <h1 className="text-xl font-bold text-white truncate max-w-[240px]">
+                                    {roundContextLabel || activeRound.courseName}
                                 </h1>
                             </div>
                             <div className={`px-3 py-1.5 rounded-full text-xs font-bold ${isComplete ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
@@ -547,9 +557,11 @@ export const Scorecard: React.FC = () => {
                                 const isMissing = isHoleMissingScore(h);
                                 return (
                                     <button
+                                        type="button"
                                         key={h}
                                         onClick={() => navigateToHole(h)}
-                                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                                        aria-label={`Edit hole ${h}`}
+                                        className={`min-w-11 min-h-11 px-3 rounded-xl text-sm font-bold transition-all touch-manipulation active:scale-95 ${
                                             isMissing 
                                                 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 animate-pulse hover:bg-rose-500/30' 
                                                 : 'bg-slate-700/50 text-slate-300 border border-slate-600/50 hover:bg-slate-600/50 hover:text-white'
@@ -1107,13 +1119,18 @@ export const Scorecard: React.FC = () => {
             <div className="relative z-10 bg-slate-900/80 backdrop-blur-xl border-b border-slate-700/50 px-4 py-2.5">
                 <div className="max-w-md mx-auto flex items-center justify-between">
                     {/* Left: Hole Counter - shows actual hole number and progress */}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col min-w-0">
                         <div className="flex items-baseline space-x-1">
                             <span className="text-2xl font-black text-white">Hole {viewHole}</span>
                         </div>
                         <span className="text-slate-500 text-xs font-medium">
                             {getHolesPlayedCount(viewHole, activeRound.startingHole || 1, activeRound.holeCount)} of {activeRound.holeCount}
                         </span>
+                        {roundContextLabel && (
+                            <span className="text-[11px] text-slate-400 font-medium truncate max-w-[170px]">
+                                {roundContextLabel}
+                            </span>
+                        )}
                     </div>
                     
                     {/* Center: Pots - Matching Payment Screen Style */}
@@ -1221,9 +1238,15 @@ export const Scorecard: React.FC = () => {
                                                     {currentHoleScore === 1 && (
                                                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
                                                     )}
-                                                    <span className={`text-2xl font-black relative z-10 ${currentHoleScore === 1 ? 'text-black' : currentHoleScore ? getScoreColor(currentHoleScore) : 'text-slate-600'}`}>
-                                                        {currentHoleScore || '-'}
-                                                    </span>
+                                                    {currentHoleScore ? (
+                                                        <span className={`text-2xl font-black relative z-10 ${currentHoleScore === 1 ? 'text-black' : getScoreColor(currentHoleScore)}`}>
+                                                            {currentHoleScore}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] font-black uppercase tracking-wide leading-tight text-center text-slate-500 px-1">
+                                                            Tap +/-
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 <button
@@ -1240,9 +1263,15 @@ export const Scorecard: React.FC = () => {
                                             <div className={`w-14 h-14 rounded-xl flex items-center justify-center border-2 ${
                                                 currentHoleScore ? getScoreBg(currentHoleScore, false) : 'bg-slate-800/50 border-slate-700/50'
                                             }`}>
-                                                <span className={`text-2xl font-black ${currentHoleScore ? getScoreColor(currentHoleScore) : 'text-slate-600'}`}>
-                                                    {currentHoleScore || '-'}
-                                                </span>
+                                                {currentHoleScore ? (
+                                                    <span className={`text-2xl font-black ${getScoreColor(currentHoleScore)}`}>
+                                                        {currentHoleScore}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] font-black uppercase tracking-wide leading-tight text-center text-slate-500 px-1">
+                                                        No score
+                                                    </span>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -1277,7 +1306,7 @@ export const Scorecard: React.FC = () => {
                         </button>
 
                         {/* Hole Pills - show holes in play order */}
-                        <div className="flex items-center justify-center gap-1 flex-1 mx-2 overflow-hidden">
+                        <div className="flex items-center justify-center gap-1.5 flex-1 mx-2 overflow-hidden">
                             {(() => {
                                 const startingHole = activeRound.startingHole || 1;
                                 const totalHoles = activeRound.holeCount;
@@ -1302,9 +1331,12 @@ export const Scorecard: React.FC = () => {
 
                                     return (
                                         <button
+                                            type="button"
                                             key={h}
                                             onClick={() => setViewHole(h)}
-                                            className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold transition-all shrink-0 ${
+                                            aria-current={isActive ? 'step' : undefined}
+                                            aria-label={`Go to hole ${h}${complete ? ', complete' : ', incomplete'}`}
+                                            className={`min-w-10 h-10 px-2 rounded-xl flex items-center justify-center text-sm font-bold transition-all shrink-0 touch-manipulation active:scale-95 ${
                                                 isActive 
                                                     ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/40 scale-110 ring-2 ring-emerald-400/50' 
                                                     : isPast && !complete 
