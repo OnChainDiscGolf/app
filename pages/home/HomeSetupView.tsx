@@ -19,6 +19,7 @@ import React from 'react';
 import { Icons } from '../../components/Icons';
 import { Button } from '../../components/Button';
 import { HomeSetupViewProps } from './homeTypes';
+import { getRoundSetupCourseHelperText, isRoundSetupReady } from './roundSetupCopy';
 
 /**
  * Round setup form -- configures course, holes, entry fee, and ace pot.
@@ -57,6 +58,9 @@ export const HomeSetupView: React.FC<HomeSetupViewProps> = ({
     setView,
     goToSettings,
 }) => {
+    const canContinue = isRoundSetupReady(courseName);
+    const courseHelperText = getRoundSetupCourseHelperText(courseName);
+
     return (
         <div className="flex flex-col h-full p-4 pb-20">
             {/* Header - Compact */}
@@ -104,8 +108,20 @@ export const HomeSetupView: React.FC<HomeSetupViewProps> = ({
                         value={courseName}
                         onChange={(e) => setCourseName(e.target.value)}
                         placeholder="Enter course name..."
-                        className="w-full bg-black/30 border border-white/10 rounded-lg p-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all placeholder:text-slate-600"
+                        aria-invalid={!canContinue}
+                        aria-describedby="course-helper"
+                        className={`w-full bg-black/30 border rounded-lg p-2.5 text-sm text-white outline-none focus:ring-2 transition-all placeholder:text-slate-600 ${
+                            canContinue
+                                ? 'border-white/10 focus:ring-emerald-500/50 focus:border-emerald-500/50'
+                                : 'border-amber-500/50 focus:ring-amber-500/50 focus:border-amber-500/50'
+                        }`}
                     />
+                    <p
+                        id="course-helper"
+                        className={`mt-1.5 text-xs ${canContinue ? 'text-emerald-300/80' : 'text-amber-300'}`}
+                    >
+                        {courseHelperText}
+                    </p>
 
                     {/* Recent courses - show when input is empty or matches */}
                     {recentCourses.length > 0 && (
@@ -411,9 +427,15 @@ export const HomeSetupView: React.FC<HomeSetupViewProps> = ({
             <div className="mt-3 pt-2 shrink-0">
                 <button
                     onClick={() => setView('select_players')}
-                    className="w-full bg-gradient-to-r from-emerald-500/70 via-teal-500/70 to-cyan-500/70 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/35 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    disabled={!canContinue}
+                    aria-disabled={!canContinue}
+                    className={`w-full font-bold py-3.5 rounded-xl shadow-lg transition-all ${
+                        canContinue
+                            ? 'bg-gradient-to-r from-emerald-500/70 via-teal-500/70 to-cyan-500/70 text-white shadow-emerald-500/20 hover:shadow-emerald-500/35 hover:scale-[1.02] active:scale-[0.98]'
+                            : 'bg-slate-800/80 text-slate-500 shadow-none cursor-not-allowed border border-slate-700/80'
+                    }`}
                 >
-                    Next
+                    {canContinue ? 'Next' : 'Enter a course to continue'}
                 </button>
             </div>
 
