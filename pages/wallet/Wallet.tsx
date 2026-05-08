@@ -61,6 +61,7 @@ import {
 import { SuccessOverlay, ProcessingOverlay } from './WalletOverlays';
 import { HelpModal, WalletHelpModal } from './WalletHelpModals';
 import { WalletModeSwitcher } from './WalletModeSwitcher';
+import { getWalletModeUxOptions, type WalletModeId } from './walletModeUx';
 import { WALLET_COLORS, WALLET_ORDER, getLeftGlowColor } from './walletConstants';
 
 /**
@@ -564,6 +565,7 @@ export const Wallet: React.FC = () => {
     const [newMintUrl, setNewMintUrl] = useState('');
     const [newMintName, setNewMintName] = useState('');
     const [localNwcString, setLocalNwcString] = useState(nwcString);
+    const [settingsWalletSection, setSettingsWalletSection] = useState<WalletModeId>(walletMode);
     const [showNwcError, setShowNwcError] = useState(false);
     const [isWiggling, setIsWiggling] = useState(false);
     const [helpModal, setHelpModal] = useState<{ isOpen: boolean, title: string, text: string } | null>(null);
@@ -577,6 +579,12 @@ export const Wallet: React.FC = () => {
 
     const safeMints = Array.isArray(mints) ? mints : [];
     const activeMint = safeMints.find(m => m.isActive) || safeMints[0];
+    const walletModeUx = getWalletModeUxOptions({
+        hasBreezWallet,
+        hasCashuMint: !!activeMint,
+        isNwcConnected: !!nwcString,
+    });
+    const settingsWalletOptions = [walletModeUx.primary, ...walletModeUx.advanced];
     const receiveAddress = walletMode === 'cashu'
         ? getMagicLightningAddress(currentUserPubkey)
         : (userProfile.lud16 || getMagicLightningAddress(currentUserPubkey));
@@ -960,49 +968,67 @@ export const Wallet: React.FC = () => {
 
                 {/* Wallet Mode Selection */}
                 <div className="mb-8">
-                    <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Active Wallet Provider</h3>
-                    <div className="grid grid-cols-3 gap-2">
-                        {/* Breez Wallet */}
-                        <button
-                            onClick={() => setWalletMode('breez')}
-                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'breez' ? 'bg-blue-500/20 border-blue-500' : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'}`}
-                        >
-                            <Icons.Zap size={20} className={`mb-1 ${walletMode === 'breez' ? 'text-blue-400' : 'text-slate-400'}`} />
-                            <span className="font-bold text-sm mb-0.5">Breez</span>
-                            <span className="text-[10px] text-center text-slate-400 leading-tight">Lightning</span>
-                        </button>
-                        {/* Cashu Wallet */}
-                        <button
-                            onClick={() => setWalletMode('cashu')}
-                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'cashu' ? 'bg-emerald-500/20 border-emerald-500' : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'}`}
-                        >
-                            <Icons.Cashew size={20} className={`mb-1 ${walletMode === 'cashu' ? 'text-emerald-400' : 'text-slate-400'}`} />
-                            <span className="font-bold text-sm mb-0.5">Cashu</span>
-                            <span className="text-[10px] text-center text-slate-400 leading-tight">eCash</span>
-                        </button>
-                        {/* NWC Wallet */}
-                        <button
-                            onClick={() => {
-                                if (nwcString) setWalletMode('nwc');
-                            }}
-                            disabled={!nwcString}
-                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'nwc'
-                                ? 'bg-purple-500/20 border-purple-500'
-                                : !nwcString
-                                    ? 'bg-slate-800/50 border-slate-700/50 opacity-30 cursor-not-allowed'
-                                    : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'
-                            }`}
-                        >
-                            <Icons.Link size={20} className={`mb-1 ${walletMode === 'nwc' ? 'text-purple-400' : !nwcString ? 'text-slate-600' : 'text-slate-400'}`} />
-                            <span className="font-bold text-sm mb-0.5">NWC</span>
-                            <span className="text-[10px] text-center text-slate-400 leading-tight">{nwcString ? 'Connect' : 'Not Setup'}</span>
-                        </button>
+                    <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Payment setup</h3>
+                    <div className="mb-3 rounded-xl border border-orange-500/20 bg-orange-500/10 p-3">
+                        <p className="text-xs leading-relaxed text-orange-200">{walletModeUx.scorekeepingOnly}</p>
                     </div>
-                    {showNwcError && walletMode === 'nwc' && !nwcString && (
-                        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center animate-in fade-in slide-in-from-top-2">
-                            <Icons.Close className="text-red-500 mr-2" size={16} />
-                            <p className="text-xs text-red-400 font-bold">
-                                Please save a connection or switch to another wallet.
+                    <div className="space-y-3">
+                        {settingsWalletOptions.map(option => {
+                            const isSelected = settingsWalletSection === option.id;
+                            const isPrimary = option.id === 'breez';
+                            const colorClasses = option.id === 'breez'
+                                ? { border: 'border-blue-500', bg: 'bg-blue-500/20', icon: 'text-blue-400' }
+                                : option.id === 'cashu'
+                                    ? { border: 'border-emerald-500', bg: 'bg-emerald-500/20', icon: 'text-emerald-400' }
+                                    : { border: 'border-purple-500', bg: 'bg-purple-500/20', icon: 'text-purple-400' };
+                            const IconComponent = option.id === 'breez' ? Icons.Zap : option.id === 'cashu' ? Icons.Cashew : Icons.Link;
+
+                            return (
+                                <button
+                                    key={option.id}
+                                    onClick={() => {
+                                        setSettingsWalletSection(option.id);
+                                        setShowNwcError(false);
+                                        if (option.id !== 'nwc' || nwcString) {
+                                            setWalletMode(option.id);
+                                        }
+                                    }}
+                                    className={`w-full rounded-xl border p-4 text-left transition-all active:scale-[0.99] ${isSelected ? `${colorClasses.bg} ${colorClasses.border}` : 'bg-slate-800 border-slate-700 hover:border-slate-500'}`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className="shrink-0 rounded-lg bg-black/20 p-2">
+                                            <IconComponent size={20} className={colorClasses.icon} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-bold text-white">{option.label}</span>
+                                                {isPrimary && (
+                                                    <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-300 border border-blue-500/30">
+                                                        Recommended
+                                                    </span>
+                                                )}
+                                                {walletMode === option.id && option.isConfigured && (
+                                                    <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300 border border-emerald-500/20">
+                                                        Active
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="mt-1 text-xs leading-relaxed text-slate-400">{option.description}</p>
+                                            <p className={`mt-2 text-[11px] font-medium ${option.isConfigured ? 'text-emerald-400' : 'text-amber-400'}`}>{option.status}</p>
+                                            {option.id === 'nwc' && !nwcString && (
+                                                <p className="mt-1 text-[11px] font-bold text-purple-300 underline decoration-purple-300/30 underline-offset-2">Tap to paste your NWC connection string below.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {showNwcError && settingsWalletSection === 'nwc' && !nwcString && (
+                        <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center animate-in fade-in slide-in-from-top-2">
+                            <Icons.Close className="text-amber-500 mr-2" size={16} />
+                            <p className="text-xs text-amber-300 font-bold">
+                                Paste and save an NWC connection string below, or choose Breez to keep using the recommended wallet.
                             </p>
                         </div>
                     )}
@@ -1056,7 +1082,7 @@ export const Wallet: React.FC = () => {
                 </div>
 
                 {/* Breez Wallet Settings */}
-                {walletMode === 'breez' && (
+                {settingsWalletSection === 'breez' && (
                     <div className="mb-8 animate-in fade-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Lightning Wallet</h3>
 
@@ -1275,7 +1301,7 @@ export const Wallet: React.FC = () => {
                 )}
 
                 {/* NWC Settings */}
-                {walletMode === 'nwc' && (
+                {settingsWalletSection === 'nwc' && (
                     <div className="mb-8 animate-in fade-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">NWC Connection</h3>
 
@@ -1334,6 +1360,8 @@ export const Wallet: React.FC = () => {
 
                                             // If successful, save to context
                                             setNwcConnection(localNwcString);
+                                            setWalletMode('nwc');
+                                            setSettingsWalletSection('nwc');
                                             // Success UI is handled by re-render with nwcString present
                                         } catch (e) {
                                             alert("Connection Failed: " + (e instanceof Error ? e.message : "Unknown error"));
@@ -1389,7 +1417,7 @@ export const Wallet: React.FC = () => {
                         <FeedbackButton onClick={() => setShowFeedbackModal(true)} />
                     </div>
                 )}
-                {walletMode === 'cashu' && (
+                {settingsWalletSection === 'cashu' && (
                     <div className="animate-in fade-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Manage Mints</h3>
                         <div className="space-y-4 mb-6">
@@ -2053,6 +2081,7 @@ export const Wallet: React.FC = () => {
         // NWC wallet receive view - if not connected, go directly to settings
         if (walletMode === 'nwc' && !nwcString) {
             // Redirect to settings immediately
+            setSettingsWalletSection('nwc');
             setView('settings');
             return null;
         }
@@ -2388,6 +2417,7 @@ export const Wallet: React.FC = () => {
         // NWC wallet send view - if not connected, go directly to settings
         if (walletMode === 'nwc' && !nwcString) {
             // Redirect to settings immediately
+            setSettingsWalletSection('nwc');
             setView('settings');
             return null;
         }
@@ -2895,7 +2925,10 @@ export const Wallet: React.FC = () => {
                         <Icons.Help size={20} />
                     </button>
                     <button
-                        onClick={() => setView('settings')}
+                        onClick={() => {
+                            setSettingsWalletSection(walletMode);
+                            setView('settings');
+                        }}
                         className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                     >
                         <Icons.Settings size={20} />
@@ -2984,16 +3017,23 @@ export const Wallet: React.FC = () => {
                         viewMode={viewMode}
                         isExpanded={isWalletSelectorExpanded}
                         isNwcConnected={!!nwcString}
-                        onModeChange={handleWalletModeChange}
-                        onViewModeChange={setViewMode}
+                        hasBreezWallet={hasBreezWallet}
+                        hasCashuMint={!!activeMint}
                         onExpandToggle={handleExpandToggle}
                         onWalletSelect={handleWalletSelect}
+                        onConfigureWallet={(mode) => {
+                            setSettingsWalletSection(mode);
+                            setView('settings');
+                        }}
                     />
 
                     {/* Status Indicator - Tappable, goes to settings (hidden when viewing "all") */}
                     {viewMode !== 'all' && (
                         <button
-                            onClick={() => setView('settings')}
+                            onClick={() => {
+                                setSettingsWalletSection(walletMode);
+                                setView('settings');
+                            }}
                             className="flex items-center space-x-1.5 bg-black/30 hover:bg-black/50 px-2 py-1 rounded-md border border-white/5 hover:border-white/10 transition-all active:scale-95"
                         >
                             {walletMode === 'breez' && (
