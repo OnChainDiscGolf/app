@@ -2894,7 +2894,7 @@ export const Wallet: React.FC = () => {
     return (
         <div
             ref={scrollContainerRef}
-            className="flex flex-col h-full p-6 pb-24 overflow-y-auto relative"
+            className="flex flex-col h-full p-4 sm:p-6 pb-nav-safe overflow-y-auto overflow-x-hidden relative"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -2950,7 +2950,7 @@ export const Wallet: React.FC = () => {
 
             {/* Wallet Balance Tile - Dual gradient system with shimmer transitions */}
             <div
-                className="rounded-3xl p-6 shadow-xl relative overflow-hidden mb-8 bg-slate-900"
+                className="rounded-3xl p-4 sm:p-6 shadow-xl relative overflow-hidden mb-6 sm:mb-8 bg-slate-900"
                 style={{
                     borderWidth: '1px',
                     borderStyle: 'solid',
@@ -3023,7 +3023,7 @@ export const Wallet: React.FC = () => {
                 )}
 
                 {/* Wallet Mode Switcher */}
-                <div className="relative z-10 flex items-center justify-between mb-4">
+                <div className="relative z-10 flex flex-col gap-3 mb-4 sm:flex-row sm:items-start sm:justify-between">
                     <WalletModeSwitcher
                         activeMode={walletMode}
                         viewMode={viewMode}
@@ -3046,7 +3046,7 @@ export const Wallet: React.FC = () => {
                                 setSettingsWalletSection(walletMode);
                                 setView('settings');
                             }}
-                            className="flex items-center space-x-1.5 bg-black/30 hover:bg-black/50 px-2 py-1 rounded-md border border-white/5 hover:border-white/10 transition-all active:scale-95"
+                            className="self-start flex shrink-0 items-center space-x-1.5 bg-black/30 hover:bg-black/50 px-2 py-1 rounded-md border border-white/5 hover:border-white/10 transition-all active:scale-95"
                         >
                             {walletMode === 'breez' && (
                                 <>
@@ -3096,7 +3096,7 @@ export const Wallet: React.FC = () => {
 
                     {/* "All Wallets" indicator when viewing cumulative balance */}
                     {viewMode === 'all' && (
-                        <div className="flex items-center space-x-1.5 bg-orange-500/10 px-2 py-1 rounded-md border border-orange-500/20">
+                        <div className="self-start flex shrink-0 items-center space-x-1.5 bg-orange-500/10 px-2 py-1 rounded-md border border-orange-500/20">
                             <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
                             <span className="text-[10px] text-orange-400 font-mono">
                                 All Wallets
@@ -3110,7 +3110,7 @@ export const Wallet: React.FC = () => {
                     <button
                         onClick={handleBalanceTap}
                         disabled={isBalanceLoading}
-                        className="flex items-baseline space-x-1 mb-3 cursor-pointer active:scale-95 transition-transform select-none"
+                        className="flex max-w-full flex-wrap items-baseline gap-x-1 mb-3 cursor-pointer active:scale-95 transition-transform select-none"
                     >
                         <div className="relative overflow-hidden">
                             {/* SATS display */}
@@ -3167,79 +3167,38 @@ export const Wallet: React.FC = () => {
                         </button>
                     )}
 
-                    <div className="relative">
-                        <div className="grid grid-cols-2 gap-3">
-                            <button
-                                onClick={() => {
-                                    if (viewMode === 'all') {
-                                        handleAllWalletsSend();
-                                    } else {
-                                        setView('send-input');
-                                    }
-                                }}
-                                className={`flex flex-col items-center justify-center bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl py-2.5 transition-all active:scale-95`}
-                            >
-                                <div className={`p-2 rounded-full mb-1 ${viewMode === 'all'
-                                    ? 'bg-orange-500/20'
-                                    : viewMode === 'breez'
-                                        ? 'bg-blue-500/20'
-                                        : viewMode === 'nwc'
-                                            ? 'bg-purple-500/20'
-                                            : 'bg-emerald-500/20'
-                                    }`}>
-                                    <Icons.Send size={20} className={
-                                        viewMode === 'all'
-                                            ? 'text-orange-400'
-                                            : viewMode === 'breez'
-                                                ? 'text-blue-400'
-                                                : viewMode === 'nwc'
-                                                    ? 'text-purple-400'
-                                                    : 'text-emerald-400'
-                                    } />
-                                </div>
-                                <span className="text-sm font-bold text-white">Send</span>
-                            </button>
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                        <button
+                            onClick={() => {
+                                if (viewMode === 'all') {
+                                    handleAllWalletsSend();
+                                } else {
+                                    setView('send-input');
+                                }
+                            }}
+                            className={`flex min-h-[4.75rem] flex-col items-center justify-center bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl py-3 transition-all active:scale-95`}
+                        >
+                            <div className={`p-2 rounded-full mb-1 ${viewMode === 'all'
+                                ? 'bg-orange-500/20'
+                                : viewMode === 'breez'
+                                    ? 'bg-blue-500/20'
+                                    : viewMode === 'nwc'
+                                        ? 'bg-purple-500/20'
+                                        : 'bg-emerald-500/20'
+                                }`}>
+                                <Icons.Send size={20} className={
+                                    viewMode === 'all'
+                                        ? 'text-orange-400'
+                                        : viewMode === 'breez'
+                                            ? 'text-blue-400'
+                                            : viewMode === 'nwc'
+                                                ? 'text-purple-400'
+                                                : 'text-emerald-400'
+                                } />
+                            </div>
+                            <span className="text-sm font-bold text-white">Send</span>
+                        </button>
 
-                            <button
-                                onClick={() => {
-                                    if (viewMode === 'all') {
-                                        handleAllWalletsReceive();
-                                    } else {
-                                        setView(walletMode === 'nwc' ? 'deposit' : 'receive');
-                                    }
-                                }}
-                                className={`flex flex-col items-center justify-center rounded-xl py-2.5 transition-all active:scale-95 ${viewMode === 'all'
-                                    ? 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 hover:border-orange-500'
-                                    : viewMode === 'breez'
-                                        ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 hover:border-blue-500'
-                                        : viewMode === 'nwc'
-                                            ? 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 hover:border-purple-500'
-                                            : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 hover:border-emerald-500'
-                                    }`}
-                            >
-                                <div className={`p-2 rounded-full mb-1 ${viewMode === 'all'
-                                    ? 'bg-orange-500/20'
-                                    : viewMode === 'breez'
-                                        ? 'bg-blue-500/20'
-                                        : viewMode === 'nwc'
-                                            ? 'bg-purple-500/20'
-                                            : 'bg-emerald-500/20'
-                                    }`}>
-                                    <Icons.Receive size={20} className={
-                                        viewMode === 'all'
-                                            ? 'text-orange-400'
-                                            : viewMode === 'breez'
-                                                ? 'text-blue-400'
-                                                : viewMode === 'nwc'
-                                                    ? 'text-purple-400'
-                                                    : 'text-emerald-400'
-                                    } />
-                                </div>
-                                <span className="text-sm font-bold text-white">Receive</span>
-                            </button>
-                        </div>
-
-                        {/* Quick QR Scan Button - Centered overlay (Frosted Glass) */}
                         <button
                             onClick={() => {
                                 if (viewMode === 'all') {
@@ -3259,8 +3218,8 @@ export const Wallet: React.FC = () => {
                                     setView('send-scan');
                                 }
                             }}
-                            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-95 backdrop-blur-sm border hover:brightness-110 ${viewMode === 'all'
-                                ? 'bg-slate-800/70 border-orange-500/30 hover:border-orange-500/50'
+                            className={`flex min-h-[4.75rem] flex-col items-center justify-center rounded-xl border py-3 transition-all active:scale-95 hover:brightness-110 ${viewMode === 'all'
+                                ? 'bg-slate-800/80 border-orange-500/30 hover:border-orange-500/50'
                                 : viewMode === 'breez'
                                     ? 'bg-blue-900/40 border-blue-500/30 hover:border-blue-500/50'
                                     : viewMode === 'nwc'
@@ -3268,15 +3227,56 @@ export const Wallet: React.FC = () => {
                                         : 'bg-emerald-900/40 border-emerald-500/30 hover:border-emerald-500/50'
                                 }`}
                         >
-                            <Icons.QrCode size={20} className={
-                                viewMode === 'all'
-                                    ? 'text-orange-400'
-                                    : viewMode === 'breez'
-                                        ? 'text-blue-400'
-                                        : viewMode === 'nwc'
-                                            ? 'text-purple-400'
-                                            : 'text-emerald-400'
-                            } />
+                            <div className="mb-1 rounded-full bg-black/20 p-2">
+                                <Icons.QrCode size={20} className={
+                                    viewMode === 'all'
+                                        ? 'text-orange-400'
+                                        : viewMode === 'breez'
+                                            ? 'text-blue-400'
+                                            : viewMode === 'nwc'
+                                                ? 'text-purple-400'
+                                                : 'text-emerald-400'
+                                } />
+                            </div>
+                            <span className="text-sm font-bold text-white">Scan</span>
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                if (viewMode === 'all') {
+                                    handleAllWalletsReceive();
+                                } else {
+                                    setView(walletMode === 'nwc' ? 'deposit' : 'receive');
+                                }
+                            }}
+                            className={`flex min-h-[4.75rem] flex-col items-center justify-center rounded-xl py-3 transition-all active:scale-95 ${viewMode === 'all'
+                                ? 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 hover:border-orange-500'
+                                : viewMode === 'breez'
+                                    ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 hover:border-blue-500'
+                                    : viewMode === 'nwc'
+                                        ? 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 hover:border-purple-500'
+                                        : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 hover:border-emerald-500'
+                                }`}
+                        >
+                            <div className={`p-2 rounded-full mb-1 ${viewMode === 'all'
+                                ? 'bg-orange-500/20'
+                                : viewMode === 'breez'
+                                    ? 'bg-blue-500/20'
+                                    : viewMode === 'nwc'
+                                        ? 'bg-purple-500/20'
+                                        : 'bg-emerald-500/20'
+                                }`}>
+                                <Icons.Receive size={20} className={
+                                    viewMode === 'all'
+                                        ? 'text-orange-400'
+                                        : viewMode === 'breez'
+                                            ? 'text-blue-400'
+                                            : viewMode === 'nwc'
+                                                ? 'text-purple-400'
+                                                : 'text-emerald-400'
+                                } />
+                            </div>
+                            <span className="text-sm font-bold text-white">Receive</span>
                         </button>
                     </div>
                 </div>

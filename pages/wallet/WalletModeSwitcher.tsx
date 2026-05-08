@@ -101,7 +101,7 @@ export const WalletModeSwitcher: React.FC<{
     };
 
     return (
-        <div className="w-full max-w-[340px] rounded-2xl bg-black/30 p-2 border border-white/10 backdrop-blur-sm">
+        <div className="w-full max-w-full rounded-2xl bg-black/30 p-2 border border-white/10 backdrop-blur-sm">
             <button
                 type="button"
                 onClick={onExpandToggle}
@@ -113,7 +113,7 @@ export const WalletModeSwitcher: React.FC<{
                         <Icons.Bitcoin size={24} className={modeColors.all.icon} />
                         <div className="min-w-0">
                             <p className="text-sm font-bold text-white">Wallet overview</p>
-                            <p className="text-xs text-slate-400 truncate">Breez recommended · score without payments anytime</p>
+                            <p className="text-xs leading-snug text-slate-400">Breez recommended · score without payments anytime</p>
                         </div>
                     </div>
                     <Icons.Next

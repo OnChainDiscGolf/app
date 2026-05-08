@@ -21,7 +21,9 @@
 
 /* Global Styles */
 :root {
-  --nav-height: 5rem; /* 80px - matches BottomNav height (h-16 + pt-2 + buffer) */
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --bottom-nav-height: 4.75rem; /* h-16 + pt-2 + border; safe-area added separately */
+  --nav-height: calc(var(--bottom-nav-height) + var(--safe-area-inset-bottom));
   --status-bar-height: env(safe-area-inset-top, 24px); /* iOS safe area or Android status bar fallback */
 }
 
@@ -31,6 +33,7 @@ body,
   height: 100%;
   margin: 0;
   overscroll-behavior-y: none;
+  overflow-x: hidden;
   /* Prevent pull-to-refresh */
 }
 
@@ -672,6 +675,14 @@ body {
 /* Use this class on scrollable containers to ensure content doesn't hide behind nav */
 .nav-safe-bottom {
   padding-bottom: var(--nav-height);
+}
+
+.pb-safe {
+  padding-bottom: calc(max(1.25rem, var(--safe-area-inset-bottom)));
+}
+
+.pb-nav-safe {
+  padding-bottom: calc(var(--bottom-nav-height) + max(1.5rem, var(--safe-area-inset-bottom)));
 }
 
 /* For elements that need to be positioned above the nav (e.g., floating buttons) */

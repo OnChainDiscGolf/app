@@ -135,8 +135,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <div className="max-w-md mx-auto min-h-screen relative bg-brand-dark shadow-2xl overflow-hidden flex flex-col safe-top">
         {/* Offline connectivity banner */}
         <OfflineBanner connectionQuality={connectionQuality} pendingActionCount={pendingActionCount} />
-        {/* Main content area - pb-20 creates space above fixed nav bar */}
-        <div className={`flex-1 flex flex-col relative ${!hideNav ? 'pb-20' : ''}`}>
+        {/* Main content area - keep scrollable pages clear of the fixed nav + gesture area */}
+        <div className={`flex-1 flex flex-col relative min-w-0 ${!hideNav ? 'pb-nav-safe' : ''}`}>
           {children}
         </div>
         {!hideNav && <BottomNav />}
