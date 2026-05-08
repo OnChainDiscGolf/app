@@ -251,11 +251,18 @@ Build still emits the existing large-chunk warning for bundled dependencies, but
 
 ## Issues found / follow-ups
 
-### High: 16 KB page-size compatibility warning on Pixel/API 36
+### High: 16 KB page-size compatibility warning on Pixel/API 36 — fixed in follow-up
 
-The app launches, but Android warns that bundled native libraries are not 16 KB page-size compatible. This should be fixed before broad Android beta/release, especially for modern Pixel devices.
+Follow-up status: fixed for packaged debug APKs by limiting Android native packaging to modern 64-bit ABIs and excluding ML Kit's unused ODML image-processing JNI binary. The app's native QR flow uses the Google Code Scanner path (`BarcodeScanner.scan`), which preserves scanner functionality while removing the 4 KB-aligned image-processing library that triggered the launch warning.
 
-Likely area: native barcode/MLKit/vision dependencies.
+Verification after the fix showed `android/app/build/outputs/apk/debug/app-debug.apk` only contains:
+
+```text
+lib/arm64-v8a/libbarhopper_v3.so
+lib/x86_64/libbarhopper_v3.so
+```
+
+Both packaged `libbarhopper_v3.so` binaries have `LOAD` segment alignment `0x4000`, so no packaged debug native libraries remain below 16 KB alignment.
 
 ### High: Breez real-wallet flow still untested
 

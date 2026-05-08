@@ -16,10 +16,27 @@ android {
         versionCode 2
         versionName "1.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        // Keep packaged native libraries compatible with Android's 16 KB page-size devices.
+        // The Google Code Scanner flow used by the app ships 16 KB-aligned 64-bit
+        // barhopper binaries; older 32-bit variants and ML Kit's unused ODML image
+        // processing JNI library are still 4 KB-aligned and trigger Pixel/API 36
+        // launch warnings when bundled in the APK.
+        ndk {
+            abiFilters 'arm64-v8a', 'x86_64'
+        }
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    packagingOptions {
+        jniLibs {
+            // The app uses the Google Code Scanner module (`BarcodeScanner.scan`) for
+            // native QR scanning, not ML Kit's local image-analysis APIs. Excluding
+            // this unused ODML JNI binary removes the remaining 4 KB-aligned native
+            // library from packaged APKs while preserving the scanner feature.
+            excludes += ['**/libimage_processing_util_jni.so']
         }
     }
     buildTypes {
