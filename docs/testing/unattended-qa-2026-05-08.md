@@ -1,227 +1,316 @@
 # Unattended QA report — 2026-05-08
 
 Branch: `beta/readiness-foundation`  
-Latest tested commit: `1d8ebfb` (`copy: soften funding guide fee and timing claims`)  
 PR: https://github.com/OnChainDiscGolf/app/pull/4
 
 ## Summary
 
-I could not run on the plugged-in Android device because Linux/ADB could not enumerate the USB device. I did complete all safe unattended coverage available from this workstation:
+I completed the unattended QA pass in three layers:
 
-- Verified web/lint/type/test/build gates.
-- Ran Capacitor Android sync successfully.
-- Attempted native Android debug APK assembly and identified the local SDK blocker.
-- Ran browser/PWA smoke testing through onboarding, wallet, funding guide, receive selector, no-entry-fee round creation, solo scorecard, scoring, and profile.
-- Found and fixed one fund-safety copy issue in `components/FundingGuide.tsx`.
+- Browser/PWA smoke test.
+- Native Android debug APK build.
+- Real Pixel 6 device smoke test over wireless ADB.
+
+The no-funds Android path now has real-device coverage through launch, onboarding, wallet view, no-entry-fee round creation, players/QR, payment/start, score entry, and next-hole navigation.
+
+I did **not** move sats or run real Breez send/receive flows. Breez initialization was skipped in this QA build because the Breez API key was not configured.
+
+## Android SDK / build status
+
+Initial blocker: Gradle was pointed at `/usr/lib/android-sdk`, which is a minimal system-owned SDK missing Android platform/build-tools packages.
+
+Resolution:
+
+- Found a full user-writable SDK at `~/Android/Sdk`.
+- Updated `android/local.properties` locally to:
+
+```properties
+sdk.dir=/home/garrett/Android/Sdk
+```
+
+- Rebuilt successfully with that SDK.
+
+Successful native build:
+
+```text
+./gradlew :app:assembleDebug
+```
+
+Debug APK produced:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+No sudo was needed.
 
 ## Physical Android device status
 
-`adb devices -l` returned no attached devices. After restarting ADB, it still returned none.
-
-Kernel USB logs showed repeated enumeration failures:
+USB still failed at Linux enumeration earlier in the session, with errors like:
 
 - `device descriptor read/64, error -32`
 - `device not accepting address ..., error -71`
 - `unable to enumerate USB device`
 
-This means the phone was not visible to ADB at all, not merely unauthorized. Likely causes: charge-only/bad cable, bad hub/port, phone USB mode issue, or a device-side prompt/connection problem.
+However, wireless debugging worked.
 
-## Android SDK / APK build status
-
-Capacitor sync succeeded:
-
-- `npx cap sync android` copied web assets and found 9 Capacitor Android plugins.
-
-Native APK assembly was attempted with `android/local.properties` set to `/usr/lib/android-sdk`, but the installed SDK is incomplete and system-owned:
-
-- `/usr/lib/android-sdk` only has `platform-tools`.
-- Missing `platforms;android-35` and `build-tools;34.0.0`.
-- No `sdkmanager` was available in PATH or under the SDK.
-- SDK root is not writable by the current user.
-
-APK build blocker:
+Discovered device:
 
 ```text
-Failed to install the following Android SDK packages as some licences have not been accepted.
-  build-tools;34.0.0 Android SDK Build-Tools 34
-  platforms;android-35 Android SDK Platform 35
+192.168.1.161:34753  Pixel_6
 ```
+
+ADB connection succeeded over Wi-Fi.
+
+Existing package on phone:
+
+```text
+app.onchain.discgolf
+```
+
+Install attempt for the normal debug APK was blocked by signature mismatch because the phone already had `app.onchain.discgolf` installed with a different signing key. I did **not** uninstall the existing app because that could wipe app data/keys.
+
+For safe side-by-side testing, I temporarily built a QA package with:
+
+```text
+applicationIdSuffix ".debug"
+```
+
+Installed package:
+
+```text
+app.onchain.discgolf.debug
+```
+
+The temporary Gradle change was reverted locally after testing. The real app package was left untouched.
+
+## Real Android smoke coverage
+
+Device: Pixel 6 over wireless ADB
+
+Package tested: `app.onchain.discgolf.debug`
+
+Screenshots/logs: local raw artifacts under `qa-output/android-device/` (ignored by git)
+
+### Launch / first run
+
+Result: app launched successfully; no crash.
+
+Observed:
+
+- Android showed a compatibility warning on launch: native libraries are not 16 KB page-size compatible.
+- Notification permission prompt appeared; I denied notifications for unattended testing.
+- App loaded to the expected onboarding/landing screen.
+
+Important finding:
+
+- The app should be checked for Android 15/16 KB page-size readiness. The warning appears to come from bundled native libraries, likely barcode/MLKit-related.
+
+### Onboarding
+
+Result: passed.
+
+Flow:
+
+- Tapped `Just Keep Score`.
+- App created/used a local profile and landed on Play home.
+- Guided tour appeared and could be skipped.
+
+### Wallet page
+
+Result: passed with warnings.
+
+Observed:
+
+- Wallet screen rendered.
+- Balance showed 0 sats.
+- Beta safety note visible.
+- Funding guide card, Send, and Receive buttons visible.
+- No visible crash/error state in the UI.
+
+Notable logcat warnings:
+
+```text
+Breez SDK not yet initialized, balance pending...
+Breez initialization skipped: API key is missing. Configure the Breez API key, then retry.
+[WalletContext] Breez init returned false
+```
+
+This is expected for a QA build without Breez credentials, but it means real Breez wallet behavior remains untested.
+
+Visual notes:
+
+- Wallet overview subtitle truncates on device.
+- A right-side orange/bordered wallet element appeared partially clipped/overflowing off-screen.
+- Bottom navigation is close to the Android gesture bar.
+
+### Events/location permission state
+
+Result: screen handled denied location state without crash.
+
+Observed:
+
+- Events screen showed: `Location permission denied. Enable it in your browser settings.`
+
+Native-app copy issue:
+
+- “browser settings” is web-specific wording. On Android this should say something like “device settings” or “app settings.”
+
+### No-entry-fee round setup
+
+Result: passed.
+
+Flow:
+
+- Opened Create Round.
+- Entered a QA course name.
+- Selected `No Entry Fee`.
+- Advanced to Players.
+
+Notes:
+
+- ADB text input represented spaces as `%20` in the field during this automated pass. That appears to be an ADB-input artifact, not necessarily an app bug.
+- If `Next` is tapped before a course is entered, the UI still needs clearer validation/disabled-state feedback.
+
+### Players / QR join
+
+Result: passed.
+
+Flow:
+
+- Players screen opened with `Disc Golfer (You)` as host.
+- `Show QR Code for Players` displayed a join QR code.
+- With the QR panel expanded, `Confirm Cardmates` is pushed below the fold; scrolling reveals it.
+- Confirmed cardmates with only the host.
+
+UX note:
+
+- One-player/solo flow works, but a short helper like “Continue solo or invite players” would make this more obvious.
+
+### Payment / Start Round
+
+Result: passed for no-entry-fee round.
+
+Observed:
+
+- Payment screen opened.
+- Player listed correctly.
+- `Start Round` visible.
+- Started round without funds or payment prompts, as expected for `No Entry Fee`.
+
+### Scorecard / scoring / hole navigation
+
+Result: passed.
+
+Flow:
+
+- Scorecard opened on Hole 1.
+- Added score using plus button.
+- Score persisted/displayed as `E (3)`.
+- Used next-hole arrow to navigate to Hole 2.
+- Hole 2 displayed, player persisted, cumulative score state persisted, and Hole 2 input was blank/dash as expected.
+
+Notes:
+
+- Tapping the small Hole 2 number directly was less reliable than using the right-arrow navigation.
+- Active score display starts as a dash, which may be unclear to new users.
+- No course name/round context is visible on the active scorecard surface.
+
+## Browser/PWA smoke coverage
+
+Target: `http://127.0.0.1:5173/` using local Vite dev server.
+
+Result: passed, no JS errors for the tested no-funds path.
+
+Covered:
+
+- Landing page.
+- Score-only onboarding.
+- Wallet page.
+- Funding guide.
+- Receive selector.
+- No-entry-fee round creation.
+- Players/QR.
+- Solo scorecard.
+- Score entry and navigation.
+- Profile page.
 
 ## Verification passed
 
-After the copy fix, these checks passed:
+After the fund-safety copy fix, these checks passed:
 
 - `git diff --check`
 - `npm run lint -- --quiet`
 - `npm run typecheck`
 - `npm run test:run` — 13 files / 121 tests passing
 - `npm run build`
+- `npx cap sync android`
+- `./gradlew :app:assembleDebug` using `~/Android/Sdk`
 
 Build still emits the existing large-chunk warning for bundled dependencies, but completes successfully.
 
-## Browser/PWA smoke coverage
+## Issues found / follow-ups
 
-Target: `http://127.0.0.1:5173/` using local Vite dev server.
+### High: 16 KB page-size compatibility warning on Pixel/API 36
 
-### Landing page
+The app launches, but Android warns that bundled native libraries are not 16 KB page-size compatible. This should be fixed before broad Android beta/release, especially for modern Pixel devices.
 
-Result: passed, no JS errors.
+Likely area: native barcode/MLKit/vision dependencies.
 
-Observed:
+### High: Breez real-wallet flow still untested
 
-- Landing page loaded after brief profile sync.
-- CTAs visible: Get Started, Just Keep Score, I already have an account.
-- Minor visual polish: headline wraps as “On-Chain Disc / Golf” on desktop-sized browser; footer/body copy is low contrast.
+Breez init was skipped because API key/config was missing in the QA build. Real wallet testing still needs:
 
-### Score-only onboarding / home
+- Breez API key configured for Android build.
+- Tiny test funds only.
+- Human approval before any send/spend action.
 
-Result: passed, no JS errors.
+### Medium: Tailwind CDN is loaded in native production bundle
 
-Flow:
+Logcat warning:
 
-- Clicked `Just Keep Score`.
-- App created a local profile and landed on Play home.
-- Guided tour appeared and could be skipped.
+```text
+cdn.tailwindcss.com should not be used in production
+```
 
-Note: tour overlay works but sits close to bottom nav and can feel crowded.
+The app should move Tailwind into the build pipeline rather than loading the CDN at runtime inside WebView.
 
-### Wallet page / B4-B5 UX
+### Medium: wallet overview visual clipping/truncation
 
-Result: passed, no JS errors.
+On real Android, wallet overview copy truncates and a right-side orange card/element appears partially clipped off-screen.
 
-Observed:
+### Medium: Android location denied copy says “browser settings”
 
-- Wallet page shows 0 sats and the beta safety note.
-- Wallet overview copy says Breez recommended and score-without-payments-anytime.
-- Funding card, Send, Receive are visible.
-- Recent Activity empty state appears.
+Native Android copy should say “device settings” or “app settings.”
 
-Notes:
+### Low/Medium: round setup validation clarity
 
-- Wallet overview subtitle can truncate visually in the card, depending on viewport.
-- Receive selector’s distinction between “choose this wallet” and “set default” could be clearer in a future UX pass.
+Clicking Next without a course should show a validation message or render as disabled.
 
-### Funding guide
+### Low/Medium: solo flow clarity
 
-Result: passed after copy fix, no JS errors.
+The one-player flow works, but could better explain that solo rounds are allowed.
 
-Flow:
+### Low: direct hole-number taps less reliable than arrow navigation
 
-- Opened `Fund with Cash App or Strike`.
-- Reviewed Cash App and Strike tabs.
-- Confirmed updated Strike copy appears in browser:
-  - “Strike offers a simple Lightning experience in supported regions.”
-  - “Fees and regional availability may vary.”
-
-Issue found/fixed:
-
-- Prior copy said “under a minute,” “Free Lightning sends,” “lowest fees,” and “0.3% fees.”
-- Fixed in commit `1d8ebfb` to avoid over-promising third-party fee/timing behavior.
-
-### No-entry-fee round creation
-
-Result: passed, no JS errors.
-
-Flow:
-
-- Opened Create Round.
-- Entered course: `Hermes QA Test Course`.
-- Selected `No Entry Fee`.
-- Proceeded to Players.
-- Showed join QR code successfully.
-- Confirmed cardmates with just the host.
-- Started round.
-
-Notes:
-
-- If `Next` is clicked with no course, nothing visibly happens. A visible validation message would improve clarity.
-- One-player flow works, but a helper like “You can continue solo or invite players” would make the solo path clearer.
-
-### Solo scorecard
-
-Result: passed, no JS errors.
-
-Flow:
-
-- Started a no-entry-fee solo round.
-- Added a score on hole 1.
-- Navigated to hole 2.
-- Score state persisted/displayed.
-
-Notes:
-
-- Scorecard is usable.
-- Active score display starts as a dash, which may be unclear to new users.
-- No course name/round context is visible on the active scorecard surface.
-- Lots of empty vertical space on desktop-sized browser; should be checked on real mobile.
-
-### Profile
-
-Result: passed, no JS errors.
-
-Observed:
-
-- Profile loaded.
-- Public key displayed.
-- Private key stayed masked.
-- Edit Profile / Detailed Stats / Log Out controls visible.
-
-## Follow-ups
-
-### Blocker: physical Android device not available to ADB
-
-Severity: High for B2/device wallet smoke test.
-
-The phone did not enumerate at the Linux USB layer, so I could not install/run the APK or collect device logcat/screenshots.
-
-Next action when near the computer:
-
-1. Use a known data-capable USB cable.
-2. Plug directly into the laptop, avoiding the hub if possible.
-3. Unlock phone.
-4. Set USB mode to File Transfer / Android Auto if prompted.
-5. Confirm Developer Options → USB debugging is enabled.
-6. Accept the RSA debugging prompt.
-7. Run `adb devices -l` again.
-
-### Blocker: Android SDK incomplete for native APK build
-
-Severity: Medium/High for unattended Android builds.
-
-Needed setup:
-
-- Install Android SDK command-line tools or Android Studio.
-- Install/accept:
-  - `platforms;android-35`
-  - `build-tools;34.0.0`
-- Ensure `ANDROID_HOME` or `android/local.properties` points at a writable SDK.
-
-### Minor UX: landing/tour visual polish
-
-Severity: Low.
-
-- Landing headline wraps awkwardly on desktop-sized viewport.
-- Tour overlay can feel crowded with bottom nav.
-
-### Minor UX: validation clarity on Round Setup
-
-Severity: Low/Medium.
-
-Clicking Next with an empty course field produced no visible feedback in the browser test. If this is intentional disabled behavior, the button should look disabled or show a validation message.
-
-### Minor UX: wallet selector default semantics
-
-Severity: Low/Medium.
-
-The Receive selector works, but the difference between selecting a wallet for this action and setting it as default could be clearer.
+Next arrow worked reliably. Direct tapping of the small Hole 2 button did not move during this automated pass.
 
 ## Safe testing not performed
 
-Skipped because it requires physical device visibility and/or human approval:
+Skipped because it requires configured credentials and/or human approval:
 
-- Installing APK on Android device.
-- Breez SDK behavior inside Android WebView.
-- Camera/QR permission flow on Android.
+- Breez SDK real init with API key.
+- Real receive invoice generation.
 - External Lightning wallet handoff.
-- Real send/receive with tiny funds.
-- Any action that would spend sats or move real funds.
+- Any send/receive with sats.
+- Any action that would spend or move real funds.
+
+## Cleanup state
+
+- Temporary side-by-side Gradle app-id change was reverted.
+- Existing installed package `app.onchain.discgolf` was not modified.
+- QA package `app.onchain.discgolf.debug` remains installed on the phone for now and can be removed later with:
+
+```bash
+adb -s 192.168.1.161:34753 uninstall app.onchain.discgolf.debug
+```
