@@ -47,6 +47,16 @@ export const Scorecard: React.FC = () => {
 
     const isHost = activeRound?.pubkey === currentUserPubkey;
     const isTournamentCard = activeTournament?.cards?.some(c => c.id === activeRound?.id) ?? false;
+    const roundContextLabel = useMemo(() => {
+        if (!activeRound) return '';
+
+        const courseName = activeRound.courseName?.trim();
+        const roundName = activeRound.name?.trim();
+        if (!courseName) return roundName || '';
+        if (!roundName || roundName === courseName || roundName === `${courseName} Round`) return courseName;
+
+        return `${roundName} • ${courseName}`;
+    }, [activeRound?.courseName, activeRound?.name]);
 
     // Initialize view hole to startingHole if available, else 1
     const [viewHole, setViewHole] = useState(activeRound?.startingHole || 1);
@@ -60,6 +70,7 @@ export const Scorecard: React.FC = () => {
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showInviteQr, setShowInviteQr] = useState(false);
     const [inviteBannerDismissed, setInviteBannerDismissed] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
 
     // Calculate pots based on granular payment selections
     const entryPayers = players.filter(p => p.paysEntry);
@@ -71,6 +82,92 @@ export const Scorecard: React.FC = () => {
     // Check if current user is in an active round as a non-host player
     const currentPlayer = players.find(p => p.isCurrentUser);
     const isNonHostInRound = activeRound && !activeRound.isFinalized && !isHost && currentPlayer;
+
+    // Compute payout preview for the finalization modal
+    const payoutPreview = useMemo(() => {
+        if (!activeRound || (entryPot <= 0 && acePot <= 0)) return null;
+
+        const payoutConfig = activeRound.payoutConfig;
+        const rankedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
+
+        // Entry pot payouts
+        const entryPayouts = entryPot > 0
+            ? calculatePayouts(players, entryPot, payoutConfig)
+            : new Map<string, number>();
+
+        // Detect ace winners: any player who scored 1 on any hole
+        const aceWinners = players.filter(p =>
+            Object.values(p.scores).some(s => s === 1)
+        );
+
+        // Ace pot distribution
+        const acePayouts = new Map<string, number>();
+        let acePotRemainder = acePot;
+        let acePotRedistributionMode: string | null = null;
+
+        if (acePot > 0) {
+            if (aceWinners.length > 0) {
+                const perAceWinner = Math.floor(acePot / aceWinners.length);
+                let distributed = 0;
+                aceWinners.forEach((p, idx) => {
+                    if (idx === aceWinners.length - 1) {
+                        acePayouts.set(p.id, acePot - distributed);
+                    } else {
+                        acePayouts.set(p.id, perAceWinner);
+                        distributed += perAceWinner;
+                    }
+                });
+                acePotRemainder = 0;
+            } else {
+                // No aces hit - apply redistribution rule
+                const redistribution = payoutConfig?.acePotRedistribution || 'add-to-entry-pot';
+                acePotRedistributionMode = redistribution;
+                if (redistribution === 'add-to-entry-pot' && entryPot > 0) {
+                    // Recalculate entry payouts with ace pot added
+                    const combinedPot = entryPot + acePot;
+                    const combined = calculatePayouts(players, combinedPot, payoutConfig);
+                    // Replace entry payouts with combined
+                    combined.forEach((amount, id) => entryPayouts.set(id, amount));
+                    acePotRemainder = 0;
+                } else if (redistribution === 'redistribute-to-participants') {
+                    const acePaying = players.filter(p => p.paysAce);
+                    if (acePaying.length > 0) {
+                        const perPlayer = Math.floor(acePot / acePaying.length);
+                        let distributed = 0;
+                        acePaying.forEach((p, idx) => {
+                            if (idx === acePaying.length - 1) {
+                                acePayouts.set(p.id, acePot - distributed);
+                            } else {
+                                acePayouts.set(p.id, perPlayer);
+                                distributed += perPlayer;
+                            }
+                        });
+                        acePotRemainder = 0;
+                    }
+                }
+                // 'forfeit' mode: acePotRemainder stays, pot rolls over
+            }
+        }
+
+        // Merge total payouts per player
+        const totalPayouts = new Map<string, number>();
+        entryPayouts.forEach((amount, id) => {
+            totalPayouts.set(id, (totalPayouts.get(id) || 0) + amount);
+        });
+        acePayouts.forEach((amount, id) => {
+            totalPayouts.set(id, (totalPayouts.get(id) || 0) + amount);
+        });
+
+        return {
+            rankedPlayers,
+            entryPayouts,
+            acePayouts,
+            aceWinners,
+            acePotRemainder,
+            acePotRedistributionMode,
+            totalPayouts,
+        };
+    }, [players, entryPot, acePot, activeRound?.payoutConfig]);
 
     // Handle "View Current Round" button click
     const handleViewCurrentRound = () => {
@@ -259,8 +356,6 @@ export const Scorecard: React.FC = () => {
         return holes;
     };
 
-    const [isPublishing, setIsPublishing] = useState(false);
-
     const handleNext = async () => {
         const startingHole = activeRound.startingHole || 1;
         const totalHoles = activeRound.holeCount;
@@ -394,91 +489,7 @@ export const Scorecard: React.FC = () => {
         return aTotal.total - bTotal.total;
     });
 
-    // Compute payout preview for the finalization modal
-    const payoutPreview = useMemo(() => {
-        if (entryPot <= 0 && acePot <= 0) return null;
 
-        const payoutConfig = activeRound?.payoutConfig;
-        const rankedPlayers = [...players].sort((a, b) => a.totalScore - b.totalScore);
-
-        // Entry pot payouts
-        const entryPayouts = entryPot > 0
-            ? calculatePayouts(players, entryPot, payoutConfig)
-            : new Map<string, number>();
-
-        // Detect ace winners: any player who scored 1 on any hole
-        const aceWinners = players.filter(p =>
-            Object.values(p.scores).some(s => s === 1)
-        );
-
-        // Ace pot distribution
-        let acePayouts = new Map<string, number>();
-        let acePotRemainder = acePot;
-        let acePotRedistributionMode: string | null = null;
-
-        if (acePot > 0) {
-            if (aceWinners.length > 0) {
-                const perAceWinner = Math.floor(acePot / aceWinners.length);
-                let distributed = 0;
-                aceWinners.forEach((p, idx) => {
-                    if (idx === aceWinners.length - 1) {
-                        acePayouts.set(p.id, acePot - distributed);
-                    } else {
-                        acePayouts.set(p.id, perAceWinner);
-                        distributed += perAceWinner;
-                    }
-                });
-                acePotRemainder = 0;
-            } else {
-                // No aces hit - apply redistribution rule
-                const redistribution = payoutConfig?.acePotRedistribution || 'add-to-entry-pot';
-                acePotRedistributionMode = redistribution;
-                if (redistribution === 'add-to-entry-pot' && entryPot > 0) {
-                    // Recalculate entry payouts with ace pot added
-                    const combinedPot = entryPot + acePot;
-                    const combined = calculatePayouts(players, combinedPot, payoutConfig);
-                    // Replace entry payouts with combined
-                    combined.forEach((amount, id) => entryPayouts.set(id, amount));
-                    acePotRemainder = 0;
-                } else if (redistribution === 'redistribute-to-participants') {
-                    const acePaying = players.filter(p => p.paysAce);
-                    if (acePaying.length > 0) {
-                        const perPlayer = Math.floor(acePot / acePaying.length);
-                        let distributed = 0;
-                        acePaying.forEach((p, idx) => {
-                            if (idx === acePaying.length - 1) {
-                                acePayouts.set(p.id, acePot - distributed);
-                            } else {
-                                acePayouts.set(p.id, perPlayer);
-                                distributed += perPlayer;
-                            }
-                        });
-                        acePotRemainder = 0;
-                    }
-                }
-                // 'forfeit' mode: acePotRemainder stays, pot rolls over
-            }
-        }
-
-        // Merge total payouts per player
-        const totalPayouts = new Map<string, number>();
-        entryPayouts.forEach((amount, id) => {
-            totalPayouts.set(id, (totalPayouts.get(id) || 0) + amount);
-        });
-        acePayouts.forEach((amount, id) => {
-            totalPayouts.set(id, (totalPayouts.get(id) || 0) + amount);
-        });
-
-        return {
-            rankedPlayers,
-            entryPayouts,
-            acePayouts,
-            aceWinners,
-            acePotRemainder,
-            acePotRedistributionMode,
-            totalPayouts,
-        };
-    }, [players, entryPot, acePot, activeRound?.payoutConfig]);
 
     // --- REVIEW UI (Shared for Halfway and Final) ---
     if (showHalfwayReview || showFinalReview) {
@@ -526,8 +537,8 @@ export const Scorecard: React.FC = () => {
                                 <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">
                                     {showHalfwayReview ? 'Halfway Review' : 'Final Review'}
                                 </p>
-                                <h1 className="text-xl font-bold text-white">
-                                    {activeRound.courseName}
+                                <h1 className="text-xl font-bold text-white truncate max-w-[240px]">
+                                    {roundContextLabel || activeRound.courseName}
                                 </h1>
                             </div>
                             <div className={`px-3 py-1.5 rounded-full text-xs font-bold ${isComplete ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
@@ -546,9 +557,11 @@ export const Scorecard: React.FC = () => {
                                 const isMissing = isHoleMissingScore(h);
                                 return (
                                     <button
+                                        type="button"
                                         key={h}
                                         onClick={() => navigateToHole(h)}
-                                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                                        aria-label={`Edit hole ${h}`}
+                                        className={`min-w-11 min-h-11 px-3 rounded-xl text-sm font-bold transition-all touch-manipulation active:scale-95 ${
                                             isMissing 
                                                 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 animate-pulse hover:bg-rose-500/30' 
                                                 : 'bg-slate-700/50 text-slate-300 border border-slate-600/50 hover:bg-slate-600/50 hover:text-white'
@@ -1106,13 +1119,18 @@ export const Scorecard: React.FC = () => {
             <div className="relative z-10 bg-slate-900/80 backdrop-blur-xl border-b border-slate-700/50 px-4 py-2.5">
                 <div className="max-w-md mx-auto flex items-center justify-between">
                     {/* Left: Hole Counter - shows actual hole number and progress */}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col min-w-0">
                         <div className="flex items-baseline space-x-1">
                             <span className="text-2xl font-black text-white">Hole {viewHole}</span>
                         </div>
                         <span className="text-slate-500 text-xs font-medium">
                             {getHolesPlayedCount(viewHole, activeRound.startingHole || 1, activeRound.holeCount)} of {activeRound.holeCount}
                         </span>
+                        {roundContextLabel && (
+                            <span className="text-[11px] text-slate-400 font-medium truncate max-w-[170px]">
+                                {roundContextLabel}
+                            </span>
+                        )}
                     </div>
                     
                     {/* Center: Pots - Matching Payment Screen Style */}
@@ -1220,9 +1238,15 @@ export const Scorecard: React.FC = () => {
                                                     {currentHoleScore === 1 && (
                                                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
                                                     )}
-                                                    <span className={`text-2xl font-black relative z-10 ${currentHoleScore === 1 ? 'text-black' : currentHoleScore ? getScoreColor(currentHoleScore) : 'text-slate-600'}`}>
-                                                        {currentHoleScore || '-'}
-                                                    </span>
+                                                    {currentHoleScore ? (
+                                                        <span className={`text-2xl font-black relative z-10 ${currentHoleScore === 1 ? 'text-black' : getScoreColor(currentHoleScore)}`}>
+                                                            {currentHoleScore}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] font-black uppercase tracking-wide leading-tight text-center text-slate-500 px-1">
+                                                            Tap +/-
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 <button
@@ -1239,9 +1263,15 @@ export const Scorecard: React.FC = () => {
                                             <div className={`w-14 h-14 rounded-xl flex items-center justify-center border-2 ${
                                                 currentHoleScore ? getScoreBg(currentHoleScore, false) : 'bg-slate-800/50 border-slate-700/50'
                                             }`}>
-                                                <span className={`text-2xl font-black ${currentHoleScore ? getScoreColor(currentHoleScore) : 'text-slate-600'}`}>
-                                                    {currentHoleScore || '-'}
-                                                </span>
+                                                {currentHoleScore ? (
+                                                    <span className={`text-2xl font-black ${getScoreColor(currentHoleScore)}`}>
+                                                        {currentHoleScore}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] font-black uppercase tracking-wide leading-tight text-center text-slate-500 px-1">
+                                                        No score
+                                                    </span>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -1276,7 +1306,7 @@ export const Scorecard: React.FC = () => {
                         </button>
 
                         {/* Hole Pills - show holes in play order */}
-                        <div className="flex items-center justify-center gap-1 flex-1 mx-2 overflow-hidden">
+                        <div className="flex items-center justify-center gap-1.5 flex-1 mx-2 overflow-hidden">
                             {(() => {
                                 const startingHole = activeRound.startingHole || 1;
                                 const totalHoles = activeRound.holeCount;
@@ -1287,7 +1317,7 @@ export const Scorecard: React.FC = () => {
                                 
                                 // Show 5 holes centered around current hole
                                 let startIdx = Math.max(0, currentIndex - 2);
-                                let endIdx = Math.min(totalHoles - 1, startIdx + 4);
+                                const endIdx = Math.min(totalHoles - 1, startIdx + 4);
                                 if (endIdx - startIdx < 4) startIdx = Math.max(0, endIdx - 4);
                                 
                                 const visibleHoles = allHolesInOrder.slice(startIdx, endIdx + 1);
@@ -1301,9 +1331,12 @@ export const Scorecard: React.FC = () => {
 
                                     return (
                                         <button
+                                            type="button"
                                             key={h}
                                             onClick={() => setViewHole(h)}
-                                            className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold transition-all shrink-0 ${
+                                            aria-current={isActive ? 'step' : undefined}
+                                            aria-label={`Go to hole ${h}${complete ? ', complete' : ', incomplete'}`}
+                                            className={`min-w-10 h-10 px-2 rounded-xl flex items-center justify-center text-sm font-bold transition-all shrink-0 touch-manipulation active:scale-95 ${
                                                 isActive 
                                                     ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/40 scale-110 ring-2 ring-emerald-400/50' 
                                                     : isPast && !complete 

@@ -271,7 +271,9 @@ export const Profile: React.FC = () => {
             navigator.clipboard.writeText(npub);
             setCopiedKeyType('npub');
             setTimeout(() => setCopiedKeyType(null), 2000);
-        } catch (e) { }
+        } catch (e) {
+            console.warn('Failed to copy npub:', e);
+        }
     };
 
     const getPrivateString = () => {

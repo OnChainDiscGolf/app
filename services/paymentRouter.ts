@@ -555,11 +555,11 @@ export const formatPaymentMethod = (method: PaymentResult['method']): string => 
         case 'breez':
             return 'Lightning (Breez)';
         case 'lnurl':
-            return 'Lightning (Direct)';
+            return 'Lightning (Fallback Wallet)';
         case 'npubcash':
             return 'Lightning (npub.cash)';
         case 'cashu_dm':
-            return 'eCash (DM)';
+            return 'eCash DM (Manual Claim)';
         case 'failed':
             return 'Failed';
         default:

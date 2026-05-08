@@ -35,11 +35,11 @@ let isReconnecting = false;
 let reconnectTimeout: NodeJS.Timeout | null = null;
 
 // Singleton client instances for different gateways
-let gatewayClients: Record<string, NPCClient> = {};
+const gatewayClients: Record<string, NPCClient> = {};
 // Subscription disposers for each gateway
-let gatewaySubscriptions: Record<string, (() => void) | null> = {};
+const gatewaySubscriptions: Record<string, (() => void) | null> = {};
 // Reconnection state per gateway
-let gatewayReconnectState: Record<string, {
+const gatewayReconnectState: Record<string, {
     attempts: number;
     timeout: NodeJS.Timeout | null;
     isReconnecting: boolean;

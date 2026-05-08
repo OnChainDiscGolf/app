@@ -250,24 +250,21 @@ export class WalletService {
      * Create a token to send to another user (eCash transfer)
      */
     async createToken(amount: number): Promise<{ token: string, remaining: Proof[] }> {
-        try {
-            // In cashu-ts v2, send returns { returnChange, send, keep }
-            // We want 'send' (the proofs to send) and 'returnChange' + 'keep' (what we keep)
-            // Actually, wallet.send(amount, proofs) returns { returnChange, send, keep }
-            // We need to construct the token from 'send' proofs.
+        void amount;
+        // In cashu-ts v2, send returns { returnChange, send, keep }
+        // We want 'send' (the proofs to send) and 'returnChange' + 'keep' (what we keep)
+        // Actually, wallet.send(amount, proofs) returns { returnChange, send, keep }
+        // We need to construct the token from 'send' proofs.
 
-            // Get all proofs (we assume the caller manages state, but here we might need to fetch them from the wallet instance if it tracks them, 
-            // but our AppContext tracks them. So we should pass proofs in or load them.)
-            // The current design passes proofs into payInvoice but not here. 
-            // Let's update the signature to accept proofs, or better, rely on the wallet's internal state if we were using it that way.
-            // But AppContext holds the state. So we need to pass proofs.
+        // Get all proofs (we assume the caller manages state, but here we might need to fetch them from the wallet instance if it tracks them,
+        // but our AppContext tracks them. So we should pass proofs in or load them.)
+        // The current design passes proofs into payInvoice but not here.
+        // Let's update the signature to accept proofs, or better, rely on the wallet's internal state if we were using it that way.
+        // But AppContext holds the state. So we need to pass proofs.
 
-            // Wait, the previous implementation of payInvoice took proofs. 
-            // Let's update createToken to take proofs as well.
-            throw new Error("Use createTokenWithProofs instead");
-        } catch (e) {
-            throw e;
-        }
+        // Wait, the previous implementation of payInvoice took proofs.
+        // Let's update createToken to take proofs as well.
+        throw new Error("Use createTokenWithProofs instead");
     }
 
     /**

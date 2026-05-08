@@ -39,7 +39,7 @@ import {
     getLightningAddress,
     registerLightningAddress
 } from '../services/breezService';
-import { BREEZ_API_KEY } from '../constants';
+import { BREEZ_API_KEY, BREEZ_CONFIG_READINESS } from '../constants';
 import { UserProfile } from '../types';
 
 /**
@@ -167,38 +167,41 @@ export const Finalization: React.FC = () => {
                     apiKey: BREEZ_API_KEY,
                     environment: 'production' as const
                 };
-                initializeBreez(identity.mnemonic, breezConfig).then(async (success) => {
-                    if (success) {
-                        console.log('✅ [Finalization] Breez SDK initialized in background');
+                if (BREEZ_CONFIG_READINESS.hasApiKey) {
+                    initializeBreez(identity.mnemonic, breezConfig).then(async (success) => {
+                        if (success) {
+                            console.log('✅ [Finalization] Breez SDK initialized in background');
 
-                        // Try to get or register Lightning address
-                        try {
-                            let lnAddressInfo = await getLightningAddress();
+                            // Try to get or register Lightning address
+                            try {
+                                let lnAddressInfo = await getLightningAddress();
 
-                            if (!lnAddressInfo) {
-                                // Try to register one based on pubkey
-                                lnAddressInfo = await registerLightningAddress(identity.publicKey);
+                                if (!lnAddressInfo) {
+                                    // Try to register one based on pubkey
+                                    lnAddressInfo = await registerLightningAddress(identity.publicKey);
+                                }
+
+                                if (lnAddressInfo) {
+                                    const breezLnAddress = lnAddressInfo.lightningAddress;
+                                    localStorage.setItem('cdg_breez_lightning_address', breezLnAddress);
+                                    console.log(`⚡ [Finalization] Breez Lightning address: ${breezLnAddress}`);
+
+                                    // Optionally update profile with Breez address
+                                    // This would override the npub.cash fallback
+                                    // Uncomment if you want Breez address to be primary:
+                                    // const updatedProfile = { ...fullProfile, lud16: breezLnAddress };
+                                    // await publishProfileWithKey(updatedProfile, identity.privateKey);
+                                }
+                            } catch (e) {
+                                console.warn('⚠️ [Finalization] Lightning address setup deferred:', e);
                             }
-
-                            if (lnAddressInfo) {
-                                const breezLnAddress = lnAddressInfo.lightningAddress;
-                                localStorage.setItem('cdg_breez_lightning_address', breezLnAddress);
-                                console.log(`⚡ [Finalization] Breez Lightning address: ${breezLnAddress}`);
-
-                                // Optionally update profile with Breez address
-                                // This would override the npub.cash fallback
-                                // Uncomment if you want Breez address to be primary:
-                                // const updatedProfile = { ...fullProfile, lud16: breezLnAddress };
-                                // await publishProfileWithKey(updatedProfile, identity.privateKey);
-                            }
-                        } catch (e) {
-                            console.warn('⚠️ [Finalization] Lightning address setup deferred:', e);
                         }
-                    }
-                }).catch((e) => {
-                    console.warn('⚠️ [Finalization] Breez initialization will retry:', e);
-                    // Breez service has infinite retry, so this will eventually succeed
-                });
+                    }).catch((e) => {
+                        console.warn('⚠️ [Finalization] Breez initialization will retry:', e);
+                    });
+                } else {
+                    console.warn(`⚠️ [Finalization] ${BREEZ_CONFIG_READINESS.missingApiKeyMessage}`);
+                }
 
                 // =====================================================
                 // COMPLETE: Update Auth State and Navigate

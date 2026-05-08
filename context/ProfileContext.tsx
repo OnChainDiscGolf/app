@@ -139,7 +139,9 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
               if (holeScore >= 4) hasBogey = true;
             });
             if (!hasBogey && Object.keys(scores).length > 0) bogeyFreeRounds++;
-          } catch (e) { }
+          } catch (e) {
+            console.warn('Failed to parse round history event:', e);
+          }
         });
 
         // Read transactions from localStorage

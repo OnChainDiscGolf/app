@@ -1,3 +1,15 @@
+/* Tailwind CSS 4 entry point. Keep this local so production/native builds never load the Tailwind CDN. */
+@import "tailwindcss";
+
+@theme {
+  --color-brand-dark: #0f172a;
+  --color-brand-primary: #10b981;
+  --color-brand-secondary: #3b82f6;
+  --color-brand-accent: #f59e0b;
+  --color-brand-surface: #1e293b;
+  --animate-pulse-fast: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 /**
  * @file index.css — Global styles for On-Chain Disc Golf.
  *
@@ -9,7 +21,9 @@
 
 /* Global Styles */
 :root {
-  --nav-height: 5rem; /* 80px - matches BottomNav height (h-16 + pt-2 + buffer) */
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --bottom-nav-height: 4.75rem; /* h-16 + pt-2 + border; safe-area added separately */
+  --nav-height: calc(var(--bottom-nav-height) + var(--safe-area-inset-bottom));
   --status-bar-height: env(safe-area-inset-top, 24px); /* iOS safe area or Android status bar fallback */
 }
 
@@ -19,6 +33,7 @@ body,
   height: 100%;
   margin: 0;
   overscroll-behavior-y: none;
+  overflow-x: hidden;
   /* Prevent pull-to-refresh */
 }
 
@@ -660,6 +675,14 @@ body {
 /* Use this class on scrollable containers to ensure content doesn't hide behind nav */
 .nav-safe-bottom {
   padding-bottom: var(--nav-height);
+}
+
+.pb-safe {
+  padding-bottom: calc(max(1.25rem, var(--safe-area-inset-bottom)));
+}
+
+.pb-nav-safe {
+  padding-bottom: calc(var(--bottom-nav-height) + max(1.5rem, var(--safe-area-inset-bottom)));
 }
 
 /* For elements that need to be positioned above the nav (e.g., floating buttons) */

@@ -111,6 +111,9 @@ interface AppContextType extends AppState {
     breez: number;
   };
   refreshAllBalances: () => Promise<void>;
+  breezReady: boolean;
+  breezInitError: string | null;
+  retryBreezInit: () => void;
 
   // Payment Notification
   paymentNotification: {
@@ -461,7 +464,7 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
           await wallet.receiveEcash(token);
           console.log("✅ Token reclaimed successfully after DM failure");
         } catch (reclaimErr) {
-          console.error("❌ CRITICAL: Failed to reclaim token after DM failure. Token:", token, reclaimErr);
+          console.error("❌ CRITICAL: Failed to reclaim entry fee token after DM failure", reclaimErr);
           alert(
             `Entry fee payment failed and automatic recovery failed. ` +
             `Your ${fee} sat token may still be claimable. ` +
@@ -1086,6 +1089,9 @@ const AppComposition: React.FC<{ children: React.ReactNode }> = ({ children }) =
     mints: wallet.mints,
     proofs: wallet.proofs,
     walletBalances: wallet.walletBalances,
+    breezReady: wallet.breezReady,
+    breezInitError: wallet.breezInitError,
+    retryBreezInit: wallet.retryBreezInit,
     paymentNotification: wallet.paymentNotification,
     setPaymentNotification: wallet.setPaymentNotification,
     lightningStrike: wallet.lightningStrike,

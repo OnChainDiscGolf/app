@@ -40,5 +40,6 @@ Thumbs.db
 
 # Testing
 coverage
+qa-output/
 .vercel
 .env*.local

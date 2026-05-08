@@ -22,6 +22,7 @@ import { Button } from '../../components/Button';
 import { JoinQrCode } from '../../components/JoinQrCode';
 import { buildRoundJoinUrl } from '../../utils/qrUrls';
 import { HomeSelectPlayersViewProps } from './homeTypes';
+import { getCardmateFlowHelperText } from './roundSetupCopy';
 
 /**
  * Player selection view -- step 2 of the round creation wizard.
@@ -78,6 +79,7 @@ export const HomeSelectPlayersView: React.FC<HomeSelectPlayersViewProps> = ({
     handlePayToSkip,
 }) => {
     const [showRoundQr, setShowRoundQr] = useState(false);
+    const cardmateHelperText = getCardmateFlowHelperText(selectedCardmates.length);
 
     return (
         <div className="flex flex-col h-full p-6 pb-24">
@@ -132,7 +134,7 @@ export const HomeSelectPlayersView: React.FC<HomeSelectPlayersViewProps> = ({
 
             {/* Current Card Section */}
             <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-black/90 rounded-2xl p-4 border border-white/10 backdrop-blur-sm mb-3">
-                <div className="flex items-center space-x-2 mb-3">
+                <div className="flex items-center space-x-2 mb-1.5">
                     <div className="w-6 h-6 bg-blue-500/15 rounded-lg flex items-center justify-center">
                         <Icons.Users size={12} className="text-blue-400/80" />
                     </div>
@@ -140,6 +142,9 @@ export const HomeSelectPlayersView: React.FC<HomeSelectPlayersViewProps> = ({
                         Current Card ({selectedCardmates.length + 1})
                     </h3>
                 </div>
+                <p className="mb-3 text-xs text-slate-400 leading-relaxed">
+                    {cardmateHelperText}
+                </p>
                 <div className="space-y-2 max-h-[150px] overflow-y-auto no-scrollbar">
                     {/* Host Player */}
                     <div className="flex items-center justify-between bg-black/30 p-3 rounded-xl border border-white/10">

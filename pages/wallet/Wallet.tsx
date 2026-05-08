@@ -46,7 +46,6 @@ import { getBtcPrice, satsToUsd } from '../../services/priceService';
 import { generateMnemonic, storeMnemonicEncrypted, retrieveMnemonicEncrypted, hasStoredMnemonic, hasUnifiedSeed } from '../../services/mnemonicService';
 import { downloadWalletCardPDF } from '../../services/backupService';
 import {
-    isBreezInitialized,
     getSparkAddress,
     createInvoice as createBreezInvoice,
     createOnchainAddress,
@@ -62,6 +61,7 @@ import {
 import { SuccessOverlay, ProcessingOverlay } from './WalletOverlays';
 import { HelpModal, WalletHelpModal } from './WalletHelpModals';
 import { WalletModeSwitcher } from './WalletModeSwitcher';
+import { getWalletModeUxOptions, type WalletModeId } from './walletModeUx';
 import { WALLET_COLORS, WALLET_ORDER, getLeftGlowColor } from './walletConstants';
 
 /**
@@ -69,7 +69,7 @@ import { WALLET_COLORS, WALLET_ORDER, getLeftGlowColor } from './walletConstants
  * send/receive flows, transaction history, and wallet configuration.
  */
 export const Wallet: React.FC = () => {
-    const { walletBalance, isBalanceLoading, transactions, userProfile, currentUserPubkey, mints, setActiveMint, addMint, removeMint, sendFunds, receiveEcash, depositFunds, checkDepositStatus, confirmDeposit, getLightningQuote, isAuthenticated, refreshWalletBalance, walletMode, nwcString, setWalletMode, setNwcConnection, checkForPayments, walletBalances, refreshAllBalances, authSource, authMethod } = useApp();
+    const { walletBalance, isBalanceLoading, transactions, userProfile, currentUserPubkey, mints, setActiveMint, addMint, removeMint, sendFunds, receiveEcash, depositFunds, checkDepositStatus, confirmDeposit, getLightningQuote, isAuthenticated, refreshWalletBalance, walletMode, nwcString, setWalletMode, setNwcConnection, checkForPayments, walletBalances, refreshAllBalances, authSource, authMethod, breezReady, breezInitError, retryBreezInit } = useApp();
     const navigate = useNavigate();
 
     // Breez Wallet Creation State (for non-mnemonic users)
@@ -210,7 +210,7 @@ export const Wallet: React.FC = () => {
 
     // Fetch Breez addresses when SDK initializes or wallet mode changes
     useEffect(() => {
-        if (walletMode === 'breez' && isBreezInitialized()) {
+        if (walletMode === 'breez' && breezReady) {
             getSparkAddress().then(addr => setBreezSparkAddress(addr));
             getBreezLightningAddress().then(info => {
                 if (info) setBreezLnAddress(info.lightningAddress);
@@ -459,6 +459,7 @@ export const Wallet: React.FC = () => {
     // Handle wallet mode change with directional transition
     const handleWalletModeChange = (newMode: 'breez' | 'cashu' | 'nwc') => {
         if (newMode === walletMode) return;
+        if (newMode === 'nwc' && !nwcString) return;
 
         // Determine transition direction based on wallet order
         const currentIndex = WALLET_ORDER.indexOf(walletMode);
@@ -564,6 +565,7 @@ export const Wallet: React.FC = () => {
     const [newMintUrl, setNewMintUrl] = useState('');
     const [newMintName, setNewMintName] = useState('');
     const [localNwcString, setLocalNwcString] = useState(nwcString);
+    const [settingsWalletSection, setSettingsWalletSection] = useState<WalletModeId>(walletMode);
     const [showNwcError, setShowNwcError] = useState(false);
     const [isWiggling, setIsWiggling] = useState(false);
     const [helpModal, setHelpModal] = useState<{ isOpen: boolean, title: string, text: string } | null>(null);
@@ -577,7 +579,27 @@ export const Wallet: React.FC = () => {
 
     const safeMints = Array.isArray(mints) ? mints : [];
     const activeMint = safeMints.find(m => m.isActive) || safeMints[0];
-    const receiveAddress = userProfile.lud16 || getMagicLightningAddress(currentUserPubkey);
+    const walletModeUx = getWalletModeUxOptions({
+        hasBreezWallet,
+        hasCashuMint: !!activeMint,
+        isNwcConnected: !!nwcString,
+    });
+    const getTransactionStatusCopy = (status?: 'pending' | 'complete' | 'failed') => {
+        switch (status) {
+            case 'pending':
+                return { label: 'Pending', className: 'bg-amber-500/10 text-amber-300 border-amber-500/30' };
+            case 'failed':
+                return { label: 'Failed', className: 'bg-red-500/10 text-red-300 border-red-500/30' };
+            case 'complete':
+                return { label: 'Complete', className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' };
+            default:
+                return null;
+        }
+    };
+    const settingsWalletOptions = [walletModeUx.primary, ...walletModeUx.advanced];
+    const receiveAddress = walletMode === 'cashu'
+        ? getMagicLightningAddress(currentUserPubkey)
+        : (userProfile.lud16 || getMagicLightningAddress(currentUserPubkey));
 
     // Reset state when entering main view and verify balance
     useEffect(() => {
@@ -710,7 +732,6 @@ export const Wallet: React.FC = () => {
         if (!file) return;
 
         try {
-            // @ts-ignore
             const jsQRModule = await import('jsqr');
             const jsQR = jsQRModule.default;
 
@@ -959,41 +980,67 @@ export const Wallet: React.FC = () => {
 
                 {/* Wallet Mode Selection */}
                 <div className="mb-8">
-                    <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Active Wallet Provider</h3>
-                    <div className="grid grid-cols-3 gap-2">
-                        {/* Breez Wallet */}
-                        <button
-                            onClick={() => setWalletMode('breez')}
-                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'breez' ? 'bg-blue-500/20 border-blue-500' : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'}`}
-                        >
-                            <Icons.Zap size={20} className={`mb-1 ${walletMode === 'breez' ? 'text-blue-400' : 'text-slate-400'}`} />
-                            <span className="font-bold text-sm mb-0.5">Breez</span>
-                            <span className="text-[10px] text-center text-slate-400 leading-tight">Lightning</span>
-                        </button>
-                        {/* Cashu Wallet */}
-                        <button
-                            onClick={() => setWalletMode('cashu')}
-                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'cashu' ? 'bg-emerald-500/20 border-emerald-500' : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'}`}
-                        >
-                            <Icons.Cashew size={20} className={`mb-1 ${walletMode === 'cashu' ? 'text-emerald-400' : 'text-slate-400'}`} />
-                            <span className="font-bold text-sm mb-0.5">Cashu</span>
-                            <span className="text-[10px] text-center text-slate-400 leading-tight">eCash</span>
-                        </button>
-                        {/* NWC Wallet */}
-                        <button
-                            onClick={() => setWalletMode('nwc')}
-                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${walletMode === 'nwc' ? 'bg-purple-500/20 border-purple-500' : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-80'}`}
-                        >
-                            <Icons.Link size={20} className={`mb-1 ${walletMode === 'nwc' ? 'text-purple-400' : 'text-slate-400'}`} />
-                            <span className="font-bold text-sm mb-0.5">NWC</span>
-                            <span className="text-[10px] text-center text-slate-400 leading-tight">Connect</span>
-                        </button>
+                    <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Payment setup</h3>
+                    <div className="mb-3 rounded-xl border border-orange-500/20 bg-orange-500/10 p-3">
+                        <p className="text-xs leading-relaxed text-orange-200">{walletModeUx.scorekeepingOnly}</p>
                     </div>
-                    {showNwcError && walletMode === 'nwc' && !nwcString && (
-                        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center animate-in fade-in slide-in-from-top-2">
-                            <Icons.Close className="text-red-500 mr-2" size={16} />
-                            <p className="text-xs text-red-400 font-bold">
-                                Please save a connection or switch to another wallet.
+                    <div className="space-y-3">
+                        {settingsWalletOptions.map(option => {
+                            const isSelected = settingsWalletSection === option.id;
+                            const isPrimary = option.id === 'breez';
+                            const colorClasses = option.id === 'breez'
+                                ? { border: 'border-blue-500', bg: 'bg-blue-500/20', icon: 'text-blue-400' }
+                                : option.id === 'cashu'
+                                    ? { border: 'border-emerald-500', bg: 'bg-emerald-500/20', icon: 'text-emerald-400' }
+                                    : { border: 'border-purple-500', bg: 'bg-purple-500/20', icon: 'text-purple-400' };
+                            const IconComponent = option.id === 'breez' ? Icons.Zap : option.id === 'cashu' ? Icons.Cashew : Icons.Link;
+
+                            return (
+                                <button
+                                    key={option.id}
+                                    onClick={() => {
+                                        setSettingsWalletSection(option.id);
+                                        setShowNwcError(false);
+                                        if (option.id !== 'nwc' || nwcString) {
+                                            setWalletMode(option.id);
+                                        }
+                                    }}
+                                    className={`w-full rounded-xl border p-4 text-left transition-all active:scale-[0.99] ${isSelected ? `${colorClasses.bg} ${colorClasses.border}` : 'bg-slate-800 border-slate-700 hover:border-slate-500'}`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className="shrink-0 rounded-lg bg-black/20 p-2">
+                                            <IconComponent size={20} className={colorClasses.icon} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-bold text-white">{option.label}</span>
+                                                {isPrimary && (
+                                                    <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-300 border border-blue-500/30">
+                                                        Recommended
+                                                    </span>
+                                                )}
+                                                {walletMode === option.id && option.isConfigured && (
+                                                    <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300 border border-emerald-500/20">
+                                                        Active
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="mt-1 text-xs leading-relaxed text-slate-400">{option.description}</p>
+                                            <p className={`mt-2 text-[11px] font-medium ${option.isConfigured ? 'text-emerald-400' : 'text-amber-400'}`}>{option.status}</p>
+                                            {option.id === 'nwc' && !nwcString && (
+                                                <p className="mt-1 text-[11px] font-bold text-purple-300 underline decoration-purple-300/30 underline-offset-2">Tap to paste your NWC connection string below.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {showNwcError && settingsWalletSection === 'nwc' && !nwcString && (
+                        <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center animate-in fade-in slide-in-from-top-2">
+                            <Icons.Close className="text-amber-500 mr-2" size={16} />
+                            <p className="text-xs text-amber-300 font-bold">
+                                Paste and save an NWC connection string below, or choose Breez to keep using the recommended wallet.
                             </p>
                         </div>
                     )}
@@ -1002,7 +1049,7 @@ export const Wallet: React.FC = () => {
                 {/* Quick Scan Default Wallet */}
                 <div className="mb-8">
                     <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Quick Scan Default</h3>
-                    <p className="text-xs text-slate-500 mb-3">Choose which wallet to use when tapping the QR scan button</p>
+                    <p className="text-xs text-slate-500 mb-3">Auto uses funded Breez first; pick Cashu or NWC here for an explicit fallback.</p>
                     <div className="grid grid-cols-3 gap-2">
                         {/* Breez */}
                         <button
@@ -1047,7 +1094,7 @@ export const Wallet: React.FC = () => {
                 </div>
 
                 {/* Breez Wallet Settings */}
-                {walletMode === 'breez' && (
+                {settingsWalletSection === 'breez' && (
                     <div className="mb-8 animate-in fade-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Lightning Wallet</h3>
 
@@ -1136,7 +1183,7 @@ export const Wallet: React.FC = () => {
 
                                         <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700">
                                             <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Wallet Status</label>
-                                            {isBreezInitialized() ? (
+                                            {breezReady ? (
                                                 <div className="flex items-center space-x-2">
                                                     <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                                                     <p className="text-sm text-emerald-400">Connected</p>
@@ -1266,7 +1313,7 @@ export const Wallet: React.FC = () => {
                 )}
 
                 {/* NWC Settings */}
-                {walletMode === 'nwc' && (
+                {settingsWalletSection === 'nwc' && (
                     <div className="mb-8 animate-in fade-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">NWC Connection</h3>
 
@@ -1325,6 +1372,8 @@ export const Wallet: React.FC = () => {
 
                                             // If successful, save to context
                                             setNwcConnection(localNwcString);
+                                            setWalletMode('nwc');
+                                            setSettingsWalletSection('nwc');
                                             // Success UI is handled by re-render with nwcString present
                                         } catch (e) {
                                             alert("Connection Failed: " + (e instanceof Error ? e.message : "Unknown error"));
@@ -1380,7 +1429,7 @@ export const Wallet: React.FC = () => {
                         <FeedbackButton onClick={() => setShowFeedbackModal(true)} />
                     </div>
                 )}
-                {walletMode === 'cashu' && (
+                {settingsWalletSection === 'cashu' && (
                     <div className="animate-in fade-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Manage Mints</h3>
                         <div className="space-y-4 mb-6">
@@ -1629,7 +1678,7 @@ export const Wallet: React.FC = () => {
             // Breez wallet receive - show Spark address or invoice generation
             // Note: State hooks are declared at component top level to satisfy React rules
 
-            if (!isBreezInitialized()) {
+            if (!breezReady) {
                 return (
                     <div className="p-6 h-full flex flex-col items-center text-center">
                         <div className="w-full flex justify-start mb-6">
@@ -1639,22 +1688,33 @@ export const Wallet: React.FC = () => {
                         </div>
 
                         <div className="flex-1 flex flex-col items-center justify-center max-w-xs">
-                            <div className="w-24 h-24 rounded-full bg-blue-500/20 flex items-center justify-center mb-6 animate-pulse">
-                                <Icons.Zap size={48} className="text-blue-400" />
+                            <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 ${breezInitError ? 'bg-red-500/20' : 'bg-blue-500/20 animate-pulse'}`}>
+                                <Icons.Zap size={48} className={breezInitError ? 'text-red-400' : 'text-blue-400'} />
                             </div>
 
-                            <h2 className="text-2xl font-bold text-white mb-3">Initializing...</h2>
+                            <h2 className="text-2xl font-bold text-white mb-3">
+                                {breezInitError ? 'Connection Failed' : 'Initializing...'}
+                            </h2>
                             <p className="text-slate-400 text-sm mb-6">
-                                Your Lightning wallet is starting up. This may take a moment.
+                                {breezInitError || 'Your Lightning wallet is starting up. This may take a moment.'}
                             </p>
 
-                            <div className="w-full bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-                                <div className="flex items-center justify-center space-x-2">
-                                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            {breezInitError ? (
+                                <button
+                                    onClick={() => retryBreezInit()}
+                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors"
+                                >
+                                    Retry
+                                </button>
+                            ) : (
+                                <div className="w-full bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                                    <div className="flex items-center justify-center space-x-2">
+                                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 );
@@ -2033,6 +2093,7 @@ export const Wallet: React.FC = () => {
         // NWC wallet receive view - if not connected, go directly to settings
         if (walletMode === 'nwc' && !nwcString) {
             // Redirect to settings immediately
+            setSettingsWalletSection('nwc');
             setView('settings');
             return null;
         }
@@ -2329,7 +2390,7 @@ export const Wallet: React.FC = () => {
             // Breez send view - parse and pay invoices/addresses
             // Note: State hooks are declared at component top level to satisfy React rules
 
-            if (!isBreezInitialized()) {
+            if (!breezReady) {
                 return (
                     <div className="p-6 h-full flex flex-col items-center text-center">
                         <div className="w-full flex justify-start mb-6">
@@ -2339,14 +2400,25 @@ export const Wallet: React.FC = () => {
                         </div>
 
                         <div className="flex-1 flex flex-col items-center justify-center max-w-xs">
-                            <div className="w-24 h-24 rounded-full bg-blue-500/20 flex items-center justify-center mb-6 animate-pulse">
-                                <Icons.Zap size={48} className="text-blue-400" />
+                            <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 ${breezInitError ? 'bg-red-500/20' : 'bg-blue-500/20 animate-pulse'}`}>
+                                <Icons.Zap size={48} className={breezInitError ? 'text-red-400' : 'text-blue-400'} />
                             </div>
 
-                            <h2 className="text-2xl font-bold text-white mb-3">Initializing...</h2>
+                            <h2 className="text-2xl font-bold text-white mb-3">
+                                {breezInitError ? 'Connection Failed' : 'Initializing...'}
+                            </h2>
                             <p className="text-slate-400 text-sm mb-6">
-                                Your Lightning wallet is starting up. This may take a moment.
+                                {breezInitError || 'Your Lightning wallet is starting up. This may take a moment.'}
                             </p>
+
+                            {breezInitError && (
+                                <button
+                                    onClick={() => retryBreezInit()}
+                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors"
+                                >
+                                    Retry
+                                </button>
+                            )}
                         </div>
                     </div>
                 );
@@ -2357,6 +2429,7 @@ export const Wallet: React.FC = () => {
         // NWC wallet send view - if not connected, go directly to settings
         if (walletMode === 'nwc' && !nwcString) {
             // Redirect to settings immediately
+            setSettingsWalletSection('nwc');
             setView('settings');
             return null;
         }
@@ -2526,7 +2599,6 @@ export const Wallet: React.FC = () => {
                                             setSendInput(contact.lud16);
                                         } else {
                                             // Use magic lightning address
-                                            const { getMagicLightningAddress } = require('../../services/nostrService');
                                             setSendInput(getMagicLightningAddress(contact.pubkey));
                                         }
                                         setView('send-details');
@@ -2822,7 +2894,7 @@ export const Wallet: React.FC = () => {
     return (
         <div
             ref={scrollContainerRef}
-            className="flex flex-col h-full p-6 pb-24 overflow-y-auto relative"
+            className="flex flex-col h-full p-4 sm:p-6 pb-nav-safe overflow-y-auto overflow-x-hidden relative"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -2865,7 +2937,10 @@ export const Wallet: React.FC = () => {
                         <Icons.Help size={20} />
                     </button>
                     <button
-                        onClick={() => setView('settings')}
+                        onClick={() => {
+                            setSettingsWalletSection(walletMode);
+                            setView('settings');
+                        }}
                         className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                     >
                         <Icons.Settings size={20} />
@@ -2875,7 +2950,7 @@ export const Wallet: React.FC = () => {
 
             {/* Wallet Balance Tile - Dual gradient system with shimmer transitions */}
             <div
-                className="rounded-3xl p-6 shadow-xl relative overflow-hidden mb-8 bg-slate-900"
+                className="rounded-3xl p-4 sm:p-6 shadow-xl relative overflow-hidden mb-6 sm:mb-8 bg-slate-900"
                 style={{
                     borderWidth: '1px',
                     borderStyle: 'solid',
@@ -2948,22 +3023,30 @@ export const Wallet: React.FC = () => {
                 )}
 
                 {/* Wallet Mode Switcher */}
-                <div className="relative z-10 flex items-center justify-between mb-4">
+                <div className="relative z-10 flex flex-col gap-3 mb-4 sm:flex-row sm:items-start sm:justify-between">
                     <WalletModeSwitcher
                         activeMode={walletMode}
                         viewMode={viewMode}
                         isExpanded={isWalletSelectorExpanded}
-                        onModeChange={handleWalletModeChange}
-                        onViewModeChange={setViewMode}
+                        isNwcConnected={!!nwcString}
+                        hasBreezWallet={hasBreezWallet}
+                        hasCashuMint={!!activeMint}
                         onExpandToggle={handleExpandToggle}
                         onWalletSelect={handleWalletSelect}
+                        onConfigureWallet={(mode) => {
+                            setSettingsWalletSection(mode);
+                            setView('settings');
+                        }}
                     />
 
                     {/* Status Indicator - Tappable, goes to settings (hidden when viewing "all") */}
                     {viewMode !== 'all' && (
                         <button
-                            onClick={() => setView('settings')}
-                            className="flex items-center space-x-1.5 bg-black/30 hover:bg-black/50 px-2 py-1 rounded-md border border-white/5 hover:border-white/10 transition-all active:scale-95"
+                            onClick={() => {
+                                setSettingsWalletSection(walletMode);
+                                setView('settings');
+                            }}
+                            className="self-start flex shrink-0 items-center space-x-1.5 bg-black/30 hover:bg-black/50 px-2 py-1 rounded-md border border-white/5 hover:border-white/10 transition-all active:scale-95"
                         >
                             {walletMode === 'breez' && (
                                 <>
@@ -3013,7 +3096,7 @@ export const Wallet: React.FC = () => {
 
                     {/* "All Wallets" indicator when viewing cumulative balance */}
                     {viewMode === 'all' && (
-                        <div className="flex items-center space-x-1.5 bg-orange-500/10 px-2 py-1 rounded-md border border-orange-500/20">
+                        <div className="self-start flex shrink-0 items-center space-x-1.5 bg-orange-500/10 px-2 py-1 rounded-md border border-orange-500/20">
                             <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
                             <span className="text-[10px] text-orange-400 font-mono">
                                 All Wallets
@@ -3027,7 +3110,7 @@ export const Wallet: React.FC = () => {
                     <button
                         onClick={handleBalanceTap}
                         disabled={isBalanceLoading}
-                        className="flex items-baseline space-x-1 mb-3 cursor-pointer active:scale-95 transition-transform select-none"
+                        className="flex max-w-full flex-wrap items-baseline gap-x-1 mb-3 cursor-pointer active:scale-95 transition-transform select-none"
                     >
                         <div className="relative overflow-hidden">
                             {/* SATS display */}
@@ -3084,79 +3167,38 @@ export const Wallet: React.FC = () => {
                         </button>
                     )}
 
-                    <div className="relative">
-                        <div className="grid grid-cols-2 gap-3">
-                            <button
-                                onClick={() => {
-                                    if (viewMode === 'all') {
-                                        handleAllWalletsSend();
-                                    } else {
-                                        setView('send-input');
-                                    }
-                                }}
-                                className={`flex flex-col items-center justify-center bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl py-2.5 transition-all active:scale-95`}
-                            >
-                                <div className={`p-2 rounded-full mb-1 ${viewMode === 'all'
-                                    ? 'bg-orange-500/20'
-                                    : viewMode === 'breez'
-                                        ? 'bg-blue-500/20'
-                                        : viewMode === 'nwc'
-                                            ? 'bg-purple-500/20'
-                                            : 'bg-emerald-500/20'
-                                    }`}>
-                                    <Icons.Send size={20} className={
-                                        viewMode === 'all'
-                                            ? 'text-orange-400'
-                                            : viewMode === 'breez'
-                                                ? 'text-blue-400'
-                                                : viewMode === 'nwc'
-                                                    ? 'text-purple-400'
-                                                    : 'text-emerald-400'
-                                    } />
-                                </div>
-                                <span className="text-sm font-bold text-white">Send</span>
-                            </button>
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                        <button
+                            onClick={() => {
+                                if (viewMode === 'all') {
+                                    handleAllWalletsSend();
+                                } else {
+                                    setView('send-input');
+                                }
+                            }}
+                            className={`flex min-h-[4.75rem] flex-col items-center justify-center bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl py-3 transition-all active:scale-95`}
+                        >
+                            <div className={`p-2 rounded-full mb-1 ${viewMode === 'all'
+                                ? 'bg-orange-500/20'
+                                : viewMode === 'breez'
+                                    ? 'bg-blue-500/20'
+                                    : viewMode === 'nwc'
+                                        ? 'bg-purple-500/20'
+                                        : 'bg-emerald-500/20'
+                                }`}>
+                                <Icons.Send size={20} className={
+                                    viewMode === 'all'
+                                        ? 'text-orange-400'
+                                        : viewMode === 'breez'
+                                            ? 'text-blue-400'
+                                            : viewMode === 'nwc'
+                                                ? 'text-purple-400'
+                                                : 'text-emerald-400'
+                                } />
+                            </div>
+                            <span className="text-sm font-bold text-white">Send</span>
+                        </button>
 
-                            <button
-                                onClick={() => {
-                                    if (viewMode === 'all') {
-                                        handleAllWalletsReceive();
-                                    } else {
-                                        walletMode === 'nwc' ? setView('deposit') : setView('receive');
-                                    }
-                                }}
-                                className={`flex flex-col items-center justify-center rounded-xl py-2.5 transition-all active:scale-95 ${viewMode === 'all'
-                                    ? 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 hover:border-orange-500'
-                                    : viewMode === 'breez'
-                                        ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 hover:border-blue-500'
-                                        : viewMode === 'nwc'
-                                            ? 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 hover:border-purple-500'
-                                            : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 hover:border-emerald-500'
-                                    }`}
-                            >
-                                <div className={`p-2 rounded-full mb-1 ${viewMode === 'all'
-                                    ? 'bg-orange-500/20'
-                                    : viewMode === 'breez'
-                                        ? 'bg-blue-500/20'
-                                        : viewMode === 'nwc'
-                                            ? 'bg-purple-500/20'
-                                            : 'bg-emerald-500/20'
-                                    }`}>
-                                    <Icons.Receive size={20} className={
-                                        viewMode === 'all'
-                                            ? 'text-orange-400'
-                                            : viewMode === 'breez'
-                                                ? 'text-blue-400'
-                                                : viewMode === 'nwc'
-                                                    ? 'text-purple-400'
-                                                    : 'text-emerald-400'
-                                    } />
-                                </div>
-                                <span className="text-sm font-bold text-white">Receive</span>
-                            </button>
-                        </div>
-
-                        {/* Quick QR Scan Button - Centered overlay (Frosted Glass) */}
                         <button
                             onClick={() => {
                                 if (viewMode === 'all') {
@@ -3176,8 +3218,8 @@ export const Wallet: React.FC = () => {
                                     setView('send-scan');
                                 }
                             }}
-                            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-95 backdrop-blur-sm border hover:brightness-110 ${viewMode === 'all'
-                                ? 'bg-slate-800/70 border-orange-500/30 hover:border-orange-500/50'
+                            className={`flex min-h-[4.75rem] flex-col items-center justify-center rounded-xl border py-3 transition-all active:scale-95 hover:brightness-110 ${viewMode === 'all'
+                                ? 'bg-slate-800/80 border-orange-500/30 hover:border-orange-500/50'
                                 : viewMode === 'breez'
                                     ? 'bg-blue-900/40 border-blue-500/30 hover:border-blue-500/50'
                                     : viewMode === 'nwc'
@@ -3185,15 +3227,56 @@ export const Wallet: React.FC = () => {
                                         : 'bg-emerald-900/40 border-emerald-500/30 hover:border-emerald-500/50'
                                 }`}
                         >
-                            <Icons.QrCode size={20} className={
-                                viewMode === 'all'
-                                    ? 'text-orange-400'
-                                    : viewMode === 'breez'
-                                        ? 'text-blue-400'
-                                        : viewMode === 'nwc'
-                                            ? 'text-purple-400'
-                                            : 'text-emerald-400'
-                            } />
+                            <div className="mb-1 rounded-full bg-black/20 p-2">
+                                <Icons.QrCode size={20} className={
+                                    viewMode === 'all'
+                                        ? 'text-orange-400'
+                                        : viewMode === 'breez'
+                                            ? 'text-blue-400'
+                                            : viewMode === 'nwc'
+                                                ? 'text-purple-400'
+                                                : 'text-emerald-400'
+                                } />
+                            </div>
+                            <span className="text-sm font-bold text-white">Scan</span>
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                if (viewMode === 'all') {
+                                    handleAllWalletsReceive();
+                                } else {
+                                    setView(walletMode === 'nwc' ? 'deposit' : 'receive');
+                                }
+                            }}
+                            className={`flex min-h-[4.75rem] flex-col items-center justify-center rounded-xl py-3 transition-all active:scale-95 ${viewMode === 'all'
+                                ? 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 hover:border-orange-500'
+                                : viewMode === 'breez'
+                                    ? 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 hover:border-blue-500'
+                                    : viewMode === 'nwc'
+                                        ? 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 hover:border-purple-500'
+                                        : 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 hover:border-emerald-500'
+                                }`}
+                        >
+                            <div className={`p-2 rounded-full mb-1 ${viewMode === 'all'
+                                ? 'bg-orange-500/20'
+                                : viewMode === 'breez'
+                                    ? 'bg-blue-500/20'
+                                    : viewMode === 'nwc'
+                                        ? 'bg-purple-500/20'
+                                        : 'bg-emerald-500/20'
+                                }`}>
+                                <Icons.Receive size={20} className={
+                                    viewMode === 'all'
+                                        ? 'text-orange-400'
+                                        : viewMode === 'breez'
+                                            ? 'text-blue-400'
+                                            : viewMode === 'nwc'
+                                                ? 'text-purple-400'
+                                                : 'text-emerald-400'
+                                } />
+                            </div>
+                            <span className="text-sm font-bold text-white">Receive</span>
                         </button>
                     </div>
                 </div>
@@ -3269,13 +3352,29 @@ export const Wallet: React.FC = () => {
                                             <p className="text-xs text-slate-500">{new Date(tx.timestamp).toLocaleDateString()}</p>
                                         </div>
                                     </div>
-                                    <span className={`font-mono font-bold ${['deposit', 'payout', 'ace_pot', 'receive'].includes(tx.type) ? 'text-green-400' : 'text-white'}`}>
-                                        {['payment', 'send'].includes(tx.type) ? '-' : '+'}{tx.amountSats}
-                                    </span>
+                                    <div className="text-right space-y-1">
+                                        <span className={`block font-mono font-bold ${['deposit', 'payout', 'ace_pot', 'receive'].includes(tx.type) ? 'text-green-400' : 'text-white'}`}>
+                                            {['payment', 'send'].includes(tx.type) ? '-' : '+'}{tx.amountSats}
+                                        </span>
+                                        {(() => {
+                                            const statusCopy = getTransactionStatusCopy(tx.status);
+                                            return statusCopy ? (
+                                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusCopy.className}`}>
+                                                    {statusCopy.label}
+                                                </span>
+                                            ) : null;
+                                        })()}
+                                    </div>
                                 </div>
                             );
                         })
                 )}
+            </div>
+
+            <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+                <p className="text-xs leading-relaxed text-amber-100/90">
+                    <span className="font-bold text-amber-200">Beta safety note:</span> Wallet features are self-custodial and still in beta. Try small amounts first, save your recovery phrase, and treat failed or pending payments as unresolved until they show complete.
+                </p>
             </div>
             {helpModal && <HelpModal isOpen={helpModal.isOpen} title={helpModal.title} text={helpModal.text} onClose={() => setHelpModal(null)} onAction={(action) => {
                 if (action === 'lightning-explainer') { setHelpModal(null); setReturnToWalletHelp(false); setShowLightningExplainer(true); }

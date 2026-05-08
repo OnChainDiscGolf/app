@@ -263,7 +263,7 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                         </div>
                         <div className="flex-1">
                             <p className="text-white font-medium">Download QR</p>
-                            <p className="text-slate-500 text-xs">Scannable QR code image for easy recovery</p>
+                            <p className="text-slate-500 text-xs">Scannable QR image; store it offline like the phrase itself</p>
                         </div>
                     </button>
 
@@ -277,7 +277,7 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                         </div>
                         <div className="flex-1">
                             <p className="text-white font-medium">Save to Nostr</p>
-                            <p className="text-slate-500 text-xs">Encrypted backup synced to Nostr relays</p>
+                            <p className="text-slate-500 text-xs">Encrypted copy on Nostr relays; your password is required to restore</p>
                         </div>
                     </button>
                 </div>
@@ -317,13 +317,13 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                                         <Icons.CheckMark className="text-green-500" size={32} />
                                     </div>
                                     <p className="text-green-400 font-medium">Backup Complete!</p>
-                                    <p className="text-slate-500 text-sm mt-1">Your encrypted backup is saved</p>
+                                    <p className="text-slate-500 text-sm mt-1">Your encrypted backup is saved. Keep your password and phrase safe.</p>
                                 </div>
                             ) : (
                                 <>
                                     <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-3">
                                         <p className="text-xs text-teal-300">
-                                            <strong>How it works:</strong> Your recovery phrase is encrypted with a password you choose, then stored on Nostr relays. Only you can decrypt it.
+                                            <strong>How it works:</strong> Your recovery phrase is encrypted with a password you choose, then stored on Nostr relays. The app cannot recover it without that password.
                                         </p>
                                     </div>
 
@@ -355,7 +355,7 @@ export const MnemonicBackup: React.FC<MnemonicBackupProps> = ({
                                     )}
 
                                     <p className="text-xs text-slate-500">
-                                        ⚠️ Remember this password! You'll need it to recover your wallet.
+                                        ⚠️ Remember this password! If you lose both this password and your phrase, the app cannot recover your wallet.
                                     </p>
 
                                     <div className="flex space-x-2">

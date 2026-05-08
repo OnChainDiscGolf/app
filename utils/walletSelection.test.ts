@@ -60,7 +60,7 @@ describe('getPreferredSendWallet — explicit user preference', () => {
 });
 
 describe('getPreferredSendWallet — auto-select cascade', () => {
-  it('auto: prefers NWC when configured and funded', () => {
+  it('auto: prefers Breez when Breez and NWC are both configured and funded', () => {
     expect(
       getPreferredSendWallet(
         inputs({
@@ -69,7 +69,7 @@ describe('getPreferredSendWallet — auto-select cascade', () => {
           hasBreezWallet: true,
         }),
       ),
-    ).toBe('nwc');
+    ).toBe('breez');
   });
 
   it('auto: prefers Breez when NWC empty but Breez funded', () => {
@@ -114,6 +114,18 @@ describe('getPreferredSendWallet — auto-select cascade', () => {
         }),
       ),
     ).toBe('breez');
+  });
+
+  it('auto: falls back to NWC when Breez is unavailable and NWC is configured and funded', () => {
+    expect(
+      getPreferredSendWallet(
+        inputs({
+          walletBalances: { breez: 0, nwc: 500, cashu: 100 },
+          nwcString: 'nostr+walletconnect://...',
+          hasBreezWallet: true,
+        }),
+      ),
+    ).toBe('nwc');
   });
 
   it('NWC funded but no NWC string → does not pick NWC', () => {

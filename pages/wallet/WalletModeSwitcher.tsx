@@ -1,240 +1,147 @@
 /**
  * @file WalletModeSwitcher.tsx
  *
- * Animated pill-style wallet type switcher displayed below the balance header.
- *
- * Behavior:
- * - **Collapsed state ("All")** -- shows combined balance across all wallets.
- *   Tapping expands to reveal the three individual wallet mode pills.
- * - **Expanded state** -- shows Breez (Lightning), Cashu (eCash), and NWC pills.
- *   Tapping a pill selects that wallet, scrolling the view and updating the
- *   balance/actions displayed. Selecting the active wallet collapses back to "All".
- * - Smooth expand/collapse CSS transitions with `requestAnimationFrame` timing.
+ * Casual-user wallet selector. Breez is presented as the recommended default,
+ * while Cashu and NWC live under advanced/fallback options.
  */
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Icons } from '../../components/Icons';
+import { getWalletModeUxOptions, type WalletModeId } from './walletModeUx';
+
+const modeColors: Record<WalletModeId | 'all', { active: string; inactive: string; icon: string; border: string }> = {
+    all: {
+        active: 'bg-orange-500/20 border-orange-500/40',
+        inactive: 'bg-black/30 border-white/10 hover:border-orange-500/30',
+        icon: 'text-orange-400',
+        border: 'border-orange-500/40',
+    },
+    breez: {
+        active: 'bg-blue-500/20 border-blue-500/50',
+        inactive: 'bg-blue-500/10 border-blue-500/20 hover:border-blue-500/40',
+        icon: 'text-blue-400',
+        border: 'border-blue-500/50',
+    },
+    cashu: {
+        active: 'bg-emerald-500/20 border-emerald-500/50',
+        inactive: 'bg-emerald-500/10 border-emerald-500/20 hover:border-emerald-500/40',
+        icon: 'text-emerald-400',
+        border: 'border-emerald-500/50',
+    },
+    nwc: {
+        active: 'bg-purple-500/20 border-purple-500/50',
+        inactive: 'bg-purple-500/10 border-purple-500/20 hover:border-purple-500/40',
+        icon: 'text-purple-400',
+        border: 'border-purple-500/50',
+    },
+};
+
+const modeIcons: Record<WalletModeId, React.FC<{ size?: number; className?: string }>> = {
+    breez: Icons.Zap,
+    cashu: Icons.Cashew,
+    nwc: Icons.Link,
+};
 
 /**
- * Collapsible wallet mode switcher with animated expand/collapse transitions.
- * Controls which wallet's balance, send/receive UI, and transaction history are shown.
+ * Wallet selector with a recommended primary path and clear recovery copy for
+ * unconfigured advanced modes.
  */
 export const WalletModeSwitcher: React.FC<{
-    activeMode: 'breez' | 'cashu' | 'nwc';
-    viewMode: 'all' | 'breez' | 'cashu' | 'nwc';
+    activeMode: WalletModeId;
+    viewMode: 'all' | WalletModeId;
     isExpanded: boolean;
-    onModeChange: (mode: 'breez' | 'cashu' | 'nwc') => void;
-    onViewModeChange: (mode: 'all' | 'breez' | 'cashu' | 'nwc') => void;
+    isNwcConnected: boolean;
+    hasBreezWallet: boolean;
+    hasCashuMint: boolean;
     onExpandToggle: () => void;
-    onWalletSelect: (mode: 'breez' | 'cashu' | 'nwc') => void;
-}> = ({ activeMode, viewMode, isExpanded, onModeChange, onViewModeChange, onExpandToggle, onWalletSelect }) => {
-    // Track animation state for smooth open/close
-    const [animationState, setAnimationState] = useState<'collapsed' | 'expanding' | 'expanded' | 'collapsing'>('collapsed');
-    const [shouldRender, setShouldRender] = useState(false);
+    onWalletSelect: (mode: WalletModeId) => void;
+    onConfigureWallet: (mode: WalletModeId) => void;
+}> = ({ activeMode, viewMode, isExpanded, isNwcConnected, hasBreezWallet, hasCashuMint, onExpandToggle, onWalletSelect, onConfigureWallet }) => {
+    const options = getWalletModeUxOptions({ hasBreezWallet, hasCashuMint, isNwcConnected });
 
-    // Handle expand/collapse transitions
-    useEffect(() => {
-        if (isExpanded && animationState === 'collapsed') {
-            setShouldRender(true);
-            // Small delay to ensure DOM is ready before animation starts
-            requestAnimationFrame(() => {
-                setAnimationState('expanding');
-            });
-        } else if (!isExpanded && (animationState === 'expanded' || animationState === 'expanding')) {
-            setAnimationState('collapsing');
-        }
-    }, [isExpanded]);
+    const renderModeButton = (option: typeof options.primary, variant: 'primary' | 'advanced') => {
+        const colors = modeColors[option.id];
+        const IconComponent = modeIcons[option.id];
+        const isActive = viewMode === option.id || (viewMode === 'all' && activeMode === option.id && option.id === 'breez');
+        const shouldConfigure = option.id === 'nwc' && !isNwcConnected;
 
-    // Handle animation end
-    const handleAnimationEnd = () => {
-        if (animationState === 'expanding') {
-            setAnimationState('expanded');
-        } else if (animationState === 'collapsing') {
-            setAnimationState('collapsed');
-            setShouldRender(false);
-        }
+        return (
+            <button
+                key={option.id}
+                type="button"
+                onClick={() => shouldConfigure ? onConfigureWallet(option.id) : onWalletSelect(option.id)}
+                className={`w-full rounded-xl border text-left transition-all active:scale-[0.99] ${isActive ? colors.active : colors.inactive} ${variant === 'primary' ? 'p-4' : 'p-3'}`}
+            >
+                <div className="flex items-start gap-3">
+                    <div className={`shrink-0 rounded-lg bg-black/20 ${variant === 'primary' ? 'p-2.5' : 'p-2'}`}>
+                        <IconComponent size={variant === 'primary' ? 22 : 18} className={colors.icon} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-bold text-white">{option.label}</span>
+                            {option.badge && (
+                                <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-300 border border-blue-500/30">
+                                    {option.badge}
+                                </span>
+                            )}
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-400">{option.description}</p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className={`text-[11px] font-medium ${option.isConfigured ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                {option.status}
+                            </span>
+                            <span className="text-[11px] font-bold text-slate-200 underline decoration-white/20 underline-offset-2">
+                                {option.actionLabel}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        );
     };
-
-    const modes = [
-        { id: 'breez' as const, label: 'Lightning', icon: Icons.Zap, color: 'blue' },
-        { id: 'cashu' as const, label: 'Cashu', icon: Icons.Cashew, color: 'emerald' },
-        { id: 'nwc' as const, label: 'NWC', icon: Icons.Link, color: 'purple' },
-    ];
-
-    const getColorClasses = (color: string) => {
-        const colors: Record<string, { active: string; inactive: string; border: string; text: string }> = {
-            blue: {
-                active: 'bg-blue-500/30',
-                inactive: 'bg-blue-500/10 hover:bg-blue-500/20',
-                border: 'border-blue-500/50',
-                text: 'text-blue-400'
-            },
-            emerald: {
-                active: 'bg-emerald-500/30',
-                inactive: 'bg-emerald-500/10 hover:bg-emerald-500/20',
-                border: 'border-emerald-500/50',
-                text: 'text-emerald-400'
-            },
-            purple: {
-                active: 'bg-purple-500/30',
-                inactive: 'bg-purple-500/10 hover:bg-purple-500/20',
-                border: 'border-purple-500/50',
-                text: 'text-purple-400'
-            },
-            orange: {
-                active: 'bg-orange-500/30',
-                inactive: 'bg-orange-500/10 hover:bg-orange-500/20',
-                border: 'border-orange-500/50',
-                text: 'text-orange-400'
-            }
-        };
-        return colors[color];
-    };
-
-    const isAllActive = viewMode === 'all';
-    const allColors = getColorClasses('orange');
-    const ICON_SIZE = 16; // Consistent icon size across all buttons
-    const isClosing = animationState === 'collapsing';
 
     return (
-        <div className="flex flex-col gap-1.5 bg-black/30 rounded-xl p-1.5 border border-white/10 backdrop-blur-sm">
-            {/* Bitcoin "All" button - always visible, consistent height */}
+        <div className="w-full max-w-full rounded-2xl bg-black/30 p-2 border border-white/10 backdrop-blur-sm">
             <button
+                type="button"
                 onClick={onExpandToggle}
-                className={`
-                    relative flex items-center justify-center rounded-lg transition-all duration-300 ease-out
-                    px-2.5 py-1.5 min-h-[36px]
-                    ${isAllActive && !isExpanded
-                        ? `${allColors.active} ${allColors.border} border`
-                        : `${allColors.inactive} border border-transparent`
-                    }
-                `}
+                className={`w-full rounded-xl border p-3 text-left transition-all active:scale-[0.99] ${viewMode === 'all' && !isExpanded ? modeColors.all.active : modeColors.all.inactive}`}
+                aria-expanded={isExpanded}
             >
-                <Icons.Bitcoin
-                    size={24}
-                    className={`${allColors.text} transition-all duration-300`}
-                />
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <Icons.Bitcoin size={24} className={modeColors.all.icon} />
+                        <div className="min-w-0">
+                            <p className="text-sm font-bold text-white">Wallet overview</p>
+                            <p className="text-xs leading-snug text-slate-400">Breez recommended · score without payments anytime</p>
+                        </div>
+                    </div>
+                    <Icons.Next
+                        size={16}
+                        className={`shrink-0 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                    />
+                </div>
             </button>
 
-            {/* Individual wallet buttons - shown when expanded or animating */}
-            {shouldRender && (
-                <div
-                    className="flex items-center justify-center origin-center overflow-hidden"
-                    style={{
-                        animation: isClosing
-                            ? 'wallet-collapse 350ms ease-in forwards'
-                            : 'wallet-expand 300ms ease-out forwards',
-                        // Fixed width: big enough to fit 3 icons + 1 label ("Lightning" is longest)
-                        width: '175px',
-                        minWidth: '175px',
-                        maxWidth: '175px'
-                    }}
-                    onAnimationEnd={handleAnimationEnd}
-                >
-                    {modes.map((mode, index) => {
-                        const isActive = viewMode === mode.id;
-                        const colors = getColorClasses(mode.color);
-                        const IconComponent = mode.icon;
-                        // Reverse the index for closing animation
-                        const animationDelay = isClosing
-                            ? (modes.length - 1 - index) * 50
-                            : index * 50;
+            {isExpanded && (
+                <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-1">
+                    {renderModeButton(options.primary, 'primary')}
 
-                        // When no wallet is selected (viewMode === 'all'), all buttons share space equally
-                        // When a wallet IS selected, selected one expands for label, others stay compact
-                        const hasSelection = viewMode !== 'all';
+                    <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-3">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Advanced / fallback</p>
+                            <span className="text-[10px] text-slate-500">optional</span>
+                        </div>
+                        <div className="space-y-2">
+                            {options.advanced.map(option => renderModeButton(option, 'advanced'))}
+                        </div>
+                    </div>
 
-                        return (
-                            <button
-                                key={mode.id}
-                                onClick={() => onWalletSelect(mode.id)}
-                                className={`
-                                    relative flex items-center justify-center rounded-lg transition-colors duration-200
-                                    min-h-[36px] py-1.5 px-2
-                                    ${isActive
-                                        ? `${colors.active} ${colors.border} border`
-                                        : `${colors.inactive} border border-transparent`
-                                    }
-                                `}
-                                style={{
-                                    // No selection: all equal. Has selection: active expands, others compact
-                                    flex: hasSelection ? (isActive ? '1 1 auto' : '0 0 auto') : '1 1 0',
-                                    // Use 'both' fill mode so items stay visible during delay before disappear animation starts
-                                    animation: isClosing
-                                        ? `wallet-item-disappear 200ms ease-in ${animationDelay}ms both`
-                                        : `wallet-item-appear 300ms ease-out ${animationDelay}ms forwards`,
-                                    opacity: 0,
-                                    transform: 'scale(0.8) translateY(-8px)'
-                                }}
-                            >
-                                <IconComponent
-                                    size={ICON_SIZE}
-                                    className={`${colors.text} flex-shrink-0 ${isActive ? 'mr-1' : ''}`}
-                                />
-                                {/* Only show label when this wallet is selected */}
-                                {isActive && (
-                                    <span
-                                        className={`
-                                            text-xs font-bold uppercase tracking-wide whitespace-nowrap
-                                            ${colors.text}
-                                        `}
-                                    >
-                                        {mode.label}
-                                    </span>
-                                )}
-                            </button>
-                        );
-                    })}
+                    <div className="rounded-xl border border-orange-500/20 bg-orange-500/10 p-3">
+                        <p className="text-xs leading-relaxed text-orange-200">{options.scorekeepingOnly}</p>
+                    </div>
                 </div>
             )}
-
-            {/* CSS Keyframes for smooth animations */}
-            <style>{`
-                @keyframes wallet-expand {
-                    0% {
-                        opacity: 0;
-                        transform: scaleX(0.5) scaleY(0.8);
-                    }
-                    100% {
-                        opacity: 1;
-                        transform: scaleX(1) scaleY(1);
-                    }
-                }
-                @keyframes wallet-collapse {
-                    0% {
-                        opacity: 1;
-                        transform: scaleX(1) scaleY(1);
-                    }
-                    70% {
-                        opacity: 0.8;
-                        transform: scaleX(0.9) scaleY(0.95);
-                    }
-                    100% {
-                        opacity: 0;
-                        transform: scaleX(0.5) scaleY(0.8);
-                    }
-                }
-                @keyframes wallet-item-appear {
-                    0% {
-                        opacity: 0;
-                        transform: scale(0.8) translateY(-8px);
-                    }
-                    100% {
-                        opacity: 1;
-                        transform: scale(1) translateY(0);
-                    }
-                }
-                @keyframes wallet-item-disappear {
-                    0% {
-                        opacity: 1;
-                        transform: scale(1) translateY(0);
-                    }
-                    100% {
-                        opacity: 0;
-                        transform: scale(0.85) translateY(-6px);
-                    }
-                }
-            `}</style>
         </div>
     );
 };

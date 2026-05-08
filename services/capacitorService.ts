@@ -106,14 +106,14 @@ export const setupDeepLinkHandler = (
 
   // Handle deep links when app is already running
   const urlOpenListener = App.addListener('appUrlOpen', (event: URLOpenListenerEvent) => {
-    console.log('📱 Deep link received:', event.url);
+    console.log('📱 Deep link received');
     routeUrl(event.url);
   });
 
   // Check for deep link on cold start
   App.getLaunchUrl().then((result) => {
     if (result?.url) {
-      console.log('📱 App launched with URL:', result.url);
+      console.log('📱 App launched from deep link');
       routeUrl(result.url);
     }
   });

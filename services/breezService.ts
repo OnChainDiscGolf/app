@@ -236,7 +236,29 @@ export interface BreezConfig {
 
 let sdkInstance: any = null;
 let isInitialized = false;
+let initializationPromise: Promise<boolean> | null = null;
 let staticLightningAddress: string | null = null;
+
+const redactForBreezLogs = (value: unknown, secrets: Array<string | null | undefined> = []): string => {
+    const activeSecrets = secrets.filter((secret): secret is string => Boolean(secret));
+    let message: string;
+
+    if (value instanceof Error) {
+        message = value.stack || value.message || value.name;
+    } else if (typeof value === 'string') {
+        message = value;
+    } else {
+        try {
+            message = JSON.stringify(value);
+        } catch {
+            message = String(value);
+        }
+    }
+
+    return activeSecrets.reduce((redacted, secret) => {
+        return redacted.split(secret).join('[REDACTED]');
+    }, message);
+};
 
 // ============================================================================
 // INITIALIZATION
@@ -292,110 +314,137 @@ export const initializeBreez = async (
     mnemonic: string,
     config: BreezConfig
 ): Promise<boolean> => {
-    console.log('🔌 Initializing Breez SDK...');
-    console.log('📋 Config environment:', config.environment);
-    console.log('🔑 API Key present:', !!config.apiKey);
+    // Already initialized — nothing to do
+    if (isInitialized) return true;
 
-    // Store mnemonic for lightning address generation
-    storedMnemonic = mnemonic;
+    if (!mnemonic.trim()) {
+        console.warn('Breez initialization skipped: wallet seed is missing. Restore or create a wallet seed, then retry.');
+        return false;
+    }
+
+    if (!config.apiKey.trim()) {
+        console.warn('Breez initialization skipped: API key is missing. Configure the Breez API key, then retry.');
+        return false;
+    }
+
+    // Initialization already in flight — return the existing promise (dedup)
+    if (initializationPromise) return initializationPromise;
+
+    initializationPromise = (async () => {
+        console.log('🔌 Initializing Breez SDK...');
+        console.log('📋 Config environment:', config.environment);
+        console.log('🔑 API Key present:', !!config.apiKey);
+
+        // Store mnemonic for lightning address generation
+        storedMnemonic = mnemonic;
+
+        try {
+            // Import Breez SDK WASM module
+            // The SDK uses WebAssembly for cryptographic operations
+            console.log('📦 Loading Breez SDK WASM module...');
+            const breezModule = await import('@breeztech/breez-sdk-spark/web');
+            const { default: init, connect, defaultConfig } = breezModule;
+
+            // Initialize WebAssembly runtime
+            // This must complete before any SDK operations
+            console.log('⚙️ Initializing WebAssembly...');
+            await init();
+
+            // Get default config and customize it with API key
+            // Network must be 'mainnet' or 'testnet' (lowercase)
+            console.log('⚡ Building SDK configuration...');
+            const network = config.environment === 'production' ? 'mainnet' : 'regtest';
+            const sdkConfig = defaultConfig(network);
+
+            // Add API key to config - this authenticates with Breez services
+            sdkConfig.apiKey = config.apiKey;
+
+            // Create seed from mnemonic
+            // ⚠️ IMPORTANT: Seed format must be { type: 'mnemonic', mnemonic: string }
+            // Do NOT try to convert to bytes or use other formats
+            console.log('🌱 Creating seed from mnemonic...');
+            const seed = {
+                type: 'mnemonic' as const,
+                mnemonic: mnemonic
+            };
+
+            // Connect to Breez services
+            // This establishes the Lightning wallet connection
+            console.log('🔗 Connecting to Breez services...');
+            const connectRequest = {
+                config: sdkConfig,
+                seed: seed,
+                storageDir: config.workingDir || './breez_data'
+            };
+
+            sdkInstance = await connect(connectRequest);
+
+            isInitialized = true;
+            console.log('✅ Breez SDK initialized successfully');
+
+            // Generate preferred address from mnemonic (deterministic)
+            const preferredAddress = generateCustomLightningAddress(mnemonic);
+            console.log('⚡ Preferred Lightning address:', preferredAddress);
+
+            // Register Lightning Address with Breez backend (non-blocking)
+            // This runs in background so SDK initialization returns quickly
+            registerLightningAddressWithBreez(preferredAddress)
+                .then(result => {
+                    if (result) {
+                        console.log('✅ Lightning Address registered with Breez:', result.lightningAddress);
+                    } else {
+                        // Registration failed - use local address as fallback (won't receive payments)
+                        staticLightningAddress = preferredAddress;
+                        console.warn('⚠️ Lightning Address registration failed, using local address (non-functional for receiving)');
+                    }
+                })
+                .catch(e => {
+                    console.warn('⚠️ Lightning Address registration error:', e);
+                    staticLightningAddress = preferredAddress;
+                });
+
+            // Set temporary address while registration is in progress
+            staticLightningAddress = preferredAddress;
+
+            return true;
+        } catch (error) {
+            const safeErrorDetails = redactForBreezLogs(error, [mnemonic, config.apiKey]);
+            console.error('❌ Breez SDK initialization failed:', safeErrorDetails);
+
+            // Log more details for debugging without exposing wallet secrets.
+            if (error instanceof Error) {
+                const safeMessage = redactForBreezLogs(error.message, [mnemonic, config.apiKey]);
+                const safeStack = redactForBreezLogs(error.stack || '', [mnemonic, config.apiKey]);
+                console.error('Error name:', error.name);
+                console.error('Error message:', safeMessage);
+                console.error('Error stack:', safeStack);
+
+                // Check for common issues
+                if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('DNS')) {
+                    console.error('🌐 Network/DNS issue detected. Check internet connection and DNS settings.');
+                }
+                if (error.message.includes('WASM') || error.message.includes('WebAssembly')) {
+                    console.error('📦 WebAssembly loading issue. Browser may not support WASM.');
+                }
+            }
+
+            isInitialized = false;
+
+            // Even if SDK fails, we can still generate a custom address for display
+            // (won't be functional for receiving until SDK initializes)
+            if (mnemonic) {
+                staticLightningAddress = generateCustomLightningAddress(mnemonic);
+                console.log('📧 Generated placeholder Lightning address:', staticLightningAddress);
+            }
+
+            return false;
+        }
+    })();
 
     try {
-        // Import Breez SDK WASM module
-        // The SDK uses WebAssembly for cryptographic operations
-        console.log('📦 Loading Breez SDK WASM module...');
-        const breezModule = await import('@breeztech/breez-sdk-spark/web');
-        const { default: init, connect, defaultConfig } = breezModule;
-        
-        // Initialize WebAssembly runtime
-        // This must complete before any SDK operations
-        console.log('⚙️ Initializing WebAssembly...');
-        await init();
-        
-        // Get default config and customize it with API key
-        // Network must be 'mainnet' or 'testnet' (lowercase)
-        console.log('⚡ Building SDK configuration...');
-        const network = config.environment === 'production' ? 'mainnet' : 'regtest';
-        const sdkConfig = defaultConfig(network);
-        
-        // Add API key to config - this authenticates with Breez services
-        sdkConfig.apiKey = config.apiKey;
-        
-        // Create seed from mnemonic
-        // ⚠️ IMPORTANT: Seed format must be { type: 'mnemonic', mnemonic: string }
-        // Do NOT try to convert to bytes or use other formats
-        console.log('🌱 Creating seed from mnemonic...');
-        const seed = {
-            type: 'mnemonic' as const,
-            mnemonic: mnemonic
-        };
-        
-        // Connect to Breez services
-        // This establishes the Lightning wallet connection
-        console.log('🔗 Connecting to Breez services...');
-        const connectRequest = {
-            config: sdkConfig,
-            seed: seed,
-            storageDir: config.workingDir || './breez_data'
-        };
-        
-        sdkInstance = await connect(connectRequest);
-        
-        isInitialized = true;
-        console.log('✅ Breez SDK initialized successfully');
-        
-        // Generate preferred address from mnemonic (deterministic)
-        const preferredAddress = generateCustomLightningAddress(mnemonic);
-        console.log('⚡ Preferred Lightning address:', preferredAddress);
-        
-        // Register Lightning Address with Breez backend (non-blocking)
-        // This runs in background so SDK initialization returns quickly
-        registerLightningAddressWithBreez(preferredAddress)
-            .then(result => {
-                if (result) {
-                    console.log('✅ Lightning Address registered with Breez:', result.lightningAddress);
-                } else {
-                    // Registration failed - use local address as fallback (won't receive payments)
-                    staticLightningAddress = preferredAddress;
-                    console.warn('⚠️ Lightning Address registration failed, using local address (non-functional for receiving)');
-                }
-            })
-            .catch(e => {
-                console.warn('⚠️ Lightning Address registration error:', e);
-                staticLightningAddress = preferredAddress;
-            });
-        
-        // Set temporary address while registration is in progress
-        staticLightningAddress = preferredAddress;
-        
-        return true;
-    } catch (error) {
-        console.error('❌ Breez SDK initialization failed:', error);
-        
-        // Log more details for debugging
-        if (error instanceof Error) {
-            console.error('Error name:', error.name);
-            console.error('Error message:', error.message);
-            console.error('Error stack:', error.stack);
-            
-            // Check for common issues
-            if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('DNS')) {
-                console.error('🌐 Network/DNS issue detected. Check internet connection and DNS settings.');
-            }
-            if (error.message.includes('WASM') || error.message.includes('WebAssembly')) {
-                console.error('📦 WebAssembly loading issue. Browser may not support WASM.');
-            }
-        }
-        
-        isInitialized = false;
-        
-        // Even if SDK fails, we can still generate a custom address for display
-        // (won't be functional for receiving until SDK initializes)
-        if (mnemonic) {
-            staticLightningAddress = generateCustomLightningAddress(mnemonic);
-            console.log('📧 Generated placeholder Lightning address:', staticLightningAddress);
-        }
-        
-        return false;
+        return await initializationPromise;
+    } finally {
+        initializationPromise = null;
     }
 };
 
@@ -450,6 +499,7 @@ export const disconnectBreez = async (): Promise<void> => {
         sdkInstance = null;
     }
     isInitialized = false;
+    initializationPromise = null;
     staticLightningAddress = null;
     storedMnemonic = null;
     console.log('🔌 Breez SDK disconnected');
@@ -761,7 +811,7 @@ export const payInvoice = async (bolt11: string): Promise<BreezPaymentResult> =>
     }
 
     try {
-        console.log(`⚡ Paying invoice: ${bolt11.substring(0, 30)}...`);
+        console.log('⚡ Paying Breez invoice');
         
         // Step 1: Prepare the payment (required by Breez SDK Spark)
         // This validates the invoice and calculates fees

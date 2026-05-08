@@ -55,6 +55,66 @@ const MAX_ERROR_BUFFER = 50;
 const warningBuffer: { timestamp: number; message: string }[] = [];
 const MAX_WARNING_BUFFER = 30;
 
+type DiagnosticConsoleMethod = 'log' | 'info' | 'debug' | 'warn' | 'error';
+const originalConsoleMethods: Partial<Record<DiagnosticConsoleMethod, (...args: unknown[]) => void>> = {};
+let errorCaptureInitialized = false;
+
+export const isDebugLoggingEnabled = (isDev: boolean = import.meta.env.DEV): boolean => {
+    try {
+        return isDev || localStorage.getItem('cdg_debug_logs') === 'true';
+    } catch {
+        return isDev;
+    }
+};
+
+const SENSITIVE_KEY_PATTERN = /(mnemonic|seed|private|secret|token|proof|preimage|invoice|bolt11|paymenthash|nwc|authorization|apikey|api_key|password)/i;
+const SENSITIVE_STRING_PATTERNS: { pattern: RegExp; replacement: string | ((match: string) => string) }[] = [
+    { pattern: /nostr\+walletconnect:\/\/[^\s"']+/gi, replacement: '[REDACTED:nwc]' },
+    { pattern: /\b(?:nsec|lnbc|lntb|lnurl|cashu)[a-z0-9]+\b/gi, replacement: (match: string) => `[REDACTED:${match.slice(0, 4).toLowerCase()}]` },
+    { pattern: /\b[A-Fa-f0-9]{64}\b/g, replacement: '[REDACTED:hex]' },
+];
+
+const redactSensitiveString = (value: string): string => {
+    return SENSITIVE_STRING_PATTERNS.reduce((redacted, { pattern, replacement }) => {
+        if (typeof replacement === 'function') {
+            return redacted.replace(pattern, replacement);
+        }
+        return redacted.replace(pattern, replacement);
+    }, value);
+};
+
+const stringifyDiagnosticArg = (arg: unknown): string => {
+    if (typeof arg === 'string') return redactSensitiveString(arg);
+    if (typeof arg === 'bigint') return arg.toString();
+    if (arg instanceof Error) {
+        return redactSensitiveString(`${arg.name}: ${arg.message}`);
+    }
+    if (arg && typeof arg === 'object') {
+        const seen = new WeakSet<object>();
+        try {
+            return redactSensitiveString(JSON.stringify(arg, (key, value) => {
+                if (SENSITIVE_KEY_PATTERN.test(key)) {
+                    return `[REDACTED:${key}]`;
+                }
+                if (typeof value === 'bigint') return value.toString();
+                if (typeof value === 'string') return redactSensitiveString(value);
+                if (value && typeof value === 'object') {
+                    if (seen.has(value)) return '[Circular]';
+                    seen.add(value);
+                }
+                return value;
+            }, 2));
+        } catch {
+            return '[Unserializable object]';
+        }
+    }
+    return redactSensitiveString(String(arg));
+};
+
+export const sanitizeDiagnosticMessage = (args: unknown[]): string => (
+    args.map(stringifyDiagnosticArg).join(' ')
+);
+
 // Navigation history buffer
 const navigationHistory: { timestamp: number; path: string }[] = [];
 const MAX_NAV_HISTORY = 20;
@@ -69,12 +129,16 @@ const MAX_NAV_HISTORY = 20;
  * buffer memory bounded. Stack traces are limited to 4 frames.
  */
 export const initErrorCapture = () => {
-    // Capture console.error
-    const originalError = console.error;
+    if (errorCaptureInitialized) return;
+    errorCaptureInitialized = true;
+
+    const methods: DiagnosticConsoleMethod[] = ['log', 'info', 'debug', 'warn', 'error'];
+    methods.forEach((method) => {
+        originalConsoleMethods[method] = console[method].bind(console) as (...args: unknown[]) => void;
+    });
+
     console.error = (...args) => {
-        const message = args.map(arg =>
-            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-        ).join(' ');
+        const message = sanitizeDiagnosticMessage(args);
 
         errorBuffer.push({
             timestamp: Date.now(),
@@ -82,33 +146,34 @@ export const initErrorCapture = () => {
             stack: new Error().stack?.split('\n').slice(2, 6).join('\n')
         });
 
-        // Keep buffer size limited
         while (errorBuffer.length > MAX_ERROR_BUFFER) {
             errorBuffer.shift();
         }
 
-        originalError.apply(console, args);
+        originalConsoleMethods.error?.(message);
     };
 
-    // Capture console.warn
-    const originalWarn = console.warn;
     console.warn = (...args) => {
-        const message = args.map(arg =>
-            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-        ).join(' ');
+        const message = sanitizeDiagnosticMessage(args);
 
         warningBuffer.push({
             timestamp: Date.now(),
             message: message.slice(0, 300) // Limit message size
         });
 
-        // Keep buffer size limited
         while (warningBuffer.length > MAX_WARNING_BUFFER) {
             warningBuffer.shift();
         }
 
-        originalWarn.apply(console, args);
+        originalConsoleMethods.warn?.(message);
     };
+
+    (['log', 'info', 'debug'] as DiagnosticConsoleMethod[]).forEach((method) => {
+        console[method] = (...args: unknown[]) => {
+            if (!isDebugLoggingEnabled()) return;
+            originalConsoleMethods[method]?.(sanitizeDiagnosticMessage(args));
+        };
+    });
 };
 
 /**
@@ -122,7 +187,7 @@ export const initErrorCapture = () => {
 export const trackNavigation = (path: string) => {
     navigationHistory.push({
         timestamp: Date.now(),
-        path
+        path: redactSensitiveString(path)
     });
 
     while (navigationHistory.length > MAX_NAV_HISTORY) {
@@ -349,11 +414,13 @@ export const sendFeedback = async (payload: FeedbackPayload): Promise<{ success:
         console.log('✓ Target pubkey:', feedbackPubkey.slice(0, 8) + '...');
         console.log('✓ Relays:', relays.slice(0, 3).join(', '), `... (${relays.length} total)`);
 
+        const sanitizedFeedbackMessage = redactSensitiveString(payload.message);
+
         // Build the feedback content
         const feedbackContent: any = {
             type: payload.type,
-            message: payload.message,
-            currentPath: payload.currentPath || window.location.pathname,
+            message: sanitizedFeedbackMessage,
+            currentPath: redactSensitiveString(payload.currentPath || window.location.pathname),
             sentAt: new Date().toISOString()
         };
 
@@ -367,7 +434,7 @@ export const sendFeedback = async (payload: FeedbackPayload): Promise<{ success:
         console.log('✓ Feedback content prepared, type:', payload.type);
 
         // Format as readable message with JSON payload
-        const messageText = `📬 FEEDBACK (${payload.type.toUpperCase()})\n\n${payload.message}\n\n---\n${JSON.stringify(feedbackContent, null, 2)}`;
+        const messageText = `📬 FEEDBACK (${payload.type.toUpperCase()})\n\n${sanitizedFeedbackMessage}\n\n---\n${JSON.stringify(feedbackContent, null, 2)}`;
 
         // Send as encrypted DM (kind 4) - universally supported
         console.log('📧 Sending via encrypted DM (kind 4)...');
